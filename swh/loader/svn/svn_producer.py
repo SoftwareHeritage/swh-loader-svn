@@ -115,28 +115,6 @@ def main(svn_url, destination_path):
 
     for data in git_history(repo, latest_revision):
         print('data: %s' % data)
-    # 3. go to first svn revision for trunk since last time (the first
-    # time, it's the revision 1)
-
-    # 5. compute filesystem tree representation for trunk
-
-    # 6. compute a commit (swh revision) `a la git`
-    # (cf. swh-loader-dir/swh-model) pointing on that tree
-
-    # 7. reference the original revision in the swh revision metadata
-
-    # 8. go to next svn revision (don't forget to update revision history)
-    # (revision 1 has no parents, revision 2 has parents revision 1,
-    # etc...)
-
-    # 9. when arrived at original svn revision (step 2)
-
-    # 10. list branches/tags
-
-    # 11. create occurrences using mapping svn revision <-> swh revision
-
-    # a good way to ascertain everything is ok could be to use git-svn to
-    # check the sha1 are ok
 
 
 if __name__ == '__main__':

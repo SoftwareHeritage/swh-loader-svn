@@ -12,7 +12,6 @@ import uuid
 
 from contextlib import contextmanager
 
-from swh.core import hashutil
 from swh.loader.svn import libloader
 from swh.loader.dir import converters, git
 from swh.loader.dir.git import GitType
@@ -64,7 +63,28 @@ def retrieve_last_known_revision(remote_url_repo):
     return 1
 
 
-def svn_tree_at(repo, latest_revision):
+def read_log_entries(repo):
+    """Read the logs entries from the repository.
+
+    """
+    logs = {}
+    for log in repo['local'].log_default():
+        logs[log.revision] = log
+
+    return logs
+
+
+def read_commit(repo, rev):
+    log_entry = repo['logs'][rev]
+
+    return {
+        'message': log_entry.msg,
+        'author_date': log_entry.date,
+        'author_name': log_entry.author,
+    }
+
+
+def read_svn_revisions(repo, latest_revision):
     """Compute tree for each revision from last known revision to
     latest_revision.
 
@@ -81,12 +101,60 @@ def svn_tree_at(repo, latest_revision):
             # compute git commit
             parsed_objects = git.walk_and_compute_sha1_from_directory(
                 repo['local_url'].encode('utf-8'))
-            # print(parsed_objects)
 
-            yield rev, parsed_objects
+            commit = read_commit(repo, rev)
+
+            yield rev, commit, parsed_objects
 
             rev += 1
 
+
+def build_swh_revision(repo_uuid, commit, rev, parsed_objects):
+    """Given a svn revision, build a swh revision.
+
+    """
+    root_tree = parsed_objects[git.ROOT_TREE_KEY][0]
+
+    author = commit['author_name']
+    if author:
+        author_committer = {
+            'name': author.encode('utf-8'),
+            'email': '',
+        }
+    else:
+        author_committer = {
+            'name': b'noone',  # HACK
+            'email': '',
+        }
+
+    msg = commit['message']
+    if msg:
+        msg = msg.encode('utf-8')
+    else:
+        msg = b''
+
+    date = {
+        'timestamp': commit['author_date'],
+        # 'offset': converters.format_to_minutes(commit['author_offset']),
+    }
+
+    return {
+        'date': date,
+        'committer_date': date,
+        'type': 'svn',
+        'directory': root_tree['sha1_git'],
+        'message': msg,
+        'author': author_committer,
+        'committer': author_committer,
+        'synthetic': True,
+        'metadata': {
+            'extra-headers': {
+                'svn-repo-uuid': repo_uuid,
+                'svn-revision': rev,
+            }
+        },
+        'parents': [],
+    }
 
 @contextmanager
 def cwd(path):
@@ -112,118 +180,6 @@ class SvnLoader(libloader.SvnLoader):
         super().__init__(config)
         self.log = logging.getLogger('swh.loader.svn.SvnLoader')
 
-    def list_repo_objs(self, dir_path, revision, release):
-        """List all objects from dir_path.
-
-        Args:
-            - dir_path (path): the directory to list
-            - revision: revision dictionary representation
-            - release: release dictionary representation
-
-        Returns:
-            a dict containing lists of `Oid`s with keys for each object type:
-            - CONTENT
-            - DIRECTORY
-        """
-        def get_objects_per_object_type(objects_per_path):
-            m = {
-                GitType.BLOB: [],
-                GitType.TREE: [],
-                GitType.COMM: [],
-                GitType.RELE: []
-            }
-            for tree_path in objects_per_path:
-                objs = objects_per_path[tree_path]
-                for obj in objs:
-                    m[obj['type']].append(obj)
-
-            return m
-
-        def _revision_from(tree_hash, revision, objects):
-            full_rev = dict(revision)
-            full_rev['directory'] = tree_hash
-            full_rev = converters.commit_to_revision(full_rev, objects)
-            full_rev['id'] = git.compute_revision_sha1_git(full_rev)
-            return full_rev
-
-        def _release_from(revision_hash, release):
-            full_rel = dict(release)
-            full_rel['target'] = revision_hash
-            full_rel['target_type'] = 'revision'
-            full_rel = converters.annotated_tag_to_release(full_rel)
-            full_rel['id'] = git.compute_release_sha1_git(full_rel)
-            return full_rel
-
-        log_id = str(uuid.uuid4())
-        sdir_path = dir_path.decode('utf-8')
-
-        self.log.info("Started listing %s" % dir_path, extra={
-            'swh_type': 'dir_list_objs_start',
-            'swh_repo': sdir_path,
-            'swh_id': log_id,
-        })
-
-        objects_per_path = git.walk_and_compute_sha1_from_directory(dir_path)
-
-        objects = get_objects_per_object_type(objects_per_path)
-
-        tree_hash = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
-
-        full_rev = _revision_from(tree_hash, revision, objects_per_path)
-
-        objects[GitType.COMM] = [full_rev]
-
-        if release and 'name' in release:
-            full_rel = _release_from(full_rev['id'], release)
-            objects[GitType.RELE] = [full_rel]
-
-        self.log.info("Done listing the objects in %s: %d contents, "
-                      "%d directories, %d revisions, %d releases" % (
-                          sdir_path,
-                          len(objects[GitType.BLOB]),
-                          len(objects[GitType.TREE]),
-                          len(objects[GitType.COMM]),
-                          len(objects[GitType.RELE])
-                      ), extra={
-                          'swh_type': 'dir_list_objs_end',
-                          'swh_repo': sdir_path,
-                          'swh_num_blobs': len(objects[GitType.BLOB]),
-                          'swh_num_trees': len(objects[GitType.TREE]),
-                          'swh_num_commits': len(objects[GitType.COMM]),
-                          'swh_num_releases': len(objects[GitType.RELE]),
-                          'swh_id': log_id,
-                      })
-
-        return objects, objects_per_path
-
-    def load_dir(self, dir_path, objects, objects_per_path, refs, origin_id):
-        if self.config['send_contents']:
-            self.bulk_send_blobs(objects_per_path, objects[GitType.BLOB],
-                                 origin_id)
-        else:
-            self.log.info('Not sending contents')
-
-        if self.config['send_directories']:
-            self.bulk_send_trees(objects_per_path, objects[GitType.TREE])
-        else:
-            self.log.info('Not sending directories')
-
-        if self.config['send_revisions']:
-            self.bulk_send_commits(objects_per_path, objects[GitType.COMM])
-        else:
-            self.log.info('Not sending revisions')
-
-        if self.config['send_releases']:
-            self.bulk_send_annotated_tags(objects_per_path,
-                                          objects[GitType.RELE])
-        else:
-            self.log.info('Not sending releases')
-
-        if self.config['send_occurrences']:
-            self.bulk_send_refs(objects_per_path, refs)
-        else:
-            self.log.info('Not sending occurrences')
-
     def process(self, svn_url, origin, destination_path):
         """Load a svn repository.
 
@@ -248,48 +204,16 @@ class SvnLoader(libloader.SvnLoader):
         # 2. retrieve current svn revision
 
         repo_metadata = repo['local'].info()
+        repo['logs'] = read_log_entries(repo)
 
         latest_revision = repo_metadata['entry_revision']
-        print(latest_revision)
+        repo_uuid = repo_metadata['repository_uuid']
 
-        for rev, parsed_objects in svn_tree_at(repo, latest_revision):
-            print('rev: %s, ...' % rev)
+        for rev, commit, parsed_objects in read_svn_revisions(repo, latest_revision):
+            swh_revision = build_swh_revision(repo_uuid, commit, rev, parsed_objects)
+            self.log.debug('rev: %s, commit: %s, swhrev: %s' % (rev, commit, swh_revision))
 
-        # def _occurrence_from(origin_id, revision_hash, occurrence):
-        #     occ = dict(occurrence)
-        #     occ.update({
-        #         'target': revision_hash,
-        #         'target_type': 'revision',
-        #         'origin': origin_id,
-        #     })
-        #     return occ
-
-        # def _occurrences_from(origin_id, revision_hash, occurrences):
-        #     full_occs = []
-        #     for occurrence in occurrences:
-        #         full_occ = _occurrence_from(origin_id,
-        #                                     revision_hash,
-        #                                     occurrence)
-        #         full_occs.append(full_occ)
-        #     return full_occs
-
-
-        # # to load the repository, walk all objects, compute their hash
-        # objects, objects_per_path = self.list_repo_objs(dir_path, revision,
-        #                                                 release)
-
-        # full_rev = objects[GitType.COMM][0]  # only 1 revision
-
-        # full_occs = _occurrences_from(origin['id'],
-        #                               full_rev['id'],
-        #                               occurrences)
-
-        # self.load_dir(dir_path, objects, objects_per_path, full_occs,
-        #               origin['id'])
-
-        # objects[GitType.REFS] = full_occs
-
-        # return {'status': True, 'objects': objects}
+        return {'status': True}
 
 
 class SvnLoaderWithHistory(SvnLoader):

@@ -14,6 +14,7 @@ from contextlib import contextmanager
 
 from swh.loader.svn import libloader
 from swh.loader.dir import git
+from swh.loader.dir.git import GitType
 
 
 def checkout_repo(remote_repo_url, destination_path=None):
@@ -98,12 +99,12 @@ def read_svn_revisions(repo, latest_revision):
             repo['remote'].checkout(revision=rev, path='.')
 
             # compute git commit
-            objects = git.walk_and_compute_sha1_from_directory(
+            objects_per_path = git.walk_and_compute_sha1_from_directory(
                 repo['local_url'].encode('utf-8'))
 
             commit = read_commit(repo, rev)
 
-            yield rev, commit, objects
+            yield rev, commit, objects_per_path
 
             rev += 1
 
@@ -189,8 +190,33 @@ class SvnLoader(libloader.SvnLoader):
         super().__init__(config)
         self.log = logging.getLogger('swh.loader.svn.SvnLoader')
 
+    def load(self, objects_per_type, objects_per_path, occurrences, origin_id):
+        if self.config['send_contents']:
+            self.bulk_send_blobs(objects_per_path,
+                                 objects_per_type[GitType.BLOB],
+                                 origin_id)
+        else:
+            self.log.info('Not sending contents')
+
+        if self.config['send_directories']:
+            self.bulk_send_trees(objects_per_path,
+                                 objects_per_type[GitType.TREE])
+        else:
+            self.log.info('Not sending directories')
+
+        if self.config['send_revisions']:
+            self.bulk_send_commits(objects_per_path,
+                                   objects_per_type[GitType.COMM])
+        else:
+            self.log.info('Not sending revisions')
+
+        if self.config['send_occurrences']:
+            self.bulk_send_refs(objects_per_type, occurrences)
+        else:
+            self.log.info('Not sending occurrences')
+
     def process(self, svn_url, origin, destination_path):
-        """Load a svn repository.
+        """Load a svn repository in swh.
 
         Checkout the svn repository locally in destination_path.
 
@@ -205,7 +231,6 @@ class SvnLoader(libloader.SvnLoader):
             Dictionary with the following keys:
             - status: mandatory, the status result as a boolean
             - stderr: optional when status is True, mandatory otherwise
-            - objects: the actual objects sent to swh storage
 
         """
         repo = checkout_repo(svn_url, destination_path)
@@ -223,9 +248,9 @@ class SvnLoader(libloader.SvnLoader):
         # create revision history
 
         swh_revisions = []
-        for rev, commit, objects in read_svn_revisions(
+        for rev, commit, objects_per_path in read_svn_revisions(
                 repo, latest_revision):
-            dir_id = objects[git.ROOT_TREE_KEY][0]['sha1_git']
+            dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
             swh_revision = build_swh_revision(repo_uuid, commit, rev,
                                               dir_id, parents[rev])
             swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
@@ -235,8 +260,22 @@ class SvnLoader(libloader.SvnLoader):
             self.log.debug('rev: %s, swhrev: %s' % (rev, swh_revision))
 
         # create occurrence pointing to the latest revision (the last one)
-        occ = build_swh_occurrence(swh_revision['id'], origin['id'], datetime.datetime.utcnow())
+        occ = build_swh_occurrence(swh_revision['id'], origin['id'],
+                                       datetime.datetime.utcnow())
         self.log.debug('occ: %s' % occ)
+
+        objects_per_type = {
+            GitType.BLOB: [],
+            GitType.TREE: [],
+            GitType.COMM: swh_revisions,
+            GitType.RELE: [],
+        }
+        for tree_path in objects_per_path:
+            objs = objects_per_path[tree_path]
+            for obj in objs:
+                objects_per_type[obj['type']].append(obj)
+
+        self.load(objects_per_type, objects_per_path, [occ], origin['id'])
 
         return {'status': True}
 

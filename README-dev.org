@@ -1,0 +1,23 @@
+#+title: swh-loader-svn
+
+- modes: all & update
+- mapping sha1 swh <-> revision svn
+- round-trip (same commit sha1)
+- single branch master (we do not interpret the svn conventions)
+- commit: author/committer is the svn user ; email is ''
+- origin: type is svn, url is svn url
+
+svn synthetic revision:
+- date committer / date author the same and corresponds to the svn's commit
+- type: svn
+- directory: directory id of checksum
+- message: svn as is
+- author/committer: svn's commit author
+- parents: [swh id of prev svn revision]
+- synthetic: True
+- metadata:
+  - gpg-signature
+  - mergetags
+  - extra-headers:
+     - svn-revision: svn rev number
+     - svn-repo-uuid: from svn's info output

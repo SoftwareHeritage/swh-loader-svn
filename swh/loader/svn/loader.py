@@ -167,6 +167,7 @@ def build_swh_occurrence(revision_id, origin_id, date):
             'origin': origin_id,
             'date': date}
 
+
 @contextmanager
 def cwd(path):
     """Contextually change the working directory to do thy bidding.
@@ -191,7 +192,7 @@ class SvnLoader(libloader.SvnLoader):
         super().__init__(config)
         self.log = logging.getLogger('swh.loader.svn.SvnLoader')
 
-    def load(self, objects_per_type, objects_per_path, occurrences, origin_id):
+    def load(self, objects_per_type, objects_per_path, origin_id):
         if self.config['send_contents']:
             self.bulk_send_blobs(objects_per_path,
                                  objects_per_type[GitType.BLOB],
@@ -212,7 +213,8 @@ class SvnLoader(libloader.SvnLoader):
             self.log.info('Not sending revisions')
 
         if self.config['send_occurrences']:
-            self.bulk_send_refs(objects_per_type, occurrences)
+            self.bulk_send_refs(objects_per_type,
+                                objects_per_type[GitType.REFS])
         else:
             self.log.info('Not sending occurrences')
 
@@ -260,24 +262,27 @@ class SvnLoader(libloader.SvnLoader):
 
             swh_revisions.append(swh_revision)
             self.log.debug('rev: %s, swhrev: %s' % (rev,
-                                                    hashutil.hash_to_hex(swh_revision['id'])))
+                                                    hashutil.hash_to_hex(
+                                                        swh_revision['id'])))
 
         # create occurrence pointing to the latest revision (the last one)
         occ = build_swh_occurrence(swh_revision['id'], origin['id'],
-                                       datetime.datetime.utcnow())
+                                   datetime.datetime.utcnow())
         self.log.debug('occ: %s' % occ)
 
         objects_per_type = {
             GitType.BLOB: [],
             GitType.TREE: [],
             GitType.COMM: swh_revisions,
+            GitType.RELE: [],
+            GitType.REFS: [occ],
         }
         for tree_path in objects_per_path:
             objs = objects_per_path[tree_path]
             for obj in objs:
                 objects_per_type[obj['type']].append(obj)
 
-        self.load(objects_per_type, objects_per_path, [occ], origin['id'])
+        self.load(objects_per_type, objects_per_path, origin['id'])
 
         return {'status': True}
 

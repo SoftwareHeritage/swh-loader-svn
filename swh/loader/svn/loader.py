@@ -246,7 +246,8 @@ class SvnLoader(libloader.SvnLoader):
 
         parents = {1: []}  # rev 1 has no parents
 
-        # create revision history
+        self.log.debug('repo: %s' % repo)
+        self.log.debug('logs: %s' % repo['logs'])
 
         swh_revisions = []
         for rev, commit, objects_per_path in read_svn_revisions(

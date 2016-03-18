@@ -284,7 +284,7 @@ class SvnLoader(libloader.SvnLoader):
 
         self.load(objects_per_type, objects_per_path, origin['id'])
 
-        return {'status': True}
+        return {'status': True, 'objects': objects_per_type}
 
 
 class SvnLoaderWithHistory(SvnLoader):

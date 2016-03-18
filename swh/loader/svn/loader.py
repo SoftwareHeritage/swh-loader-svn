@@ -271,7 +271,6 @@ class SvnLoader(libloader.SvnLoader):
             GitType.BLOB: [],
             GitType.TREE: [],
             GitType.COMM: swh_revisions,
-            GitType.RELE: [],
         }
         for tree_path in objects_per_path:
             objs = objects_per_path[tree_path]

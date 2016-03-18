@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import datetime
 import logging
 import os
 import svn.remote as remote
@@ -153,6 +154,17 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):
         'parents': parents,
     }
 
+
+def build_swh_occurrence(revision_id, origin_id, date):
+    """Build a swh occurrence from the revision id, origin id, and date.
+
+    """
+    return {'branch': 'master',
+            'target': revision_id,
+            'target_type': 'revision',
+            'origin': origin_id,
+            'date': date}
+
 @contextmanager
 def cwd(path):
     """Contextually change the working directory to do thy bidding.
@@ -208,6 +220,9 @@ class SvnLoader(libloader.SvnLoader):
 
         parents = {1: []}  # rev 1 has no parents
 
+        # create revision history
+
+        swh_revisions = []
         for rev, commit, objects in read_svn_revisions(
                 repo, latest_revision):
             dir_id = objects[git.ROOT_TREE_KEY][0]['sha1_git']
@@ -215,7 +230,13 @@ class SvnLoader(libloader.SvnLoader):
                                               dir_id, parents[rev])
             swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
             parents[rev+1] = [swh_revision['id']]
+
+            swh_revisions.append(swh_revision)
             self.log.debug('rev: %s, swhrev: %s' % (rev, swh_revision))
+
+        # create occurrence pointing to the latest revision (the last one)
+        occ = build_swh_occurrence(swh_revision['id'], origin['id'], datetime.datetime.utcnow())
+        self.log.debug('occ: %s' % occ)
 
         return {'status': True}
 

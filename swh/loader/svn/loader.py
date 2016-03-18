@@ -12,6 +12,7 @@ import tempfile
 
 from contextlib import contextmanager
 
+from swh.core import hashutil
 from swh.loader.svn import libloader
 from swh.loader.dir import git
 from swh.loader.dir.git import GitType
@@ -257,7 +258,8 @@ class SvnLoader(libloader.SvnLoader):
             parents[rev+1] = [swh_revision['id']]
 
             swh_revisions.append(swh_revision)
-            self.log.debug('rev: %s, swhrev: %s' % (rev, swh_revision))
+            self.log.debug('rev: %s, swhrev: %s' % (rev,
+                                                    hashutil.hash_to_hex(swh_revision['id'])))
 
         # create occurrence pointing to the latest revision (the last one)
         occ = build_swh_occurrence(swh_revision['id'], origin['id'],

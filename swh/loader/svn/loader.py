@@ -8,13 +8,11 @@ import os
 import svn.remote as remote
 import svn.local as local
 import tempfile
-import uuid
 
 from contextlib import contextmanager
 
 from swh.loader.svn import libloader
-from swh.loader.dir import converters, git
-from swh.loader.dir.git import GitType
+from swh.loader.dir import git
 
 
 def checkout_repo(remote_repo_url, destination_path=None):
@@ -99,32 +97,31 @@ def read_svn_revisions(repo, latest_revision):
             repo['remote'].checkout(revision=rev, path='.')
 
             # compute git commit
-            parsed_objects = git.walk_and_compute_sha1_from_directory(
+            objects = git.walk_and_compute_sha1_from_directory(
                 repo['local_url'].encode('utf-8'))
 
             commit = read_commit(repo, rev)
 
-            yield rev, commit, parsed_objects
+            yield rev, commit, objects
 
             rev += 1
 
 
-def build_swh_revision(repo_uuid, commit, rev, parsed_objects):
+def build_swh_revision(repo_uuid, commit, rev, dir_id):
     """Given a svn revision, build a swh revision.
 
     """
-    root_tree = parsed_objects[git.ROOT_TREE_KEY][0]
-
     author = commit['author_name']
     if author:
         author_committer = {
+            # HACK: shouldn't we use the same for email?
             'name': author.encode('utf-8'),
-            'email': '',
+            'email': b'',
         }
     else:
         author_committer = {
-            'name': b'noone',  # HACK
-            'email': '',
+            'name': b'',  # HACK: some repository have commits without author
+            'email': b'',
         }
 
     msg = commit['message']
@@ -135,14 +132,14 @@ def build_swh_revision(repo_uuid, commit, rev, parsed_objects):
 
     date = {
         'timestamp': commit['author_date'],
-        # 'offset': converters.format_to_minutes(commit['author_offset']),
+        'offset': 0,  # HACK: PySvn transforms into datetime with utc timezone
     }
 
     return {
         'date': date,
         'committer_date': date,
         'type': 'svn',
-        'directory': root_tree['sha1_git'],
+        'directory': dir_id,
         'message': msg,
         'author': author_committer,
         'committer': author_committer,
@@ -209,9 +206,13 @@ class SvnLoader(libloader.SvnLoader):
         latest_revision = repo_metadata['entry_revision']
         repo_uuid = repo_metadata['repository_uuid']
 
-        for rev, commit, parsed_objects in read_svn_revisions(repo, latest_revision):
-            swh_revision = build_swh_revision(repo_uuid, commit, rev, parsed_objects)
-            self.log.debug('rev: %s, commit: %s, swhrev: %s' % (rev, commit, swh_revision))
+        for rev, commit, objects in read_svn_revisions(
+                repo, latest_revision):
+            dir_id = objects[git.ROOT_TREE_KEY][0]['sha1_git']
+            swh_revision = build_swh_revision(repo_uuid, commit, rev, dir_id)
+            swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
+            self.log.debug('rev: %s, commit: %s, swhrev: %s' % (
+                rev, commit, swh_revision))
 
         return {'status': True}
 

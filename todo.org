@@ -1,7 +1,7 @@
 #+author: ardumont
 
-- [ ] Create basic svn server for local tests
-- [ ] Load some basic svn repositories
+- [X] Create basic svn server for local tests
+- [X] Load some basic svn repositories
 - [X] Svn loading poc
 - [ ] Spec for svn loader
 - [ ] Basic svn loader

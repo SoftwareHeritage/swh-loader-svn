@@ -107,7 +107,7 @@ def read_svn_revisions(repo, latest_revision):
             rev += 1
 
 
-def build_swh_revision(repo_uuid, commit, rev, dir_id):
+def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):
     """Given a svn revision, build a swh revision.
 
     """
@@ -150,7 +150,7 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id):
                 'svn-revision': rev,
             }
         },
-        'parents': [],
+        'parents': parents,
     }
 
 @contextmanager
@@ -206,13 +206,16 @@ class SvnLoader(libloader.SvnLoader):
         latest_revision = repo_metadata['entry_revision']
         repo_uuid = repo_metadata['repository_uuid']
 
+        parents = {1: []}  # rev 1 has no parents
+
         for rev, commit, objects in read_svn_revisions(
                 repo, latest_revision):
             dir_id = objects[git.ROOT_TREE_KEY][0]['sha1_git']
-            swh_revision = build_swh_revision(repo_uuid, commit, rev, dir_id)
+            swh_revision = build_swh_revision(repo_uuid, commit, rev,
+                                              dir_id, parents[rev])
             swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
-            self.log.debug('rev: %s, commit: %s, swhrev: %s' % (
-                rev, commit, swh_revision))
+            parents[rev+1] = [swh_revision['id']]
+            self.log.debug('rev: %s, swhrev: %s' % (rev, swh_revision))
 
         return {'status': True}
 

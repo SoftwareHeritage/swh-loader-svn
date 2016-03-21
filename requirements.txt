@@ -2,4 +2,6 @@
 # should match https://pypi.python.org/pypi names. For the full spec or
 # dependency lines, see https://pip.readthedocs.org/en/1.1/requirements.html
 vcversioner
+swh.core >= 0.0.16
 swh.model >= 0.0.4
+swh.scheduler >= 0.0.6

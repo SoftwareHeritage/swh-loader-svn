@@ -91,23 +91,21 @@ def read_svn_revisions(repo, latest_revision):
 
     """
     rev = retrieve_last_known_revision(repo['remote_url'])
-    if rev == latest_revision:
-        return None
+    if rev != latest_revision:
+        with cwd(repo['local_url']):
+            while rev != latest_revision:
+                # checkout to the revision rev
+                repo['remote'].checkout(revision=rev, path='.')
 
-    with cwd(repo['local_url']):
-        while rev != latest_revision:
-            # checkout to the revision rev
-            repo['remote'].checkout(revision=rev, path='.')
+                # compute git commit
+                objects_per_path = git.walk_and_compute_sha1_from_directory(
+                    repo['local_url'].encode('utf-8'))
 
-            # compute git commit
-            objects_per_path = git.walk_and_compute_sha1_from_directory(
-                repo['local_url'].encode('utf-8'))
+                commit = read_commit(repo, rev)
 
-            commit = read_commit(repo, rev)
+                yield rev, commit, objects_per_path
 
-            yield rev, commit, objects_per_path
-
-            rev += 1
+                rev += 1
 
 
 def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):

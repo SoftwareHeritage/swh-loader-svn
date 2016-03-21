@@ -253,6 +253,7 @@ class SvnLoader(libloader.SvnLoader):
         for rev, commit, objects_per_path in read_svn_revisions(
                 repo, latest_revision):
             dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
+            self.log.debug('tree: %s' % hashutil.hash_to_hex(dir_id))
             swh_revision = build_swh_revision(repo_uuid, commit, rev,
                                               dir_id, parents[rev])
             swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)

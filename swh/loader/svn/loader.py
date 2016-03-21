@@ -14,8 +14,8 @@ from contextlib import contextmanager
 
 from swh.core import hashutil
 from swh.loader.svn import libloader
-from swh.loader.dir import git
-from swh.loader.dir.git import GitType
+from swh.model import git
+from swh.model.git import GitType
 
 
 def checkout_repo(remote_repo_url, destination_path=None):
@@ -99,7 +99,8 @@ def read_svn_revisions(repo, latest_revision):
 
                 # compute git commit
                 objects_per_path = git.walk_and_compute_sha1_from_directory(
-                    repo['local_url'].encode('utf-8'))
+                    repo['local_url'].encode('utf-8'),
+                    dir_ok_fn = lambda dirpath: not b'.svn' in dirpath)
 
                 commit = read_commit(repo, rev)
 

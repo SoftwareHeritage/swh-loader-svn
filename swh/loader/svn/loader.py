@@ -181,7 +181,7 @@ def cwd(path):
         os.chdir(prev_cwd)
 
 
-class SvnLoader(libloader.SvnLoader):
+class SvnLoader(libloader.SWHLoader):
     """A svn loader.
 
     This will load the svn repository.

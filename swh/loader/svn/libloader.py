@@ -73,7 +73,7 @@ def retry_loading(error):
     return True
 
 
-class SvnLoader(config.SWHConfig):
+class SWHLoader(config.SWHConfig):
     """A svn loader.
 
     This will load the svn repository.

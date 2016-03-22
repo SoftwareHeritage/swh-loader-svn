@@ -186,6 +186,7 @@ class SvnLoader(libloader.SWHLoader):
     This will load the svn repository.
 
     """
+
     def __init__(self, config, log_class=None):
         log_class = 'swh.loader.svn.SvnLoader' if not log_class else log_class
         super().__init__(config, log_class)
@@ -193,8 +194,7 @@ class SvnLoader(libloader.SWHLoader):
     def load(self, objects_per_type, objects_per_path, origin_id):
         if self.config['send_contents']:
             self.bulk_send_blobs(objects_per_path,
-                                 objects_per_type[GitType.BLOB],
-                                 origin_id)
+                                 objects_per_type[GitType.BLOB], origin_id)
         else:
             self.log.info('Not sending contents')
 
@@ -254,15 +254,14 @@ class SvnLoader(libloader.SWHLoader):
                 repo, latest_revision):
             dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
             self.log.debug('tree: %s' % hashutil.hash_to_hex(dir_id))
-            swh_revision = build_swh_revision(repo_uuid, commit, rev,
-                                              dir_id, parents[rev])
+            swh_revision = build_swh_revision(repo_uuid, commit, rev, dir_id,
+                                              parents[rev])
             swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
-            parents[rev+1] = [swh_revision['id']]
+            parents[rev + 1] = [swh_revision['id']]
 
             swh_revisions.append(swh_revision)
-            self.log.debug('rev: %s, swhrev: %s' % (rev,
-                                                    hashutil.hash_to_hex(
-                                                        swh_revision['id'])))
+            self.log.debug('rev: %s, swhrev: %s' %
+                           (rev, hashutil.hash_to_hex(swh_revision['id'])))
 
         # create occurrence pointing to the latest revision (the last one)
         occ = build_swh_occurrence(swh_revision['id'], origin['id'],
@@ -296,6 +295,7 @@ class SvnLoaderWithHistory(SvnLoader):
     - close the entry in fetch_history
 
     """
+
     def __init__(self, config):
         super().__init__(config, 'swh.loader.svn.SvnLoaderWithHistory')
 
@@ -309,8 +309,7 @@ class SvnLoaderWithHistory(SvnLoader):
               - type: type of the origin
 
         """
-        origin = {'type': 'svn',
-                  'url': svn_url}
+        origin = {'type': 'svn', 'url': svn_url}
         origin['id'] = self.storage.origin_add_one(origin)
 
         fetch_history_id = self.open_fetch_history(origin['id'])

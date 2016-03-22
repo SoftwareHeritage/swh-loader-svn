@@ -146,9 +146,9 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):
         'committer': author_committer,
         'synthetic': True,
         'metadata': {
-            'extra-headers': {
-                'svn-repo-uuid': repo_uuid,
-                'svn-revision': rev,
+            'extra_headers': {
+                'svn_repo_uuid': repo_uuid,
+                'svn_revision': rev,
             }
         },
         'parents': parents,

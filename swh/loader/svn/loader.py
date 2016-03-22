@@ -100,7 +100,7 @@ def read_svn_revisions(repo, latest_revision):
                 # compute git commit
                 objects_per_path = git.walk_and_compute_sha1_from_directory(
                     repo['local_url'].encode('utf-8'),
-                    dir_ok_fn = lambda dirpath: not b'.svn' in dirpath)
+                    dir_ok_fn=lambda dirpath: b'.svn' not in dirpath)
 
                 commit = read_commit(repo, rev)
 

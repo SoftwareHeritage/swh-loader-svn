@@ -97,7 +97,7 @@ class SWHLoader(config.SWHConfig):
         'occurrence_packet_size': ('int', 100000),
     }
 
-    def __init__(self, config):
+    def __init__(self, config, logging_class):
         self.config = config
 
         if self.config['storage_class'] == 'remote_storage':
@@ -107,7 +107,10 @@ class SWHLoader(config.SWHConfig):
 
         self.storage = Storage(*self.config['storage_args'])
 
-        self.log = logging.getLogger('swh.loader.dir.DirLoader')
+        self.log = logging.getLogger(logging_class)
+
+        l = logging.getLogger('requests.packages.urllib3.connectionpool')
+        l.setLevel(logging.WARN)
 
     def open_fetch_history(self, origin_id):
         return self.storage.fetch_history_start(origin_id)

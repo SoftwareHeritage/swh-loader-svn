@@ -4,7 +4,6 @@
 # See top-level LICENSE file for more information
 
 import datetime
-import logging
 import os
 import svn.remote as remote
 import svn.local as local
@@ -187,9 +186,9 @@ class SvnLoader(libloader.SWHLoader):
     This will load the svn repository.
 
     """
-    def __init__(self, config):
-        super().__init__(config)
-        self.log = logging.getLogger('swh.loader.svn.SvnLoader')
+    def __init__(self, config, log_class=None):
+        log_class = 'swh.loader.svn.SvnLoader' if not log_class else log_class
+        super().__init__(config, log_class)
 
     def load(self, objects_per_type, objects_per_path, origin_id):
         if self.config['send_contents']:
@@ -298,8 +297,7 @@ class SvnLoaderWithHistory(SvnLoader):
 
     """
     def __init__(self, config):
-        super().__init__(config)
-        self.log = logging.getLogger('swh.loader.svn.SvnLoaderWithHistory')
+        super().__init__(config, 'swh.loader.svn.SvnLoaderWithHistory')
 
     def process(self, svn_url, destination_path):
         """Load a directory in backend.

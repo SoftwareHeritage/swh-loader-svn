@@ -5,9 +5,9 @@
 
 import datetime
 import os
-import svn.remote as remote
-import svn.local as local
+import pysvn
 import tempfile
+import subprocess
 
 from contextlib import contextmanager
 
@@ -17,7 +17,14 @@ from swh.model import git
 from swh.model.git import GitType
 
 
-def checkout_repo(remote_repo_url, destination_path=None):
+def repo_uuid(local_path):
+    with cwd(local_path):
+        cmd = 'svn info | grep UUID | cut -f2 -d:'
+        uuid = subprocess.check_output(cmd, shell=True)
+        return uuid.strip()
+
+
+def fork(remote_repo_url, destination_path=None):
     """Checkout a remote repository locally.
 
     Args:
@@ -38,26 +45,67 @@ def checkout_repo(remote_repo_url, destination_path=None):
         os.makedirs(destination_path, exist_ok=True)
         local_dirname = destination_path
     else:
-        local_dirname = tempfile.mkdtemp(suffix='swh.loader.svn.',
+        local_dirname = tempfile.mkdtemp(suffix='swh.loader',
                                          prefix='tmp.',
                                          dir='/tmp')
 
+    print('svn co %s %s' % (remote_repo_url, local_dirname))
     local_repo_url = os.path.join(local_dirname, name)
 
-    remote_client = remote.RemoteClient(remote_repo_url)
-    remote_client.checkout(local_repo_url)
+    client = pysvn.Client()
+    client.checkout(remote_repo_url, local_repo_url)
 
-    return {'remote': remote_client,
-            'local': local.LocalClient(local_repo_url),
+    uuid = repo_uuid(local_repo_url)
+
+    return {'client': client,
+            'uuid': uuid,
             'remote_url': remote_repo_url,
             'local_url': local_repo_url}
 
 
-def retrieve_last_known_revision(remote_url_repo):
-    """Function that given a remote url returns the last known revision or
-    1 if this is the first time.
+def checkout(repo, revision):
+    """Checkout repository at revision."""
+    repo['client'].checkout(
+        repo['remote_url'],
+        repo['local_url'],
+        revision=pysvn.Revision(pysvn.opt_revision_kind.number, revision))
+
+
+def read_current_revision_at_path(repo):
+    """Retrieve current revision at local path."""
+    head_rev = pysvn.Revision(pysvn.opt_revision_kind.head)
+    info = repo['client'].info2(repo['local_url'],
+                                revision=head_rev,
+                                recurse=False)
+    return info[0][1]['rev'].number
+
+
+def read_origin_revision_from_url(repo):
+    """Determine the first revision number from which the url appeared.
 
     """
+    return repo['client'].log(repo['remote_url'])[-1].data.get(
+        'revision').number
+
+
+def svn_logs(repo):
+    revision_start = repo['revision_start']
+    revision_end = repo['revision_end']
+    return repo['client'].log(
+        repo['local_url'],
+        revision_start=pysvn.Revision(pysvn.opt_revision_kind.number,
+                                      revision_start),
+        revision_end=pysvn.Revision(pysvn.opt_revision_kind.number,
+                                    revision_end))
+
+
+def retrieve_last_known_revision(repo, from_start=True):  # hack
+    """Function that given a remote url returns the last known revision or
+    the original revision if this is the first time.
+
+    """
+    if from_start:
+        return read_origin_revision_from_url(repo)
     # TODO: Contact swh-storage to retrieve the last occurrence for
     # the given origin
     return 1
@@ -68,44 +116,46 @@ def read_log_entries(repo):
 
     """
     logs = {}
-    for log in repo['local'].log_default():
-        logs[log.revision] = log
+    revisions = []
+    for log in svn_logs(repo):
+        rev = log.revision.number
+        revisions.append(rev)
+        logs[rev] = {'author_date': log.date,
+                     'author_name': log.author,
+                     'message': log.message,
+                     'revision': log.revision.number}
 
-    return logs
-
-
-def read_commit(repo, rev):
-    log_entry = repo['logs'][rev]
-
-    return {
-        'message': log_entry.msg,
-        'author_date': log_entry.date,
-        'author_name': log_entry.author,
-    }
+    return revisions, logs
 
 
-def read_svn_revisions(repo, latest_revision):
+def read_svn_revisions(repo):
     """Compute tree for each revision from last known revision to
     latest_revision.
 
     """
-    rev = retrieve_last_known_revision(repo['remote_url'])
-    if rev != latest_revision:
+    revisions = repo['revisions']
+    rev = repo['revision_start']
+    revision_end = repo['revision_end']
+    logs = repo['logs']
+    l = len(revisions)
+    if rev != revision_end:
         with cwd(repo['local_url']):
-            while rev != latest_revision:
+            for i, rev in enumerate(revisions):
                 # checkout to the revision rev
-                repo['remote'].checkout(revision=rev, path='.')
+                checkout(repo, revision=rev)
 
                 # compute git commit
                 objects_per_path = git.walk_and_compute_sha1_from_directory(
                     repo['local_url'].encode('utf-8'),
                     dir_ok_fn=lambda dirpath: b'.svn' not in dirpath)
 
-                commit = read_commit(repo, rev)
+                commit = logs[rev]
 
-                yield rev, commit, objects_per_path
-
-                rev += 1
+                if i + 1 < l:
+                    nextrev = revisions[i + 1]
+                else:
+                    nextrev = None
+                yield rev, nextrev, commit, objects_per_path
 
 
 def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):
@@ -234,30 +284,38 @@ class SvnLoader(libloader.SWHLoader):
             - stderr: optional when status is True, mandatory otherwise
 
         """
-        repo = checkout_repo(svn_url, destination_path)
+        repo = fork(svn_url, destination_path)
 
         # 2. retrieve current svn revision
 
-        repo_metadata = repo['local'].info()
-        repo['logs'] = read_log_entries(repo)
+        revision_start = retrieve_last_known_revision(repo)
+        revision_end = read_current_revision_at_path(repo)
 
-        latest_revision = repo_metadata['entry_revision']
-        repo_uuid = repo_metadata['repository_uuid']
-
-        parents = {1: []}  # rev 1 has no parents
+        repo.update({'revision_start': revision_start,
+                     'revision_end': revision_end})
 
         self.log.debug('repo: %s' % repo)
-        self.log.debug('logs: %s' % repo['logs'])
+        revisions, logs = read_log_entries(repo)
+        repo['revisions'] = revisions
+        repo['logs'] = logs
+
+        self.log.debug(repo['logs'])
+
+        repo_uuid = repo['uuid']
+
+        parents = {revision_start: []}  # rev 1 has no parents
 
         swh_revisions = []
-        for rev, commit, objects_per_path in read_svn_revisions(
-                repo, latest_revision):
+        for rev, nextrev, commit, objects_per_path in read_svn_revisions(repo):
+            self.log.debug('rev: %s' % rev)
+
             dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
             self.log.debug('tree: %s' % hashutil.hash_to_hex(dir_id))
             swh_revision = build_swh_revision(repo_uuid, commit, rev, dir_id,
                                               parents[rev])
             swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
-            parents[rev + 1] = [swh_revision['id']]
+            if nextrev:
+                parents[nextrev] = [swh_revision['id']]
 
             swh_revisions.append(swh_revision)
             self.log.debug('rev: %s, swhrev: %s' %

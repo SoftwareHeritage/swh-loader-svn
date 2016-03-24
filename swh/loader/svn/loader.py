@@ -17,6 +17,20 @@ from swh.model import git
 from swh.model.git import GitType
 
 
+@contextmanager
+def cwd(path):
+    """Contextually change the working directory to do thy bidding.
+    Then gets back to the original location.
+
+    """
+    prev_cwd = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(prev_cwd)
+
+
 def repo_uuid(local_path):
     with cwd(local_path):
         cmd = 'svn info | grep UUID | cut -f2 -d:'
@@ -96,22 +110,20 @@ def read_origin_revision_from_url(repo):
 
 
 def svn_logs(repo):
-    revision_start = repo['revision_start']
-    revision_end = repo['revision_end']
     """Return the logs of the repository between the revision start and end of such repository.
 
     """
     return repo['client'].log(
-        repo['local_url'],
+        url_or_path=repo['local_url'],
         revision_start=pysvn.Revision(pysvn.opt_revision_kind.number,
-                                      revision_start),
+                                      repo['revision_start']),
         revision_end=pysvn.Revision(pysvn.opt_revision_kind.number,
-                                    revision_end))
+                                    repo['revision_end']))
 
 
 def retrieve_last_known_revision(repo, from_start=True):  # hack
-    """Function that given a remote url returns the last known revision or
-    the original revision if this is the first time.
+    """Given a repo, returns the last swh known revision or its original revision if
+    this is the first time.
 
     """
     if from_start:
@@ -144,8 +156,7 @@ def read_log_entries(repo):
         revisions.append(rev)
         logs[rev] = {'author_date': log.date,
                      'author_name': log.author,
-                     'message': log.message,
-                     'revision': log.revision.number}
+                     'message': log.message}
 
     return revisions, logs
 
@@ -161,23 +172,23 @@ def read_svn_revisions(repo):
     logs = repo['logs']
     l = len(revisions)
     if rev != revision_end:
-        with cwd(repo['local_url']):
-            for i, rev in enumerate(revisions):
-                # checkout to the revision rev
-                checkout(repo, revision=rev)
+        for i, rev in enumerate(revisions):
+            # checkout to the revision rev
+            checkout(repo, revision=rev)
 
-                # compute git commit
-                objects_per_path = git.walk_and_compute_sha1_from_directory(
-                    repo['local_url'].encode('utf-8'),
-                    dir_ok_fn=lambda dirpath: b'.svn' not in dirpath)
+            # compute git commit
+            objects_per_path = git.walk_and_compute_sha1_from_directory(
+                repo['local_url'].encode('utf-8'),
+                dir_ok_fn=lambda dirpath: b'.svn' not in dirpath)
 
-                commit = logs[rev]
+            commit = logs[rev]
 
-                if i + 1 < l:
-                    nextrev = revisions[i + 1]
-                else:
-                    nextrev = None
-                yield rev, nextrev, commit, objects_per_path
+            nextrev_index = i+1
+            if nextrev_index < l:
+                nextrev = revisions[nextrev_index]
+            else:
+                nextrev = None
+            yield rev, nextrev, commit, objects_per_path
 
 
 def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):
@@ -236,20 +247,6 @@ def build_swh_occurrence(revision_id, origin_id, date):
             'target_type': 'revision',
             'origin': origin_id,
             'date': date}
-
-
-@contextmanager
-def cwd(path):
-    """Contextually change the working directory to do thy bidding.
-    Then gets back to the original location.
-
-    """
-    prev_cwd = os.getcwd()
-    os.chdir(path)
-    try:
-        yield
-    finally:
-        os.chdir(prev_cwd)
 
 
 class SvnLoader(libloader.SWHLoader):

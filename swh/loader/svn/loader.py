@@ -35,7 +35,7 @@ def repo_uuid(local_path):
     with cwd(local_path):
         cmd = 'svn info | grep UUID | cut -f2 -d:'
         uuid = subprocess.check_output(cmd, shell=True)
-        return uuid.strip()
+        return uuid.strip().decode('utf-8')
 
 
 def fork(remote_repo_url, destination_path=None):

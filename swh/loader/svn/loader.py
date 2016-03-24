@@ -336,6 +336,11 @@ class SvnLoader(libloader.SWHLoader):
                      'revision_end': revision_end})
 
         self.log.debug('repo: %s' % repo)
+
+        if revision_start == revision_end:
+            self.log.info('%s@%s already injected.' % (svn_url, revision_end))
+            return {'status': True}
+
         revisions, logs = read_log_entries(repo)
         repo.update({
             'revisions': revisions,
@@ -348,10 +353,6 @@ class SvnLoader(libloader.SWHLoader):
                                               logs[revision_end]))
 
         repo_uuid = repo['uuid']
-
-        if revision_start == revision_end:
-            self.log.info('%s@%s already injected.' % (svn_url, revision_end))
-            return {'status': True}
 
         if revision_start == 1:
             parents = {revision_start: []}  # no parents for initial revision

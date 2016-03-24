@@ -8,6 +8,8 @@ import os
 import pysvn
 import tempfile
 import subprocess
+import sys
+import traceback
 
 from contextlib import contextmanager
 
@@ -366,6 +368,13 @@ class SvnLoaderWithHistory(SvnLoader):
 
         fetch_history_id = self.open_fetch_history(origin['id'])
 
-        result = super().process(svn_url, origin, destination_path)
+        try:
+            result = super().process(svn_url, origin, destination_path)
+        except:
+            e_info = sys.exc_info()
+            self.log.error('Problem during svn load for repo %s - %s' % (svn_url, e_info[1]))
+            result = {'status': False, 'stderr': 'reason:%s\ntrace:%s' % (
+                    e_info[1],
+                    ''.join(traceback.format_tb(e_info[2])))}
 
         self.close_fetch_history(fetch_history_id, result)

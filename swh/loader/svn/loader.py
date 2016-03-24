@@ -90,7 +90,6 @@ def fork(repo):
             - local_url: local url which has been computed
 
     """
-    print('svn co %s %s' % (repo['remote_url'], repo['local_url']))
     repo['client'].checkout(repo['remote_url'], repo['local_url'])
 
     uuid = repo_uuid(repo['local_url'])
@@ -157,11 +156,14 @@ def check_for_previous_revision(repo, origin_id):
     if occ:
         revision_id = occ[0]['target']
         revisions = storage.revision_get([revision_id])
-        revision_parents = storage.revision_shortlog([revision_id], limit=1)
+        parents = {}
+        for rev, pparents in storage.revision_shortlog([revision_id], limit=1):
+            parents[rev] = pparents
+
         if revisions:
             rev = revisions[0]
             svn_revision = rev['metadata']['extra_headers']['svn_revision']
-            return svn_revision, revision_parents
+            return svn_revision, parents[revision_id]
 
     return None, None
 

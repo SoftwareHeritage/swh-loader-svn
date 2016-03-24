@@ -39,8 +39,40 @@ def repo_uuid(local_path):
         uuid = subprocess.check_output(cmd, shell=True)
         return uuid.strip().decode('utf-8')
 
+def init_repo(remote_repo_url, destination_path=None):
+    """Initialize a repository without any action on disk.
 
-def fork(remote_repo_url, destination_path=None):
+    Args:
+        remote_repo_url: The remote svn url
+        destination_path: The optional local parent folder to checkout the
+        repository to
+
+    Returns:
+        Dictionary with the following keys:
+            - client: client instance to manipulate the repository
+            - remote_url: remote url (same as input)
+            - local_url: local url which has been computed
+
+    """
+    name = os.path.basename(remote_repo_url)
+    if destination_path:
+        os.makedirs(destination_path, exist_ok=True)
+        local_dirname = destination_path
+    else:
+        local_dirname = tempfile.mkdtemp(suffix='swh.loader',
+                                         prefix='tmp.',
+                                         dir='/tmp')
+
+    local_repo_url = os.path.join(local_dirname, name)
+
+    client = pysvn.Client()
+
+    return {'client': client,
+            'remote_url': remote_repo_url,
+            'local_url': local_repo_url}
+
+
+def fork(repo):
     """Checkout remote repository remote_repo_url to local working copy
     destination_path.
 
@@ -57,27 +89,15 @@ def fork(remote_repo_url, destination_path=None):
             - local_url: local url which has been computed
 
     """
-    name = os.path.basename(remote_repo_url)
-    if destination_path:
-        os.makedirs(destination_path, exist_ok=True)
-        local_dirname = destination_path
-    else:
-        local_dirname = tempfile.mkdtemp(suffix='swh.loader',
-                                         prefix='tmp.',
-                                         dir='/tmp')
+    print('svn co %s %s' % (repo['remote_url'], repo['local_url']))
+    repo['client'].checkout(repo['remote_url'], repo['local_url'])
 
-    print('svn co %s %s' % (remote_repo_url, local_dirname))
-    local_repo_url = os.path.join(local_dirname, name)
+    uuid = repo_uuid(repo['local_url'])
 
-    client = pysvn.Client()
-    client.checkout(remote_repo_url, local_repo_url)
-
-    uuid = repo_uuid(local_repo_url)
-
-    return {'client': client,
+    return {'client': repo['client'],
             'uuid': uuid,
-            'remote_url': remote_repo_url,
-            'local_url': local_repo_url}
+            'remote_url': repo['remote_url'],
+            'local_url': repo['local_url']}
 
 
 def checkout(repo, revision):
@@ -123,17 +143,35 @@ def svn_logs(repo):
                                     repo['revision_end']))
 
 
-def retrieve_last_known_revision(repo, from_start=True):  # hack
+def check_for_previous_revision(repo, origin_id):
+    """Look for possible existing revision.
+
+    Return:
+        The previous svn revision known if found, None otherwise.
+
+    """
+    storage = repo['storage']
+    occ = storage.occurrence_get(origin_id)
+    if occ:
+        revision_id = occ[0]['target']
+        revision = storage.revision_get([revision_id])
+        print(revision)
+        revision_parents = storage.revision_shortlog([revision_id], limit=1)
+        print(revision_parents)
+        if revision:
+            svn_revision = revision[0]['metadata']['extra_headers']['svn_revision']
+            return svn_revision, revision_parents
+
+    return None, None
+
+
+def retrieve_last_known_revision(repo):  # hack
     """Given a repo, returns the last swh known revision or its original revision if
     this is the first time.
 
     """
-    if from_start:
-        return read_origin_revision_from_url(repo)
-    # TODO: Contact swh-storage to retrieve the last occurrence for
-    # the given origin
-    return 1
-
+    return repo['client'].log(repo['remote_url'])[-1].data.get(
+        'revision').number
 
 def read_log_entries(repo):
     """Read the logs entries from the repository repo.
@@ -169,28 +207,26 @@ def read_svn_revisions(repo):
 
     """
     revisions = repo['revisions']
-    rev = repo['revision_start']
-    revision_end = repo['revision_end']
     logs = repo['logs']
     l = len(revisions)
-    if rev != revision_end:
-        for i, rev in enumerate(revisions):
-            # checkout to the revision rev
-            checkout(repo, revision=rev)
+    for i, rev in enumerate(revisions):
+        # checkout to the revision rev
+        checkout(repo, revision=rev)
 
-            # compute git commit
-            objects_per_path = git.walk_and_compute_sha1_from_directory(
-                repo['local_url'].encode('utf-8'),
-                dir_ok_fn=lambda dirpath: b'.svn' not in dirpath)
+        # compute git commit
+        objects_per_path = git.walk_and_compute_sha1_from_directory(
+            repo['local_url'].encode('utf-8'),
+            dir_ok_fn=lambda dirpath: b'.svn' not in dirpath)
 
-            commit = logs[rev]
+        commit = logs[rev]
 
-            nextrev_index = i+1
-            if nextrev_index < l:
-                nextrev = revisions[nextrev_index]
-            else:
-                nextrev = None
-            yield rev, nextrev, commit, objects_per_path
+        nextrev_index = i+1
+        if nextrev_index < l:
+            nextrev = revisions[nextrev_index]
+        else:
+            nextrev = None
+
+        yield rev, nextrev, commit, objects_per_path
 
 
 def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):
@@ -218,7 +254,7 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):
 
     date = {
         'timestamp': commit['author_date'],
-        'offset': 0,  # HACK: PySvn transforms into datetime with utc timezone
+        'offset': 0,
     }
 
     return {
@@ -280,11 +316,17 @@ class SvnLoader(libloader.SWHLoader):
             - stderr: optional when status is True, mandatory otherwise
 
         """
-        repo = fork(svn_url, destination_path)
+        repo = init_repo(svn_url, destination_path)
+        repo['storage'] = self.storage
+        revision_start, revision_parents = check_for_previous_revision(repo, origin['id'])
+
+        repo = fork(repo)
 
         # 2. retrieve current svn revision
 
-        revision_start = retrieve_last_known_revision(repo)
+        if not revision_start:
+            revision_start = retrieve_last_known_revision(repo)
+
         revision_end = read_current_revision_at_path(repo)
 
         repo.update({'revision_start': revision_start,
@@ -292,18 +334,30 @@ class SvnLoader(libloader.SWHLoader):
 
         self.log.debug('repo: %s' % repo)
         revisions, logs = read_log_entries(repo)
-        repo['revisions'] = revisions
-        repo['logs'] = logs
+        repo.update({
+            'revisions': revisions,
+            'logs': logs
+        })
 
-        self.log.debug(repo['logs'])
+        self.log.debug('revisions: %s, ..., %s' % (revisions[0], revisions[-1]))
+        self.log.debug('logs: %s, ..., %s' % (logs[revision_start], logs[revision_end]))
 
         repo_uuid = repo['uuid']
 
-        parents = {revision_start: []}  # rev 1 has no parents
+        if revision_start == revision_end:
+            self.log.info('%s@%s already injected.' % (svn_url, revision_end))
+            return {'status': True}
+
+        if revision_start == 1:
+            parents = {revision_start: []}  # no parents for initial revision
+        else:
+            parents = {revision_start: revisions_parent}
+
+        self.log.debug('parents: %s' % parents)
 
         swh_revisions = []
         for rev, nextrev, commit, objects_per_path in read_svn_revisions(repo):
-            self.log.debug('rev: %s' % rev)
+            self.log.debug('rev: %s, nextrev: %s' % (rev, nextrev))
 
             dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
             self.log.debug('tree: %s' % hashutil.hash_to_hex(dir_id))
@@ -329,6 +383,7 @@ class SvnLoader(libloader.SWHLoader):
             GitType.RELE: [],
             GitType.REFS: [occ],
         }
+
         for tree_path in objects_per_path:
             objs = objects_per_path[tree_path]
             for obj in objs:

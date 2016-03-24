@@ -155,9 +155,7 @@ def check_for_previous_revision(repo, origin_id):
     if occ:
         revision_id = occ[0]['target']
         revision = storage.revision_get([revision_id])
-        print(revision)
         revision_parents = storage.revision_shortlog([revision_id], limit=1)
-        print(revision_parents)
         if revision:
             svn_revision = revision[0]['metadata']['extra_headers']['svn_revision']
             return svn_revision, revision_parents
@@ -356,8 +354,19 @@ class SvnLoader(libloader.SWHLoader):
         self.log.debug('parents: %s' % parents)
 
         swh_revisions = []
+        # for each revision
         for rev, nextrev, commit, objects_per_path in read_svn_revisions(repo):
             self.log.debug('rev: %s, nextrev: %s' % (rev, nextrev))
+
+            objects_per_type = {
+                GitType.BLOB: [],
+                GitType.TREE: [],
+                GitType.COMM: [],
+                GitType.RELE: [],
+                GitType.REFS: [],
+            }
+
+            # compute the fs tree's checksums
 
             dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
             self.log.debug('tree: %s' % hashutil.hash_to_hex(dir_id))
@@ -367,9 +376,23 @@ class SvnLoader(libloader.SWHLoader):
             if nextrev:
                 parents[nextrev] = [swh_revision['id']]
 
+            # and the revision pointing to that tree
             swh_revisions.append(swh_revision)
+
             self.log.debug('rev: %s, swhrev: %s' %
                            (rev, hashutil.hash_to_hex(swh_revision['id'])))
+
+            # send blobs
+            for tree_path in objects_per_path:
+                self.log.debug('tree_path: %s' % tree_path)
+                objs = objects_per_path[tree_path]
+                for obj in objs:
+                    self.log.debug('obj: %s' % obj)
+                    objects_per_type[obj['type']].append(obj)
+
+            self.load(objects_per_type, objects_per_path, origin['id'])
+
+        ### send revisions and occurrences
 
         # create occurrence pointing to the latest revision (the last one)
         occ = build_swh_occurrence(swh_revision['id'], origin['id'],
@@ -383,11 +406,6 @@ class SvnLoader(libloader.SWHLoader):
             GitType.RELE: [],
             GitType.REFS: [occ],
         }
-
-        for tree_path in objects_per_path:
-            objs = objects_per_path[tree_path]
-            for obj in objs:
-                objects_per_type[obj['type']].append(obj)
 
         self.load(objects_per_type, objects_per_path, origin['id'])
 
@@ -423,13 +441,13 @@ class SvnLoaderWithHistory(SvnLoader):
 
         fetch_history_id = self.open_fetch_history(origin['id'])
 
-        try:
-            result = super().process(svn_url, origin, destination_path)
-        except:
-            e_info = sys.exc_info()
-            self.log.error('Problem during svn load for repo %s - %s' % (svn_url, e_info[1]))
-            result = {'status': False, 'stderr': 'reason:%s\ntrace:%s' % (
-                    e_info[1],
-                    ''.join(traceback.format_tb(e_info[2])))}
+        # try:
+        result = super().process(svn_url, origin, destination_path)
+        # except:
+        #     e_info = sys.exc_info()
+        #     self.log.error('Problem during svn load for repo %s - %s' % (svn_url, e_info[1]))
+        #     result = {'status': False, 'stderr': 'reason:%s\ntrace:%s' % (
+        #             e_info[1],
+        #             ''.join(traceback.format_tb(e_info[2])))}
 
         self.close_fetch_history(fetch_history_id, result)

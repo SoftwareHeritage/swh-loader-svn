@@ -39,6 +39,7 @@ def repo_uuid(local_path):
         uuid = subprocess.check_output(cmd, shell=True)
         return uuid.strip().decode('utf-8')
 
+
 def init_repo(remote_repo_url, destination_path=None):
     """Initialize a repository without any action on disk.
 
@@ -132,7 +133,8 @@ def read_origin_revision_from_url(repo):
 
 
 def svn_logs(repo):
-    """Return the logs of the repository between the revision start and end of such repository.
+    """Return the logs of the repository between the revision start and end of such
+    repository.
 
     """
     return repo['client'].log(
@@ -154,22 +156,24 @@ def check_for_previous_revision(repo, origin_id):
     occ = storage.occurrence_get(origin_id)
     if occ:
         revision_id = occ[0]['target']
-        revision = storage.revision_get([revision_id])
+        revisions = storage.revision_get([revision_id])
         revision_parents = storage.revision_shortlog([revision_id], limit=1)
-        if revision:
-            svn_revision = revision[0]['metadata']['extra_headers']['svn_revision']
+        if revisions:
+            rev = revisions[0]
+            svn_revision = rev['metadata']['extra_headers']['svn_revision']
             return svn_revision, revision_parents
 
     return None, None
 
 
 def retrieve_last_known_revision(repo):  # hack
-    """Given a repo, returns the last swh known revision or its original revision if
-    this is the first time.
+    """Given a repo, returns the last swh known revision or its original revision
+    if this is the first time.
 
     """
     return repo['client'].log(repo['remote_url'])[-1].data.get(
         'revision').number
+
 
 def read_log_entries(repo):
     """Read the logs entries from the repository repo.
@@ -316,7 +320,8 @@ class SvnLoader(libloader.SWHLoader):
         """
         repo = init_repo(svn_url, destination_path)
         repo['storage'] = self.storage
-        revision_start, revision_parents = check_for_previous_revision(repo, origin['id'])
+        revision_start, revision_parents = check_for_previous_revision(
+            repo, origin['id'])
 
         repo = fork(repo)
 
@@ -337,8 +342,10 @@ class SvnLoader(libloader.SWHLoader):
             'logs': logs
         })
 
-        self.log.debug('revisions: %s, ..., %s' % (revisions[0], revisions[-1]))
-        self.log.debug('logs: %s, ..., %s' % (logs[revision_start], logs[revision_end]))
+        self.log.debug('revisions: %s, ..., %s' % (revisions[0],
+                                                   revisions[-1]))
+        self.log.debug('logs: %s, ..., %s' % (logs[revision_start],
+                                              logs[revision_end]))
 
         repo_uuid = repo['uuid']
 
@@ -392,7 +399,7 @@ class SvnLoader(libloader.SWHLoader):
 
             self.load(objects_per_type, objects_per_path, origin['id'])
 
-        ### send revisions and occurrences
+        # send revisions and occurrences
 
         # create occurrence pointing to the latest revision (the last one)
         occ = build_swh_occurrence(swh_revision['id'], origin['id'],
@@ -441,13 +448,14 @@ class SvnLoaderWithHistory(SvnLoader):
 
         fetch_history_id = self.open_fetch_history(origin['id'])
 
-        # try:
-        result = super().process(svn_url, origin, destination_path)
-        # except:
-        #     e_info = sys.exc_info()
-        #     self.log.error('Problem during svn load for repo %s - %s' % (svn_url, e_info[1]))
-        #     result = {'status': False, 'stderr': 'reason:%s\ntrace:%s' % (
-        #             e_info[1],
-        #             ''.join(traceback.format_tb(e_info[2])))}
+        try:
+            result = super().process(svn_url, origin, destination_path)
+        except:
+            e_info = sys.exc_info()
+            self.log.error('Problem during svn load for repo %s - %s' % (
+                svn_url, e_info[1]))
+            result = {'status': False, 'stderr': 'reason:%s\ntrace:%s' % (
+                    e_info[1],
+                    ''.join(traceback.format_tb(e_info[2])))}
 
         self.close_fetch_history(fetch_history_id, result)

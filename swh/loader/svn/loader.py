@@ -166,15 +166,6 @@ def check_for_previous_revision(repo, origin_id):
     return None, None
 
 
-def retrieve_last_known_revision(repo):  # hack
-    """Given a repo, returns the last swh known revision or its original revision
-    if this is the first time.
-
-    """
-    return repo['client'].log(repo['remote_url'])[-1].data.get(
-        'revision').number
-
-
 def read_log_entries(repo):
     """Read the logs entries from the repository repo.
 
@@ -328,7 +319,7 @@ class SvnLoader(libloader.SWHLoader):
         # 2. retrieve current svn revision
 
         if not revision_start:
-            revision_start = retrieve_last_known_revision(repo)
+            revision_start = read_origin_revision_from_url(repo)
 
         revision_end = read_current_revision_at_path(repo)
 

@@ -306,6 +306,12 @@ class SWHLoader(config.SWHConfig):
         else:
             self.log.info('Not sending revisions')
 
+        if self.config['send_releases']:
+            self.bulk_send_annotated_tags(objects_per_path,
+                                          objects_per_type[GitType.RELE])
+        else:
+            self.log.info('Not sending releases')
+
         if self.config['send_occurrences']:
             self.bulk_send_refs(objects_per_type,
                                 objects_per_type[GitType.REFS])

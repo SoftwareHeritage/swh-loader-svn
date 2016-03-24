@@ -328,7 +328,7 @@ class SvnLoader(libloader.SWHLoader):
 
         self.log.debug('repo: %s' % repo)
 
-        if revision_start == revision_end:
+        if revision_start == revision_end and revision_start is not 1:
             self.log.info('%s@%s already injected.' % (svn_url, revision_end))
             return {'status': True}
 

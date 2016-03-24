@@ -25,7 +25,8 @@ def repo_uuid(local_path):
 
 
 def fork(remote_repo_url, destination_path=None):
-    """Checkout a remote repository locally.
+    """Checkout remote repository remote_repo_url to local working copy
+    destination_path.
 
     Args:
         remote_repo_url: The remote svn url
@@ -34,8 +35,8 @@ def fork(remote_repo_url, destination_path=None):
 
     Returns:
         Dictionary with the following keys:
-            - remote: remote instance to manipulate the repo
-            - local: local instance to manipulate the local repo
+            - client: client instance to manipulate the repository
+            - uuid: the repository's uuid
             - remote_url: remote url (same as input)
             - local_url: local url which has been computed
 
@@ -64,7 +65,13 @@ def fork(remote_repo_url, destination_path=None):
 
 
 def checkout(repo, revision):
-    """Checkout repository at revision."""
+    """Checkout repository repo at revision.
+
+    Args:
+        repo: the repository instance
+        revision: the revision number to checkout the repo to.
+
+    """
     repo['client'].checkout(
         repo['remote_url'],
         repo['local_url'],
@@ -91,6 +98,9 @@ def read_origin_revision_from_url(repo):
 def svn_logs(repo):
     revision_start = repo['revision_start']
     revision_end = repo['revision_end']
+    """Return the logs of the repository between the revision start and end of such repository.
+
+    """
     return repo['client'].log(
         repo['local_url'],
         revision_start=pysvn.Revision(pysvn.opt_revision_kind.number,
@@ -112,7 +122,19 @@ def retrieve_last_known_revision(repo, from_start=True):  # hack
 
 
 def read_log_entries(repo):
-    """Read the logs entries from the repository.
+    """Read the logs entries from the repository repo.
+
+    Args
+        repo: the repository instance
+
+    Returns
+        tuple of revisions and logs.
+        revisions: list of revisions in order
+        logs: Dictionary with key revision number and value the log entry.
+              The log entry is a dictionary with the following keys:
+                 - author_date: date of the commit
+                 - author_name: name of the author
+                 - message: commit message
 
     """
     logs = {}

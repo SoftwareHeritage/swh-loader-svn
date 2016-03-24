@@ -286,3 +286,28 @@ class SWHLoader(config.SWHConfig):
         packet_size = self.config['occurrence_packet_size']
         send_in_packets(refs, converters.ref_to_occurrence,
                         self.send_occurrences, packet_size)
+
+    def load(self, objects_per_type, objects_per_path, origin_id):
+        if self.config['send_contents']:
+            self.bulk_send_blobs(objects_per_path,
+                                 objects_per_type[GitType.BLOB], origin_id)
+        else:
+            self.log.info('Not sending contents')
+
+        if self.config['send_directories']:
+            self.bulk_send_trees(objects_per_path,
+                                 objects_per_type[GitType.TREE])
+        else:
+            self.log.info('Not sending directories')
+
+        if self.config['send_revisions']:
+            self.bulk_send_commits(objects_per_path,
+                                   objects_per_type[GitType.COMM])
+        else:
+            self.log.info('Not sending revisions')
+
+        if self.config['send_occurrences']:
+            self.bulk_send_refs(objects_per_type,
+                                objects_per_type[GitType.REFS])
+        else:
+            self.log.info('Not sending occurrences')

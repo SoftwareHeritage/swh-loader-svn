@@ -349,7 +349,7 @@ class SvnLoader(libloader.SWHLoader):
         if revision_start == 1:
             parents = {revision_start: []}  # no parents for initial revision
         else:
-            parents = {revision_start: revisions_parent}
+            parents = {revision_start: revision_parents}
 
         self.log.debug('parents: %s' % parents)
 

@@ -69,6 +69,7 @@ class SvnLoader(libloader.SWHLoader):
         else:
             parents = {revision_start: revision_parents}
 
+        self.log.info('svnrepo: %s' % svnrepo)
         swh_revisions = []
         # for each revision
         for rev, nextrev, commit, objects_per_path in svnrepo.swh_hash_data_per_revision(  # noqa
@@ -99,15 +100,13 @@ class SvnLoader(libloader.SWHLoader):
             # and the revision pointing to that tree
             swh_revisions.append(swh_revision)
 
-            self.log.debug('rev: %s, swhrev: %s' %
+            self.log.info('svnrev: %s, swhrev: %s' %
                            (rev, hashutil.hash_to_hex(swh_revision['id'])))
 
             # send blobs
             for tree_path in objects_per_path:
-                self.log.debug('tree_path: %s' % tree_path)
                 objs = objects_per_path[tree_path]
                 for obj in objs:
-                    self.log.debug('obj: %s' % obj)
                     objects_per_type[obj['type']].append(obj)
 
             self.load(objects_per_type, objects_per_path, origin['id'])

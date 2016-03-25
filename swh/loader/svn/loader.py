@@ -56,7 +56,7 @@ class SvnLoader(libloader.SWHLoader):
         self.log.debug('revision_end: %s' % revision_end)
 
         if not revision_start:
-            revision_start = svnrepo.initial_revision()
+            revision_start = 1  # svnrepo.initial_revision()
 
         self.log.debug('initial revision: %s' % revision_start)
 

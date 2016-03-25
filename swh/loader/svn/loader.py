@@ -114,7 +114,7 @@ def checkout(repo, revision):
         revision=pysvn.Revision(pysvn.opt_revision_kind.number, revision))
 
 
-def read_current_revision_at_path(repo):
+def svn_read_current_revision_at_path(repo):
     """Retrieve current revision at local path."""
     head_rev = pysvn.Revision(pysvn.opt_revision_kind.head)
     info = repo['client'].info2(repo['local_url'],
@@ -123,8 +123,10 @@ def read_current_revision_at_path(repo):
     return info[0][1]['rev'].number
 
 
-def read_origin_revision_from_url(repo):
+def svn_read_origin_revision_from_url(repo):
     """Determine the first revision number from which the url appeared.
+
+    This is only extracted from the svn repository.
 
     """
     return repo['client'].log(repo['remote_url'])[-1].data.get(
@@ -144,7 +146,7 @@ def svn_logs(repo):
                                     repo['revision_end']))
 
 
-def check_for_previous_revision(repo, origin_id):
+def swh_check_for_previous_revision(repo, origin_id):
     """Look for possible existing revision.
 
     Return:
@@ -313,7 +315,7 @@ class SvnLoader(libloader.SWHLoader):
         """
         repo = init_repo(svn_url, destination_path)
         repo['storage'] = self.storage
-        revision_start, revision_parents = check_for_previous_revision(
+        revision_start, revision_parents = swh_check_for_previous_revision(
             repo, origin['id'])
 
         repo = fork(repo)
@@ -321,9 +323,9 @@ class SvnLoader(libloader.SWHLoader):
         # 2. retrieve current svn revision
 
         if not revision_start:
-            revision_start = read_origin_revision_from_url(repo)
+            revision_start = svn_read_origin_revision_from_url(repo)
 
-        revision_end = read_current_revision_at_path(repo)
+        revision_end = svn_read_current_revision_at_path(repo)
 
         repo.update({'revision_start': revision_start,
                      'revision_end': revision_end})

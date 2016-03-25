@@ -45,15 +45,15 @@ class SvnLoader(libloader.SWHLoader):
                               destination_path)
         revision_start, revision_parents = svnrepo.swh_previous_revision_and_parents()  # noqa
 
-        # initial checkout
         svnrepo.fork()
 
         if not revision_start:
             revision_start = svnrepo.initial_revision()
 
-        revision_end = svnrepo.current_revision()
+        revision_end = svnrepo.head_revision()
 
-        self.log.debug('svnrepo: %s' % svnrepo)
+        self.log.debug('svnrepo: %s\nrevision_start: %s\nrevision_end: %s' % (
+            svnrepo, revision_start, revision_end))
 
         if revision_start == revision_end and revision_start is not 1:
             self.log.info('%s@%s already injected.' % (svn_url, revision_end))

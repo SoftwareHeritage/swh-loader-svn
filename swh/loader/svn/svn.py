@@ -89,15 +89,6 @@ class SvnRepo():
             uuid = subprocess.check_output(cmd, shell=True)
             return uuid.strip().decode('utf-8')
 
-    def fork(self):
-        """Checkout remote repository to a local working copy.
-
-        This will also update the repository's uuid.
-
-        """
-        self.client.checkout(self.remote_url, self.local_url)
-        self.uuid = self.read_uuid()
-
     def checkout(self, revision):
         """Checkout repository repo at revision.
 
@@ -110,7 +101,16 @@ class SvnRepo():
             self.local_url,
             revision=pysvn.Revision(pysvn.opt_revision_kind.number, revision))
 
-    def current_revision(self):
+    def fork(self):
+        """Checkout remote repository to a local working copy (at revision 1).
+
+        This will also update the repository's uuid.
+
+        """
+        self.checkout(1)
+        self.uuid = self.read_uuid()
+
+    def head_revision(self):
         """Retrieve current revision of the repository's working copy.
 
         """

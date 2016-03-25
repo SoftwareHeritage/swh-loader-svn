@@ -129,14 +129,33 @@ class SvnRepo():
         return self.client.log(self.remote_url)[-1].data.get(
             'revision').number
 
+    def stream_logs(self, revision_start, revision_end, block_size=100):
+        """Stream svn logs between revision_start and revision_end by chunks of block_size logs.
+
+        """
+        r1 = revision_start
+        done = False
+        r2 = r1 + block_size
+        if r2 > revision_end:
+            r2 = revision_end
+            done = True
+
+        for l in self.client.log(url_or_path=self.local_url,
+                                 revision_start=pysvn.Revision(pysvn.opt_revision_kind.number, r1),
+                                 revision_end=pysvn.Revision(pysvn.opt_revision_kind.number, r2)):
+            yield l
+
+        if not done:
+            yield from self.stream_logs(r2, revision_end)
+
     def logs(self, revision_start, revision_end):
-        """Return the revisions and logs of the repository between the revision start
+        """Yields revision and associated revision information between the revision start
         and revision_end.
 
-        Args
+        Args:
             repo: the repository instance
 
-        Returns
+        Yields:
             tuple of revisions and logs.
             revisions: list of revisions in order
             logs: Dictionary with key revision number and value the log entry.
@@ -146,22 +165,10 @@ class SvnRepo():
                      - message: commit message
 
         """
-        r0 = pysvn.Revision(pysvn.opt_revision_kind.number, revision_start)
-        r1 = pysvn.Revision(pysvn.opt_revision_kind.number, revision_end)
-        svn_logs = self.client.log(url_or_path=self.local_url,
-                                   revision_start=r0,
-                                   revision_end=r1)
-
-        logs = {}
-        revisions = []
-        for log in svn_logs:
-            rev = log.revision.number
-            revisions.append(rev)
-            logs[rev] = {'author_date': log.date,
-                         'author_name': log.author,
-                         'message': log.message}
-
-        return revisions, logs
+        for log in self.stream_logs(revision_start, revision_end):
+            yield log.revision.number, {'author_date': log.date,
+                                        'author_name': log.author,
+                                        'message': log.message}
 
     def swh_previous_revision_and_parents(self):
         """Look for possible existing revision.
@@ -204,10 +211,8 @@ class SvnRepo():
             - objects_per_path: dictionary of path, swh hash data with type
 
         """
-        revisions, logs = self.logs(start_revision, end_revision)
-        l = len(revisions)
         local_url = self.local_url.encode('utf-8')
-        for i, rev in enumerate(revisions):
+        for rev, commit in self.logs(start_revision, end_revision):
             # checkout to the revision rev
             self.checkout(revision=rev)
 
@@ -215,12 +220,9 @@ class SvnRepo():
             objects_per_path = git.walk_and_compute_sha1_from_directory(
                 local_url, dir_ok_fn=lambda dirpath: b'.svn' not in dirpath)
 
-            commit = logs[rev]
-
-            nextrev_index = i+1
-            if nextrev_index < l:
-                nextrev = revisions[nextrev_index]
-            else:
+            if rev == end_revision:
                 nextrev = None
+            else:
+                nextrev = rev + 1
 
             yield rev, nextrev, commit, objects_per_path

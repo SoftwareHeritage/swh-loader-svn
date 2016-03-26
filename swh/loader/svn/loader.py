@@ -5,7 +5,7 @@
 
 import datetime
 
-from swh.core import hashutil
+from swh.core import hashutil, utils
 from swh.model import git
 from swh.model.git import GitType
 
@@ -22,6 +22,58 @@ class SvnLoader(libloader.SWHLoader):
     def __init__(self, config, log_class=None):
         log_class = 'swh.loader.svn.SvnLoader' if not log_class else log_class
         super().__init__(config, log_class)
+
+    def process_revisions(self, svnrepo, revision_start, revision_end,
+                          revision_parents):
+        """Process revisions from revision_start to revision_end and send to
+        swh for storage.
+
+        Yields:
+            swh revision
+
+        """
+        if revision_start == 1:
+            parents = {revision_start: []}  # no parents for initial revision
+        else:
+            parents = {revision_start: revision_parents}
+
+        # for each revision
+        for rev, nextrev, commit, objects_per_path in svnrepo.swh_hash_data_per_revision(  # noqa
+                revision_start, revision_end):
+            self.log.debug('rev: %s, nextrev: %s' % (rev, nextrev))
+
+            objects_per_type = {
+                GitType.BLOB: [],
+                GitType.TREE: [],
+                GitType.COMM: [],
+                GitType.RELE: [],
+                GitType.REFS: [],
+            }
+
+            # compute the fs tree's checksums
+            dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
+            self.log.debug('tree: %s' % hashutil.hash_to_hex(dir_id))
+            swh_revision = converters.build_swh_revision(svnrepo.uuid,
+                                                         commit,
+                                                         rev,
+                                                         dir_id,
+                                                         parents[rev])
+            swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
+            if nextrev:
+                parents[nextrev] = [swh_revision['id']]
+
+            self.log.info('svnrev: %s, swhrev: %s' %
+                           (rev, hashutil.hash_to_hex(swh_revision['id'])))
+
+            # send blobs
+            for tree_path in objects_per_path:
+                objs = objects_per_path[tree_path]
+                for obj in objs:
+                    objects_per_type[obj['type']].append(obj)
+
+            self.load(objects_per_type, objects_per_path, svnrepo.origin_id)
+
+            yield swh_revision
 
     def process(self, svn_url, origin, destination_path):
         """Load a svn repository in swh.
@@ -64,71 +116,25 @@ class SvnLoader(libloader.SWHLoader):
             self.log.info('%s@%s already injected.' % (svn_url, revision_end))
             return {'status': True}
 
-        if revision_start == 1:
-            parents = {revision_start: []}  # no parents for initial revision
-        else:
-            parents = {revision_start: revision_parents}
-
         self.log.info('svnrepo: %s' % svnrepo)
-        swh_revisions = []
-        # for each revision
-        for rev, nextrev, commit, objects_per_path in svnrepo.swh_hash_data_per_revision(  # noqa
-                revision_start, revision_end):
-            self.log.debug('rev: %s, nextrev: %s' % (rev, nextrev))
 
-            objects_per_type = {
-                GitType.BLOB: [],
-                GitType.TREE: [],
-                GitType.COMM: [],
-                GitType.RELE: [],
-                GitType.REFS: [],
-            }
+        # process and store revision to swh
+        group_revs = utils.grouper(
+            self.process_revisions(svnrepo, revision_start, revision_end, revision_parents), 100)
 
-            # compute the fs tree's checksums
-
-            dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
-            self.log.debug('tree: %s' % hashutil.hash_to_hex(dir_id))
-            swh_revision = converters.build_swh_revision(svnrepo.uuid,
-                                                         commit,
-                                                         rev,
-                                                         dir_id,
-                                                         parents[rev])
-            swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
-            if nextrev:
-                parents[nextrev] = [swh_revision['id']]
-
-            # and the revision pointing to that tree
-            swh_revisions.append(swh_revision)
-
-            self.log.info('svnrev: %s, swhrev: %s' %
-                           (rev, hashutil.hash_to_hex(swh_revision['id'])))
-
-            # send blobs
-            for tree_path in objects_per_path:
-                objs = objects_per_path[tree_path]
-                for obj in objs:
-                    objects_per_type[obj['type']].append(obj)
-
-            self.load(objects_per_type, objects_per_path, origin['id'])
-
-        # send revisions and occurrences
+        for revisions in group_revs:
+            revs = list(revisions)
+            self.log.info('%s revisions sent to swh' % len(revs))
+            self.maybe_load_revisions(revs)
 
         # create occurrence pointing to the latest revision (the last one)
+        swh_revision = revs[-1]
         occ = converters.build_swh_occurrence(swh_revision['id'], origin['id'],
                                               datetime.datetime.utcnow())
         self.log.debug('occ: %s' % occ)
+        self.maybe_load_occurrences([occ])
 
-        objects_per_type = {
-            GitType.BLOB: [],
-            GitType.TREE: [],
-            GitType.COMM: swh_revisions,
-            GitType.RELE: [],
-            GitType.REFS: [occ],
-        }
-
-        self.load(objects_per_type, objects_per_path, origin['id'])
-
-        return {'status': True, 'objects': objects_per_type}
+        return {'status': True}
 
 
 class SvnLoaderWithHistory(SvnLoader):

@@ -260,18 +260,20 @@ class SWHLoader(config.SWHConfig):
                         objects=objects,
                         log=self.log)
 
-    def bulk_send_commits(self, objects, commits):
-        """Format commits as swh revisions and send them to the database"""
+    def bulk_send_commits(self, commits):
+        """Format commits as swh revisions and send them to the database.
+
+        """
         packet_size = self.config['revision_packet_size']
 
         send_in_packets(commits, (lambda x, objects={}, log=None: x),
                         self.send_revisions, packet_size,
-                        objects=objects,
                         log=self.log)
 
-    def bulk_send_annotated_tags(self, objects, tags):
+    def bulk_send_annotated_tags(self, tags):
         """Format annotated tags (pygit2.Tag objects) as swh releases and send
-        them to the database
+        them to the database.
+
         """
         packet_size = self.config['release_packet_size']
 
@@ -279,41 +281,51 @@ class SWHLoader(config.SWHConfig):
                         self.send_releases, packet_size,
                         log=self.log)
 
-    def bulk_send_refs(self, objects, refs):
+    def bulk_send_refs(self, refs):
         """Format git references as swh occurrences and send them to the
-        database
+        database.
+
         """
         packet_size = self.config['occurrence_packet_size']
         send_in_packets(refs, converters.ref_to_occurrence,
                         self.send_occurrences, packet_size)
 
-    def load(self, objects_per_type, objects_per_path, origin_id):
+    def maybe_load_contents(self, contents, objects_per_path, origin_id):
         if self.config['send_contents']:
-            self.bulk_send_blobs(objects_per_path,
-                                 objects_per_type[GitType.BLOB], origin_id)
+            self.bulk_send_blobs(objects_per_path, contents, origin_id)
         else:
             self.log.info('Not sending contents')
 
+    def maybe_load_directories(self, trees, objects_per_path):
         if self.config['send_directories']:
-            self.bulk_send_trees(objects_per_path,
-                                 objects_per_type[GitType.TREE])
+            self.bulk_send_trees(objects_per_path, trees)
         else:
             self.log.info('Not sending directories')
 
+    def maybe_load_revisions(self, revisions):
         if self.config['send_revisions']:
-            self.bulk_send_commits(objects_per_path,
-                                   objects_per_type[GitType.COMM])
+            self.bulk_send_commits(revisions)
         else:
             self.log.info('Not sending revisions')
 
+    def maybe_load_releases(self, releases):
         if self.config['send_releases']:
-            self.bulk_send_annotated_tags(objects_per_path,
-                                          objects_per_type[GitType.RELE])
+            self.bulk_send_annotated_tags(releases)
         else:
             self.log.info('Not sending releases')
 
+    def maybe_load_occurrences(self, occurrences):
         if self.config['send_occurrences']:
-            self.bulk_send_refs(objects_per_type,
-                                objects_per_type[GitType.REFS])
+            self.bulk_send_refs(occurrences)
         else:
             self.log.info('Not sending occurrences')
+
+    def load(self, objects_per_type, objects_per_path, origin_id):
+        self.maybe_load_contents(objects_per_type[GitType.BLOB],
+                                 objects_per_path,
+                                 origin_id)
+        self.maybe_load_directories(objects_per_type[GitType.TREE],
+                                    objects_per_path)
+        self.maybe_load_revisions(objects_per_type[GitType.COMM])
+        self.maybe_load_releases(objects_per_type[GitType.RELE])
+        self.maybe_load_occurrences(objects_per_type[GitType.REFS])

@@ -135,7 +135,7 @@ class SvnRepo():
         """
         r1 = revision_start
         done = False
-        r2 = r1 + block_size
+        r2 = r1 + block_size - 1
         if r2 > revision_end:
             r2 = revision_end
             done = True
@@ -146,7 +146,7 @@ class SvnRepo():
             yield l
 
         if not done:
-            yield from self.stream_logs(r2, revision_end)
+            yield from self.stream_logs(r2 + 1, revision_end)
 
     def logs(self, revision_start, revision_end):
         """Yields revision and associated revision information between the revision start

@@ -166,9 +166,12 @@ class SvnRepo():
 
         """
         for log in self.stream_logs(revision_start, revision_end):
-            yield log.revision.number, {'author_date': log.date,
-                                        'author_name': log.author,
-                                        'message': log.message}
+            author_date = log.date
+            author = log.author
+            message = log.message
+            yield log.revision.number, {'author_date': author_date if author_date else '',
+                                        'author_name': author if author else '',
+                                        'message': message if message else ''}
 
     def swh_previous_revision_and_parents(self):
         """Look for possible existing revision.

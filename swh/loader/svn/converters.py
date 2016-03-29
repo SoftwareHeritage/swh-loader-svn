@@ -4,31 +4,50 @@
 # See top-level LICENSE file for more information
 
 
+import email.utils
+
+
+def uid_to_person(uid, encode=True):
+    """Convert an uid to a person suitable for insertion.
+
+    Args:
+        uid: an uid of the form "Name <email@ddress>"
+        encode: whether to convert the output to bytes or not
+    Returns: a dictionary with keys:
+        name: the name associated to the uid
+        email: the mail associated to the uid
+    """
+
+    ret = {
+        'name': '',
+        'email': '',
+    }
+
+    name, mail = email.utils.parseaddr(uid)
+
+    if name and email:
+        ret['name'] = name
+        ret['email'] = mail
+    else:
+        ret['name'] = uid
+
+    if encode:
+        for key in ('name', 'email'):
+            ret[key] = ret[key].encode('utf-8')
+
+    return ret
+
+
 def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):
     """Given a svn revision, build a swh revision.
 
     """
-    author = commit.get('author_name')
-    if author:
-        author_committer = {
-            # HACK: shouldn't we use the same for email?
-            'name': author.encode('utf-8'),
-            'email': b'',
-        }
-    else:
-        author_committer = {
-            'name': b'',  # HACK: some repository have commits without author
-            'email': b'',
-        }
+    author = uid_to_person(commit['author_name'])
 
-    msg = commit['message']
-    if msg:
-        msg = msg.encode('utf-8')
-    else:
-        msg = b''
+    msg = commit['message'].encode('utf-8')
 
     date = {
-        'timestamp': commit.get('author_date'),
+        'timestamp': commit['author_date'],
         'offset': 0,
     }
 
@@ -38,8 +57,8 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):
         'type': 'svn',
         'directory': dir_id,
         'message': msg,
-        'author': author_committer,
-        'committer': author_committer,
+        'author': author,
+        'committer': author,
         'synthetic': True,
         'metadata': {
             'extra_headers': {

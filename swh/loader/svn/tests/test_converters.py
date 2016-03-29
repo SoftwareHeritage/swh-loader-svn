@@ -12,6 +12,28 @@ from swh.loader.svn import converters
 
 class TestConverters(unittest.TestCase):
     @istest
+    def uid_to_person(self):
+        actual_person1 = converters.uid_to_person('tony <ynot@dagobah>',
+                                                  encode=False)
+        self.assertEquals(actual_person1, {
+            'name': 'tony',
+            'email': 'ynot@dagobah'
+        })
+
+        actual_person2 = converters.uid_to_person('ardumont <ard@dagobah>',
+                                                  encode=True)
+        self.assertEquals(actual_person2, {
+            'name': b'ardumont',
+            'email': b'ard@dagobah'
+        })
+
+        actual_person3 = converters.uid_to_person('someone')
+        self.assertEquals(actual_person3, {
+            'name': b'someone',
+            'email': b''
+        })
+
+    @istest
     def build_swh_revision(self):
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid='uuid',

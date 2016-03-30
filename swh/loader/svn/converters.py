@@ -61,10 +61,10 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):
         'committer': author,
         'synthetic': True,
         'metadata': {
-            'extra_headers': {
-                'svn_repo_uuid': repo_uuid,
-                'svn_revision': rev,
-            }
+            'extra_headers': [
+                ['svn_repo_uuid', repo_uuid],
+                ['svn_revision', rev]
+            ]
         },
         'parents': parents,
     }

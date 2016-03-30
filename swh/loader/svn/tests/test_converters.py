@@ -54,10 +54,10 @@ class TestConverters(unittest.TestCase):
             'committer': {'name': b'theo', 'email': b''},
             'synthetic': True,
             'metadata': {
-                'extra_headers': {
-                    'svn_repo_uuid': 'uuid',
-                    'svn_revision': 10,
-                }
+                'extra_headers': [
+                    ['svn_repo_uuid', 'uuid'],
+                    ['svn_revision', 10],
+                ]
             },
             'parents': ['123'],
     })
@@ -67,8 +67,8 @@ class TestConverters(unittest.TestCase):
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid='uuid',
             dir_id='dir-id',
-            commit={'author_name': None,
-                    'message': None,
+            commit={'author_name': '',
+                    'message': '',
                     'author_date': '2009-04-10 06:55:53'},
             rev=8,
             parents=[])
@@ -83,10 +83,10 @@ class TestConverters(unittest.TestCase):
             'committer': {'name': b'', 'email': b''},
             'synthetic': True,
             'metadata': {
-                'extra_headers': {
-                    'svn_repo_uuid': 'uuid',
-                    'svn_revision': 8,
-                }
+                'extra_headers': [
+                    ['svn_repo_uuid', 'uuid'],
+                    ['svn_revision', 8],
+                ]
             },
             'parents': [],
     })

@@ -140,7 +140,7 @@ class SvnRepo():
         Args:
             revision_start: the svn revision starting bound
             revision_end: the svn revision ending bound
-            block_size: the number of revisions
+            block_size: block size of revisions to fetch
 
         Yields:
             tuple of revisions and logs.

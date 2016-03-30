@@ -192,13 +192,11 @@ class SvnRepo():
         if occ:
             revision_id = occ[0]['target']
             revisions = storage.revision_get([revision_id])
-            parents = {}
-            for rev, pparents in storage.revision_shortlog([revision_id],
-                                                           limit=1):
-                parents[rev] = pparents
 
             if revisions:
                 rev = revisions[0]
+                parents = dict(storage.revision_shortlog([revision_id],
+                                                         limit=1))
                 extra_headers = dict(rev['metadata']['extra_headers'])
                 svn_revision = extra_headers['svn_revision']
                 return svn_revision, revision_id, {

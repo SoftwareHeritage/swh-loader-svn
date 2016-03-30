@@ -23,21 +23,22 @@ class SvnLoader(libloader.SWHLoader):
         log_class = 'swh.loader.svn.SvnLoader' if not log_class else log_class
         super().__init__(config, log_class)
 
-    def check_history_not_altered_with(self, svnrepo, revision_start,
-                                       revision_id, revision_parents):
+    def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.
 
         """
-        logs_gen = svnrepo.swh_hash_data_per_revision(revision_start,
-                                                      revision_start)
-        rev, _, commit, objects_per_path = list(logs_gen)[0]
+        revision_id = swh_rev['id']
+        parents = swh_rev['parents']
+        hash_data_per_revs = svnrepo.swh_hash_data_per_revision(revision_start,
+                                                                revision_start)
+        rev, _, commit, objects_per_path = list(hash_data_per_revs)[0]
 
         dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
         swh_revision = converters.build_swh_revision(svnrepo.uuid,
                                                      commit,
                                                      rev,
                                                      dir_id,
-                                                     revision_parents[rev])
+                                                     parents)
         swh_revision_id = git.compute_revision_sha1_git(swh_revision)
 
         return swh_revision_id == revision_id
@@ -113,19 +114,26 @@ class SvnLoader(libloader.SWHLoader):
         svnrepo = svn.SvnRepo(svn_url, origin['id'], self.storage,
                               destination_path)
 
-        revision_start, revision_id, revision_parents = svnrepo.swh_previous_revision_and_parents()  # noqa
+        swh_rev = svnrepo.swh_previous_revision()
 
-        self.log.debug('checkout at %s: %s' % (revision_start, svnrepo))
+        if swh_rev:
+            extra_headers = dict(swh_rev['metadata']['extra_headers'])
+            revision_start = extra_headers['svn_revision']
+            revision_parents = {
+                revision_start: swh_rev['parents']
+            }
+        else:
+            revision_start = 1
+            revision_parents = {
+                revision_start: []
+            }
+
         svnrepo.fork(revision_start)
+        self.log.debug('svn co %s@%s' % (svn_url, revision_start))
 
-        self.log.debug('svnrepo: %s' % svnrepo)
-
-        # Check the svn history has not been altered
-        if revision_id and not self.check_history_not_altered_with(
-                svnrepo,
-                revision_start,
-                revision_id,
-                revision_parents):
+        if swh_rev and not self.check_history_not_altered(svnrepo,
+                                                          revision_start,
+                                                          swh_rev):
             msg = 'History of svn %s@%s history modified. Skipping...' % (
                 svn_url, revision_start)
             self.log.warn(msg)
@@ -133,23 +141,21 @@ class SvnLoader(libloader.SWHLoader):
 
         revision_end = svnrepo.head_revision()
 
-        self.log.debug('revision_start: %s\nrevision_end: %s ' % (
+        self.log.debug('[revision_start-revision_end]: [%s-%s]' % (
             revision_start, revision_end))
 
         if revision_start == revision_end and revision_start is not 1:
             self.log.info('%s@%s already injected.' % (svn_url, revision_end))
             return {'status': True}
 
-        self.log.info('svnrepo: %s' % svnrepo)
+        self.log.info('Repo %s ready to be processed.' % svnrepo)
 
         # process and store revision to swh
-        revisions_gen = self.process_revisions(svnrepo,
-                                               revision_start,
-                                               revision_end,
-                                               revision_parents)
-        group_revs = utils.grouper(revisions_gen, 100)
-
-        for revisions in group_revs:
+        for revisions in utils.grouper(
+                self.process_revisions(svnrepo,
+                                       revision_start,
+                                       revision_end,
+                                       revision_parents), 100):
             revs = list(revisions)
             self.log.info('%s revisions sent to swh' % len(revs))
             self.maybe_load_revisions(revs)

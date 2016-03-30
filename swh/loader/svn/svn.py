@@ -8,6 +8,7 @@ import pysvn
 import tempfile
 import subprocess
 
+from pysvn import Revision, opt_revision_kind
 from contextlib import contextmanager
 
 from swh.model import git
@@ -99,7 +100,7 @@ class SvnRepo():
         self.client.checkout(
             self.remote_url,
             self.local_url,
-            revision=pysvn.Revision(pysvn.opt_revision_kind.number, revision))
+            revision=Revision(opt_revision_kind.number, revision))
 
     def fork(self, svn_revision=None):
         """Checkout remote repository to a local working copy (at revision 1
@@ -115,7 +116,7 @@ class SvnRepo():
         """Retrieve current revision of the repository's working copy.
 
         """
-        head_rev = pysvn.Revision(pysvn.opt_revision_kind.head)
+        head_rev = Revision(opt_revision_kind.head)
         info = self.client.info2(self.local_url,
                                  revision=head_rev,
                                  recurse=False)
@@ -156,13 +157,12 @@ class SvnRepo():
         r2 = r1 + block_size - 1
 
         done = False
-        if r2 > revision_end:
+        if r2 >= revision_end:
             r2 = revision_end
             done = True
 
-        rev_start = pysvn.Revision(pysvn.opt_revision_kind.number,
-                                   revision_start)
-        rev_end = pysvn.Revision(pysvn.opt_revision_kind.number, revision_end)
+        rev_start = Revision(opt_revision_kind.number, r1)
+        rev_end = Revision(opt_revision_kind.number, r2)
         for log_entry in self.client.log(url_or_path=self.local_url,
                                          revision_start=rev_start,
                                          revision_end=rev_end):
@@ -176,15 +176,13 @@ class SvnRepo():
             }
 
         if not done:
-            yield from self.stream_logs(r2 + 1, revision_end)
+            yield from self.logs(r2 + 1, revision_end, block_size)
 
-    def swh_previous_revision_and_parents(self):
+    def swh_previous_revision(self):
         """Look for possible existing revision.
 
         Returns:
-            The previous svn revision known by swh with its swh
-            revision id and its associated parents if it exists.
-            The tuple (1, None, []) otherwise.
+            The previous swh revision if found, None otherwise.
 
         """
         storage = self.storage
@@ -194,14 +192,7 @@ class SvnRepo():
             revisions = storage.revision_get([revision_id])
 
             if revisions:
-                rev = revisions[0]
-                extra_headers = dict(rev['metadata']['extra_headers'])
-                svn_revision = extra_headers['svn_revision']
-                return svn_revision, revision_id, {
-                    svn_revision: rev['parents']
-                }
-
-        return 1, None, {1: []}
+                return revisions[0]
 
     def swh_hash_data_per_revision(self, start_revision, end_revision):
         """Compute swh hash data per each revision between start_revision and

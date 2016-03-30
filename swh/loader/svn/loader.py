@@ -23,11 +23,15 @@ class SvnLoader(libloader.SWHLoader):
         log_class = 'swh.loader.svn.SvnLoader' if not log_class else log_class
         super().__init__(config, log_class)
 
-    def check_history_not_altered_with(self, svnrepo, revision_start, revision_id, revision_parents):
+    def check_history_not_altered_with(self, svnrepo, revision_start,
+                                       revision_id, revision_parents):
         """Given a svn repository, check if the history was not tampered with.
 
         """
-        rev, _, commit, objects_per_path = list(svnrepo.swh_hash_data_per_revision(revision_start, revision_start))[0]
+        logs_gen = svnrepo.swh_hash_data_per_revision(revision_start,
+                                                      revision_start)
+        rev, _, commit, objects_per_path = list(logs_gen)[0]
+
         dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
         swh_revision = converters.build_swh_revision(svnrepo.uuid,
                                                      commit,
@@ -76,7 +80,7 @@ class SvnLoader(libloader.SWHLoader):
                 revision_parents[nextrev] = [swh_revision['id']]
 
             self.log.info('svnrev: %s, swhrev: %s' %
-                           (rev, hashutil.hash_to_hex(swh_revision['id'])))
+                          (rev, hashutil.hash_to_hex(swh_revision['id'])))
 
             # send blobs
             for tree_path in objects_per_path:
@@ -117,16 +121,20 @@ class SvnLoader(libloader.SWHLoader):
         self.log.debug('svnrepo: %s' % svnrepo)
 
         # Check the svn history has not been altered
-        if revision_id and not self.check_history_not_altered_with(svnrepo,
-                                                                   revision_start,
-                                                                   revision_id,
-                                                                   revision_parents):
-            self.log.info('History of svn %s@%s history modified. Skipping...' % (svn_url, revision_start))
-            return {'status': False, 'stderr': 'History of svn %s@%s modified.' % (svn_url, revision_start)}
+        if revision_id and not self.check_history_not_altered_with(
+                svnrepo,
+                revision_start,
+                revision_id,
+                revision_parents):
+            msg = 'History of svn %s@%s history modified. Skipping...' % (
+                svn_url, revision_start)
+            self.log.warn(msg)
+            return {'status': False, 'stderr': msg}
 
         revision_end = svnrepo.head_revision()
 
-        self.log.debug('revision_start: %s\nrevision_end: %s ' % (revision_start, revision_end))
+        self.log.debug('revision_start: %s\nrevision_end: %s ' % (
+            revision_start, revision_end))
 
         if revision_start == revision_end and revision_start is not 1:
             self.log.info('%s@%s already injected.' % (svn_url, revision_end))
@@ -135,8 +143,11 @@ class SvnLoader(libloader.SWHLoader):
         self.log.info('svnrepo: %s' % svnrepo)
 
         # process and store revision to swh
-        group_revs = utils.grouper(
-            self.process_revisions(svnrepo, revision_start, revision_end, revision_parents), 100)
+        revisions_gen = self.process_revisions(svnrepo,
+                                               revision_start,
+                                               revision_end,
+                                               revision_parents)
+        group_revs = utils.grouper(revisions_gen, 100)
 
         for revisions in group_revs:
             revs = list(revisions)

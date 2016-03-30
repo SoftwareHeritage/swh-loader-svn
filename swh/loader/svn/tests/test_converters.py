@@ -46,7 +46,8 @@ class TestConverters(unittest.TestCase):
 
         self.assertEquals(actual_swh_revision, {
             'date': {'timestamp': '2009-04-18 06:55:53 +0200', 'offset': 0},
-            'committer_date': {'timestamp': '2009-04-18 06:55:53 +0200', 'offset': 0},
+            'committer_date': {'timestamp': '2009-04-18 06:55:53 +0200',
+                               'offset': 0},
             'type': 'svn',
             'directory': 'dir-id',
             'message': b'commit message',
@@ -60,7 +61,7 @@ class TestConverters(unittest.TestCase):
                 ]
             },
             'parents': ['123'],
-    })
+        })
 
     @istest
     def build_swh_revision_empty_data(self):
@@ -75,7 +76,8 @@ class TestConverters(unittest.TestCase):
 
         self.assertEquals(actual_swh_revision, {
             'date': {'timestamp': '2009-04-10 06:55:53', 'offset': 0},
-            'committer_date': {'timestamp': '2009-04-10 06:55:53', 'offset': 0},
+            'committer_date': {'timestamp': '2009-04-10 06:55:53',
+                               'offset': 0},
             'type': 'svn',
             'directory': 'dir-id',
             'message': b'',
@@ -89,11 +91,13 @@ class TestConverters(unittest.TestCase):
                 ]
             },
             'parents': [],
-    })
+        })
 
     @istest
     def build_swh_occurrence(self):
-        actual_occ = converters.build_swh_occurrence('revision-id', 'origin-id', 'some-date')
+        actual_occ = converters.build_swh_occurrence('revision-id',
+                                                     'origin-id',
+                                                     'some-date')
 
         self.assertEquals(actual_occ, {
             'branch': 'master',

@@ -131,10 +131,11 @@ class SvnRepo():
             'revision').number
 
     def logs(self, revision_start, revision_end, block_size=100):
-        """Stream svn logs between revision_start and revision_end by chunks of block_size logs.
+        """Stream svn logs between revision_start and revision_end by chunks of
+        block_size logs.
 
-        Yields revision and associated revision information between the revision start
-        and revision_end.
+        Yields revision and associated revision information between the
+        revision start and revision_end.
 
         Args:
             revision_start: the svn revision starting bound
@@ -149,6 +150,7 @@ class SvnRepo():
                      - author_date: date of the commit
                      - author_name: name of the author
                      - message: commit message
+
         """
         r1 = revision_start
         r2 = r1 + block_size - 1
@@ -158,7 +160,8 @@ class SvnRepo():
             r2 = revision_end
             done = True
 
-        rev_start = pysvn.Revision(pysvn.opt_revision_kind.number, revision_start)
+        rev_start = pysvn.Revision(pysvn.opt_revision_kind.number,
+                                   revision_start)
         rev_end = pysvn.Revision(pysvn.opt_revision_kind.number, revision_end)
         for log_entry in self.client.log(url_or_path=self.local_url,
                                          revision_start=rev_start,
@@ -198,7 +201,9 @@ class SvnRepo():
                 rev = revisions[0]
                 extra_headers = dict(rev['metadata']['extra_headers'])
                 svn_revision = extra_headers['svn_revision']
-                return svn_revision, revision_id, {svn_revision: parents[revision_id]}
+                return svn_revision, revision_id, {
+                    svn_revision: parents[revision_id]
+                }
 
         return 1, None, {1: []}
 

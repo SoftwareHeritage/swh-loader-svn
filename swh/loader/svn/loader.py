@@ -23,21 +23,34 @@ class SvnLoader(libloader.SWHLoader):
         log_class = 'swh.loader.svn.SvnLoader' if not log_class else log_class
         super().__init__(config, log_class)
 
+    def check_history_not_altered_with(self, svnrepo, revision_start, revision_id, revision_parents):
+        """Given a svn repository, check if the history was not tampered with.
+
+        """
+        rev, _, commit, objects_per_path = list(svnrepo.swh_hash_data_per_revision(revision_start, revision_start))[0]
+        dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
+        swh_revision = converters.build_swh_revision(svnrepo.uuid,
+                                                     commit,
+                                                     rev,
+                                                     dir_id,
+                                                     revision_parents[rev])
+        swh_revision_id = git.compute_revision_sha1_git(swh_revision)
+
+        return swh_revision_id == revision_id
+
     def process_revisions(self, svnrepo, revision_start, revision_end,
                           revision_parents):
-        """Process revisions from revision_start to revision_end and send to
-        swh for storage.
+        """Process revisions from revision_start to revision_end and send to swh for
+        storage.
+
+        At each svn revision, checkout the repository, compute the
+        tree hash and blobs and send for swh storage to store.
+        Then computes and yields the swh revision.
 
         Yields:
             swh revision
 
         """
-        if revision_start == 1:
-            parents = {revision_start: []}  # no parents for initial revision
-        else:
-            parents = {revision_start: revision_parents}
-
-        # for each revision
         for rev, nextrev, commit, objects_per_path in svnrepo.swh_hash_data_per_revision(  # noqa
                 revision_start, revision_end):
             self.log.debug('rev: %s, nextrev: %s' % (rev, nextrev))
@@ -57,10 +70,10 @@ class SvnLoader(libloader.SWHLoader):
                                                          commit,
                                                          rev,
                                                          dir_id,
-                                                         parents[rev])
+                                                         revision_parents[rev])
             swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
             if nextrev:
-                parents[nextrev] = [swh_revision['id']]
+                revision_parents[nextrev] = [swh_revision['id']]
 
             self.log.info('svnrev: %s, swhrev: %s' %
                            (rev, hashutil.hash_to_hex(swh_revision['id'])))
@@ -95,22 +108,25 @@ class SvnLoader(libloader.SWHLoader):
         """
         svnrepo = svn.SvnRepo(svn_url, origin['id'], self.storage,
                               destination_path)
+
+        revision_start, revision_id, revision_parents = svnrepo.swh_previous_revision_and_parents()  # noqa
+
+        self.log.debug('checkout at %s: %s' % (revision_start, svnrepo))
+        svnrepo.fork(revision_start)
+
         self.log.debug('svnrepo: %s' % svnrepo)
 
-        revision_start, revision_parents = svnrepo.swh_previous_revision_and_parents()  # noqa
-
-        svnrepo.fork()
-
-        self.log.debug('checkout at r1: %s' % svnrepo)
+        # Check the svn history has not been altered
+        if revision_id and not self.check_history_not_altered_with(svnrepo,
+                                                                   revision_start,
+                                                                   revision_id,
+                                                                   revision_parents):
+            self.log.info('History of svn %s@%s history modified. Skipping...' % (svn_url, revision_start))
+            return {'status': False, 'stderr': 'History of svn %s@%s modified.' % (svn_url, revision_start)}
 
         revision_end = svnrepo.head_revision()
 
-        self.log.debug('revision_end: %s' % revision_end)
-
-        if not revision_start:
-            revision_start = 1  # svnrepo.initial_revision()
-
-        self.log.debug('initial revision: %s' % revision_start)
+        self.log.debug('revision_start: %s\nrevision_end: %s ' % (revision_start, revision_end))
 
         if revision_start == revision_end and revision_start is not 1:
             self.log.info('%s@%s already injected.' % (svn_url, revision_end))

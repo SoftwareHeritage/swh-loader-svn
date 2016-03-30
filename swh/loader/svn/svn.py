@@ -101,13 +101,14 @@ class SvnRepo():
             self.local_url,
             revision=pysvn.Revision(pysvn.opt_revision_kind.number, revision))
 
-    def fork(self):
-        """Checkout remote repository to a local working copy (at revision 1).
+    def fork(self, svn_revision=None):
+        """Checkout remote repository to a local working copy (at revision 1
+        if the svn revision is not specified).
 
         This will also update the repository's uuid.
 
         """
-        self.checkout(1)
+        self.checkout(1 if not svn_revision else svn_revision)
         self.uuid = self.read_uuid()
 
     def head_revision(self):
@@ -129,31 +130,16 @@ class SvnRepo():
         return self.client.log(self.remote_url)[-1].data.get(
             'revision').number
 
-    def stream_logs(self, revision_start, revision_end, block_size=100):
+    def logs(self, revision_start, revision_end, block_size=100):
         """Stream svn logs between revision_start and revision_end by chunks of block_size logs.
 
-        """
-        r1 = revision_start
-        done = False
-        r2 = r1 + block_size - 1
-        if r2 > revision_end:
-            r2 = revision_end
-            done = True
-
-        for l in self.client.log(url_or_path=self.local_url,
-                                 revision_start=pysvn.Revision(pysvn.opt_revision_kind.number, r1),
-                                 revision_end=pysvn.Revision(pysvn.opt_revision_kind.number, r2)):
-            yield l
-
-        if not done:
-            yield from self.stream_logs(r2 + 1, revision_end)
-
-    def logs(self, revision_start, revision_end):
-        """Yields revision and associated revision information between the revision start
+        Yields revision and associated revision information between the revision start
         and revision_end.
 
         Args:
-            repo: the repository instance
+            revision_start: the svn revision starting bound
+            revision_end: the svn revision ending bound
+            block_size: the number of revisions
 
         Yields:
             tuple of revisions and logs.
@@ -163,22 +149,39 @@ class SvnRepo():
                      - author_date: date of the commit
                      - author_name: name of the author
                      - message: commit message
-
         """
-        for log in self.stream_logs(revision_start, revision_end):
-            author_date = log.date
-            author = log.author
-            message = log.message
-            yield log.revision.number, {'author_date': author_date if author_date else '',
-                                        'author_name': author if author else '',
-                                        'message': message if message else ''}
+        r1 = revision_start
+        r2 = r1 + block_size - 1
+
+        done = False
+        if r2 > revision_end:
+            r2 = revision_end
+            done = True
+
+        rev_start = pysvn.Revision(pysvn.opt_revision_kind.number, revision_start)
+        rev_end = pysvn.Revision(pysvn.opt_revision_kind.number, revision_end)
+        for log_entry in self.client.log(url_or_path=self.local_url,
+                                         revision_start=rev_start,
+                                         revision_end=rev_end):
+            author_date = log_entry.date
+            author = log_entry.author
+            message = log_entry.message
+            yield log_entry.revision.number, {
+                'author_date': author_date if author_date else '',
+                'author_name': author if author else '',
+                'message': message if message else ''
+            }
+
+        if not done:
+            yield from self.stream_logs(r2 + 1, revision_end)
 
     def swh_previous_revision_and_parents(self):
         """Look for possible existing revision.
 
         Returns:
-            The tuple (previous svn revision known by swh and its parents) if
-            the svn revision is found, the tuple (None, None) otherwise.
+            The previous svn revision known by swh with its swh
+            revision id and its associated parents if it exists.
+            The tuple (1, None, []) otherwise.
 
         """
         storage = self.storage
@@ -193,10 +196,11 @@ class SvnRepo():
 
             if revisions:
                 rev = revisions[0]
-                svn_revision = rev['metadata']['extra_headers']['svn_revision']
-                return svn_revision, parents[revision_id]
+                extra_headers = dict(rev['metadata']['extra_headers'])
+                svn_revision = extra_headers['svn_revision']
+                return svn_revision, revision_id, {svn_revision: parents[revision_id]}
 
-        return None, None
+        return 1, None, {1: []}
 
     def swh_hash_data_per_revision(self, start_revision, end_revision):
         """Compute swh hash data per each revision between start_revision and

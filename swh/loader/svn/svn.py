@@ -195,12 +195,10 @@ class SvnRepo():
 
             if revisions:
                 rev = revisions[0]
-                parents = dict(storage.revision_shortlog([revision_id],
-                                                         limit=1))
                 extra_headers = dict(rev['metadata']['extra_headers'])
                 svn_revision = extra_headers['svn_revision']
                 return svn_revision, revision_id, {
-                    svn_revision: parents[revision_id]
+                    svn_revision: rev['parents']
                 }
 
         return 1, None, {1: []}

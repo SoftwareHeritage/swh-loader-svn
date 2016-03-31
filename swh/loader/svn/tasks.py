@@ -88,4 +88,4 @@ class LoadSvnRepositoryTsk(Task):
         #             e_info[1],
         #             ''.join(traceback.format_tb(e_info[2])))}
 
-        self.close_fetch_history(fetch_history_id, result)
+        self.close_fetch_history(storage, fetch_history_id, result)

@@ -94,27 +94,6 @@ class SWHLoader(config.SWHConfig):
         l = logging.getLogger('requests.packages.urllib3.connectionpool')
         l.setLevel(logging.WARN)
 
-    def open_fetch_history(self, origin_id):
-        return self.storage.fetch_history_start(origin_id)
-
-    def close_fetch_history(self, fetch_history_id, res):
-        result = None
-        if 'objects' in res:
-            result = {
-                'contents': len(res['objects'].get(GitType.BLOB, [])),
-                'directories': len(res['objects'].get(GitType.TREE, [])),
-                'revisions': len(res['objects'].get(GitType.COMM, [])),
-                'releases': len(res['objects'].get(GitType.RELE, [])),
-                'occurrences': len(res['objects'].get(GitType.REFS, [])),
-            }
-
-        data = {
-            'status': res['status'],
-            'result': result,
-            'stderr': res.get('stderr')
-        }
-        return self.storage.fetch_history_end(fetch_history_id, data)
-
     @retry(retry_on_exception=retry_loading, stop_max_attempt_number=3)
     def send_contents(self, content_list):
         """Actually send properly formatted contents to the database"""

@@ -5,8 +5,10 @@
 
 from swh.core.config import load_named_config
 from swh.scheduler.task import Task
+from swh.storage import get_storage
+from swh.model.git import GitType
 
-from swh.loader.svn.loader import SvnLoaderWithHistory
+from swh.loader.svn.loader import SvnLoader
 
 
 DEFAULT_CONFIG = {
@@ -40,6 +42,27 @@ class LoadSvnRepositoryTsk(Task):
                 DEFAULT_CONFIG)
         return self.__config
 
+    def open_fetch_history(self, storage, origin_id):
+        return storage.fetch_history_start(origin_id)
+
+    def close_fetch_history(self, storage, fetch_history_id, res):
+        result = None
+        if 'objects' in res:
+            result = {
+                'contents': len(res['objects'].get(GitType.BLOB, [])),
+                'directories': len(res['objects'].get(GitType.TREE, [])),
+                'revisions': len(res['objects'].get(GitType.COMM, [])),
+                'releases': len(res['objects'].get(GitType.RELE, [])),
+                'occurrences': len(res['objects'].get(GitType.REFS, [])),
+            }
+
+        data = {
+            'status': res['status'],
+            'result': result,
+            'stderr': res.get('stderr')
+        }
+        return storage.fetch_history_end(fetch_history_id, data)
+
     def run(self, svn_url, local_path):
         """Import a svn repository.
 
@@ -47,6 +70,25 @@ class LoadSvnRepositoryTsk(Task):
             cf. swh.loader.svn.loader.process docstring
 
         """
-        loader = SvnLoaderWithHistory(self.config)
-        loader.log = self.log
-        loader.process(svn_url, local_path)
+        config = self.config
+        storage = get_storage(
+            config['storage_class'],
+            config['storage_args'],
+        )
+
+        origin = {'type': 'svn', 'url': svn_url}
+        origin['id'] = storage.origin_add_one(origin)
+
+        fetch_history_id = self.open_fetch_history(storage, origin['id'])
+
+        # try:
+        result = SvnLoader(config).process(svn_url, origin, local_path)
+        # except:
+        #     e_info = sys.exc_info()
+        #     self.log.error('Problem during svn load for repo %s - %s' % (
+        #         svn_url, e_info[1]))
+        #     result = {'status': False, 'stderr': 'reason:%s\ntrace:%s' % (
+        #             e_info[1],
+        #             ''.join(traceback.format_tb(e_info[2])))}
+
+        self.close_fetch_history(fetch_history_id, result)

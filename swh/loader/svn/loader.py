@@ -13,15 +13,12 @@ from swh.loader.svn import libloader, svn, converters
 
 
 class SvnLoader(libloader.SWHLoader):
-    """A svn loader.
-
-    This will load the svn repository.
+    """Svn loader to load one svn repository.
 
     """
 
-    def __init__(self, config, log_class=None):
-        log_class = 'swh.loader.svn.SvnLoader' if not log_class else log_class
-        super().__init__(config, log_class)
+    def __init__(self, config):
+        super().__init__(config, 'swh.loader.svn.SvnLoader')
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.
@@ -168,45 +165,3 @@ class SvnLoader(libloader.SWHLoader):
         self.maybe_load_occurrences([occ])
 
         return {'status': True}
-
-
-class SvnLoaderWithHistory(SvnLoader):
-    """A svn loader.
-
-    This will:
-    - create the origin if it does not exist
-    - open an entry in fetch_history
-    - load the svn repository
-    - close the entry in fetch_history
-
-    """
-
-    def __init__(self, config):
-        super().__init__(config, 'swh.loader.svn.SvnLoaderWithHistory')
-
-    def process(self, svn_url, destination_path):
-        """Load a directory in backend.
-
-        Args:
-            - svn_url: svn url to import
-            - origin: Dictionary origin
-              - url: url origin we fetched
-              - type: type of the origin
-
-        """
-        origin = {'type': 'svn', 'url': svn_url}
-        origin['id'] = self.storage.origin_add_one(origin)
-
-        fetch_history_id = self.open_fetch_history(origin['id'])
-
-        # try:
-        result = super().process(svn_url, origin, destination_path)
-        # except:
-        #     e_info = sys.exc_info()
-        #     self.log.error('Problem during svn load for repo %s - %s' % (
-        #         svn_url, e_info[1]))
-        #     result = {'status': False, 'stderr': 'reason:%s\ntrace:%s' % (
-        #             e_info[1],
-        #             ''.join(traceback.format_tb(e_info[2])))}
-
-        self.close_fetch_history(fetch_history_id, result)

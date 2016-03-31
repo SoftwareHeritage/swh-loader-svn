@@ -22,7 +22,7 @@ DEFAULT_CONFIG = {
     'content_packet_size': ('int', 10000),
     'content_packet_size_bytes': ('int', 1073741824),
     'directory_packet_size': ('int', 25000),
-    'revision_packet_size': ('int', 100000),
+    'revision_packet_size': ('int', 100),
     'release_packet_size': ('int', 100000),
     'occurrence_packet_size': ('int', 100000),
 }
@@ -67,7 +67,7 @@ class LoadSvnRepositoryTsk(Task):
         """Import a svn repository.
 
         Args:
-            cf. swh.loader.svn.loader.process docstring
+            cf. swh.loader.svn.SvnLoader.process docstring
 
         """
         config = self.config

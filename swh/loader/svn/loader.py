@@ -147,12 +147,14 @@ class SvnLoader(libloader.SWHLoader):
 
         self.log.info('Repo %s ready to be processed.' % svnrepo)
 
-        # process and store revision to swh
+        # process and store revision to swh (sent by by blocks of
+        # 'revision_packet_size')
         for revisions in utils.grouper(
                 self.process_revisions(svnrepo,
                                        revision_start,
                                        revision_end,
-                                       revision_parents), 100):
+                                       revision_parents),
+                self.config['revision_packet_size']):
             revs = list(revisions)
             self.log.info('%s revisions sent to swh' % len(revs))
             self.maybe_load_revisions(revs)

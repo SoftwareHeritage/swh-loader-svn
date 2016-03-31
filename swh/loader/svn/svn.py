@@ -165,14 +165,37 @@ class SvnRepo():
         rev_end = Revision(opt_revision_kind.number, r2)
         for log_entry in self.client.log(url_or_path=self.local_url,
                                          revision_start=rev_start,
-                                         revision_end=rev_end):
+                                         revision_end=rev_end,
+                                         discover_changed_paths=True):
             author_date = log_entry.date
             author = log_entry.author
             message = log_entry.message
-            yield log_entry.revision.number, {
+            rev = log_entry.revision.number
+            # Determine the changed paths
+            changed_paths = []
+            for paths in log_entry.changed_paths:
+                path = os.path.join(self.local_url, paths.path.lstrip('/'))
+                changed_paths.append({
+                    'path': path.encode('utf-8'),
+                    'action': paths.action  # A(dd), M(odified), D(eleted)
+                })
+
+            # # determine the full diff between (rev - 1) and rev
+            # diff = self.client.diff(url_or_path=self.local_url,
+            #                         tmp_path='/tmp',
+            #                         url_or_path2=self.local_url,
+            #                         revision1=Revision(
+            #                             opt_revision_kind.number, rev-1),
+            #                         revision2=Revision(
+            #                             opt_revision_kind.number, rev),
+            #                         ignore_content_type=True)
+
+            yield rev, {
                 'author_date': author_date if author_date else '',
                 'author_name': author if author else '',
-                'message': message if message else ''
+                'message': message if message else '',
+                'changed_paths': changed_paths,
+                # 'diff': diff
             }
 
         if not done:
@@ -210,14 +233,23 @@ class SvnRepo():
             - objects_per_path: dictionary of path, swh hash data with type
 
         """
+        def ignore_svn_folder(dirpath):
+            return b'.svn' not in dirpath
+
         local_url = self.local_url.encode('utf-8')
         for rev, commit in self.logs(start_revision, end_revision):
             # checkout to the revision rev
             self.checkout(revision=rev)
 
-            # compute git commit
-            objects_per_path = git.walk_and_compute_sha1_from_directory(
-                local_url, dir_ok_fn=lambda dirpath: b'.svn' not in dirpath)
+            if rev == start_revision:  # first time we walk the complete tree
+                # compute git commit
+                objects_per_path = git.walk_and_compute_sha1_from_directory(
+                    local_url, dir_ok_fn=ignore_svn_folder)
+            else:  # then we update only what needs to be
+                objects_per_path = git.update_checksums_from(
+                    commit['changed_paths'],
+                    objects_per_path,
+                    dir_ok_fn=ignore_svn_folder)
 
             if rev == end_revision:
                 nextrev = None

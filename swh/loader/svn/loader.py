@@ -55,7 +55,11 @@ class SvnLoader(libloader.SWHLoader):
         """
         for rev, nextrev, commit, objects_per_path in svnrepo.swh_hash_data_per_revision(  # noqa
                 revision_start, revision_end):
-            self.log.debug('rev: %s, nextrev: %s' % (rev, nextrev))
+            self.log.debug('rev: %s, nextrev: %s\ncommit: %s' % (
+                rev, nextrev, commit))
+
+            self.log.debug('objects_per_path_keys: %s\nobjects_per_path: %s' %
+                           (objects_per_path.keys(), objects_per_path))
 
             objects_per_type = {
                 GitType.BLOB: [],

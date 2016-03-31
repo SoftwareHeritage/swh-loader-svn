@@ -79,24 +79,6 @@ class SWHLoader(config.SWHConfig):
     This will load the svn repository.
 
     """
-    DEFAULT_CONFIG = {
-        'storage_class': ('str', 'remote_storage'),
-        'storage_args': ('list[str]', ['http://localhost:5000/']),
-
-        'send_contents': ('bool', True),
-        'send_directories': ('bool', True),
-        'send_revisions': ('bool', True),
-        'send_releases': ('bool', True),
-        'send_occurrences': ('bool', True),
-
-        'content_packet_size': ('int', 10000),
-        'content_packet_size_bytes': ('int', 1024 * 1024 * 1024),
-        'directory_packet_size': ('int', 25000),
-        'revision_packet_size': ('int', 100000),
-        'release_packet_size': ('int', 100000),
-        'occurrence_packet_size': ('int', 100000),
-    }
-
     def __init__(self, config, logging_class):
         self.config = config
 

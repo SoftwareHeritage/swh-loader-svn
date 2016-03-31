@@ -15,6 +15,7 @@ from swh.core import config
 
 from swh.loader.dir import converters
 from swh.model.git import GitType
+from swh.storage import get_storage
 
 
 def send_in_packets(source_list, formatter, sender, packet_size,
@@ -82,12 +83,8 @@ class SWHLoader(config.SWHConfig):
     def __init__(self, config, logging_class):
         self.config = config
 
-        if self.config['storage_class'] == 'remote_storage':
-            from swh.storage.api.client import RemoteStorage as Storage
-        else:
-            from swh.storage import Storage
-
-        self.storage = Storage(*self.config['storage_args'])
+        self.storage = get_storage(config['storage_class'],
+                                   config['storage_args'])
 
         self.log = logging.getLogger(logging_class)
 

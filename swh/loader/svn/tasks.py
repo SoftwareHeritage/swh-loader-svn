@@ -71,10 +71,7 @@ class LoadSvnRepositoryTsk(Task):
 
         """
         config = self.config
-        storage = get_storage(
-            config['storage_class'],
-            config['storage_args'],
-        )
+        storage = get_storage(config['storage_class'], config['storage_args'])
 
         origin = {'type': 'svn', 'url': svn_url}
         origin['id'] = storage.origin_add_one(origin)

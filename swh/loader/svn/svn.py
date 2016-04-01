@@ -9,8 +9,8 @@ import tempfile
 import subprocess
 import shutil
 
-from pysvn import Revision, opt_revision_kind
 from contextlib import contextmanager
+from pysvn import Revision, opt_revision_kind
 from retrying import retry
 
 from swh.model import git

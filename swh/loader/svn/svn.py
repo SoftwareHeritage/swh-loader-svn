@@ -7,6 +7,7 @@ import os
 import pysvn
 import tempfile
 import subprocess
+import shutil
 
 from pysvn import Revision, opt_revision_kind
 from contextlib import contextmanager
@@ -257,3 +258,9 @@ class SvnRepo():
                 nextrev = rev + 1
 
             yield rev, nextrev, commit, objects_per_path
+
+    def cleanup(self):
+        """Clean up the local url checkout.
+
+        """
+        shutil.rmtree(self.local_url)

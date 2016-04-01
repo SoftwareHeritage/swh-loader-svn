@@ -115,59 +115,64 @@ class SvnLoader(libloader.SWHLoader):
         svnrepo = svn.SvnRepo(svn_url, origin['id'], self.storage,
                               destination_path)
 
-        swh_rev = svnrepo.swh_previous_revision()
+        try:
+            swh_rev = svnrepo.swh_previous_revision()
 
-        if swh_rev:
-            extra_headers = dict(swh_rev['metadata']['extra_headers'])
-            revision_start = extra_headers['svn_revision']
-            revision_parents = {
-                revision_start: swh_rev['parents']
-            }
-        else:
-            revision_start = 1
-            revision_parents = {
-                revision_start: []
-            }
+            if swh_rev:
+                extra_headers = dict(swh_rev['metadata']['extra_headers'])
+                revision_start = extra_headers['svn_revision']
+                revision_parents = {
+                    revision_start: swh_rev['parents']
+                }
+            else:
+                revision_start = 1
+                revision_parents = {
+                    revision_start: []
+                }
 
-        svnrepo.fork(revision_start)
-        self.log.debug('svn co %s@%s' % (svn_url, revision_start))
+            svnrepo.fork(revision_start)
+            self.log.debug('svn co %s@%s' % (svn_url, revision_start))
 
-        if swh_rev and not self.check_history_not_altered(svnrepo,
-                                                          revision_start,
-                                                          swh_rev):
-            msg = 'History of svn %s@%s history modified. Skipping...' % (
-                svn_url, revision_start)
-            self.log.warn(msg)
-            return {'status': False, 'stderr': msg}
+            if swh_rev and not self.check_history_not_altered(svnrepo,
+                                                              revision_start,
+                                                              swh_rev):
+                msg = 'History of svn %s@%s history modified. Skipping...' % (
+                    svn_url, revision_start)
+                self.log.warn(msg)
+                return {'status': False, 'stderr': msg}
 
-        revision_end = svnrepo.head_revision()
+            revision_end = svnrepo.head_revision()
 
-        self.log.debug('[revision_start-revision_end]: [%s-%s]' % (
-            revision_start, revision_end))
+            self.log.debug('[revision_start-revision_end]: [%s-%s]' % (
+                revision_start, revision_end))
 
-        if revision_start == revision_end and revision_start is not 1:
-            self.log.info('%s@%s already injected.' % (svn_url, revision_end))
-            return {'status': True}
+            if revision_start == revision_end and revision_start is not 1:
+                self.log.info('%s@%s already injected.' % (svn_url,
+                                                           revision_end))
+                return {'status': True}
 
-        self.log.info('Repo %s ready to be processed.' % svnrepo)
+            self.log.info('Repo %s ready to be processed.' % svnrepo)
 
-        # process and store revision to swh (sent by by blocks of
-        # 'revision_packet_size')
-        for revisions in utils.grouper(
-                self.process_revisions(svnrepo,
-                                       revision_start,
-                                       revision_end,
-                                       revision_parents),
-                self.config['revision_packet_size']):
-            revs = list(revisions)
-            self.log.info('%s revisions sent to swh' % len(revs))
-            self.maybe_load_revisions(revs)
+            # process and store revision to swh (sent by by blocks of
+            # 'revision_packet_size')
+            for revisions in utils.grouper(
+                    self.process_revisions(svnrepo,
+                                           revision_start,
+                                           revision_end,
+                                           revision_parents),
+                    self.config['revision_packet_size']):
+                revs = list(revisions)
+                self.log.info('%s revisions sent to swh' % len(revs))
+                self.maybe_load_revisions(revs)
 
-        # create occurrence pointing to the latest revision (the last one)
-        swh_revision = revs[-1]
-        occ = converters.build_swh_occurrence(swh_revision['id'], origin['id'],
-                                              datetime.datetime.utcnow())
-        self.log.debug('occ: %s' % occ)
-        self.maybe_load_occurrences([occ])
+            # create occurrence pointing to the latest revision (the last one)
+            swh_revision = revs[-1]
+            occ = converters.build_swh_occurrence(swh_revision['id'],
+                                                  origin['id'],
+                                                  datetime.datetime.utcnow())
+            self.log.debug('occ: %s' % occ)
+            self.maybe_load_occurrences([occ])
+        finally:
+            svnrepo.cleanup()
 
         return {'status': True}

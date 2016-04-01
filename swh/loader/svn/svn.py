@@ -11,6 +11,7 @@ import shutil
 
 from pysvn import Revision, opt_revision_kind
 from contextlib import contextmanager
+from retrying import retry
 
 from swh.model import git
 
@@ -91,6 +92,7 @@ class SvnRepo():
             uuid = subprocess.check_output(cmd, shell=True)
             return uuid.strip().decode('utf-8')
 
+    @retry(stop_max_attempt_number=3)
     def checkout(self, revision):
         """Checkout repository repo at revision.
 

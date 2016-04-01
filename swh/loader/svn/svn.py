@@ -69,7 +69,6 @@ class SvnRepo():
     """Swh representation of a svn repository.
 
     """
-
     def __init__(self, remote_url, origin_id, storage, local_url=None):
         self.remote_url = remote_url
         self.storage = storage
@@ -134,6 +133,17 @@ class SvnRepo():
         return self.client.log(self.remote_url)[-1].data.get(
             'revision').number
 
+    def _to_change_paths(self, changed_paths):
+        """Convert changed paths to dict.
+
+        """
+        for paths in changed_paths:
+            path = os.path.join(self.local_url, paths.path.lstrip('/'))
+            yield{
+                'path': path.encode('utf-8'),
+                'action': paths.action  # A(dd), M(odified), D(eleted)
+            }
+
     def logs(self, revision_start, revision_end, block_size=100):
         """Stream svn logs between revision_start and revision_end by chunks of
         block_size logs.
@@ -174,16 +184,7 @@ class SvnRepo():
             author = log_entry.author
             message = log_entry.message
             rev = log_entry.revision.number
-            # Determine the changed paths
-            changed_paths = []
-            for paths in log_entry.changed_paths:
-                path = os.path.join(self.local_url, paths.path.lstrip('/'))
-                changed_paths.append({
-                    'path': path.encode('utf-8'),
-                    'action': paths.action  # A(dd), M(odified), D(eleted)
-                })
-
-            # # determine the full diff between (rev - 1) and rev
+            # determine the full diff between (rev - 1) and rev
             # diff = self.client.diff(url_or_path=self.local_url,
             #                         tmp_path='/tmp',
             #                         url_or_path2=self.local_url,
@@ -197,7 +198,8 @@ class SvnRepo():
                 'author_date': author_date if author_date else '',
                 'author_name': author if author else '',
                 'message': message if message else '',
-                'changed_paths': changed_paths,
+                'changed_paths': self._to_change_paths(
+                    log_entry.changed_paths),
                 # 'diff': diff
             }
 

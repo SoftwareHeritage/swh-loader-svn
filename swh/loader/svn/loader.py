@@ -5,7 +5,7 @@
 
 import datetime
 
-from swh.core import hashutil, utils
+from swh.core import utils
 from swh.model import git
 from swh.model.git import GitType
 
@@ -57,11 +57,6 @@ class SvnLoader(libloader.SWHLoader):
         """
         for rev, nextrev, commit, objects_per_path in svnrepo.swh_hash_data_per_revision(  # noqa
                 revision_start, revision_end):
-            self.log.debug('rev: %s, nextrev: %s\ncommit: %s' % (
-                rev, nextrev, commit))
-
-            self.log.debug('objects_per_path_keys: %s\nobjects_per_path: %s' %
-                           (objects_per_path.keys(), objects_per_path))
 
             objects_per_type = {
                 GitType.BLOB: [],
@@ -73,18 +68,17 @@ class SvnLoader(libloader.SWHLoader):
 
             # compute the fs tree's checksums
             dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
-            self.log.debug('tree: %s' % hashutil.hash_to_hex(dir_id))
             swh_revision = converters.build_swh_revision(svnrepo.uuid,
                                                          commit,
                                                          rev,
                                                          dir_id,
                                                          revision_parents[rev])
             swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
+            # self.log.debug('svnrev: %s, swhrev: %s, nextsvnrev: %s' % (
+            #     rev, swh_revision['id'], nextrev))
+
             if nextrev:
                 revision_parents[nextrev] = [swh_revision['id']]
-
-            self.log.info('svnrev: %s, swhrev: %s' %
-                          (rev, hashutil.hash_to_hex(swh_revision['id'])))
 
             # send blobs
             for tree_path in objects_per_path:
@@ -164,7 +158,6 @@ class SvnLoader(libloader.SWHLoader):
                                            revision_parents),
                     self.config['revision_packet_size']):
                 revs = list(revisions)
-                self.log.info('%s revisions sent to swh' % len(revs))
                 self.maybe_load_revisions(revs)
 
             # create occurrence pointing to the latest revision (the last one)

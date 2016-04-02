@@ -3,6 +3,8 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import logging
+
 from swh.core.config import load_named_config
 from swh.scheduler.task import Task
 from swh.storage import get_storage
@@ -40,6 +42,10 @@ class LoadSvnRepositoryTsk(Task):
             self.__config = load_named_config(
                 'loader/svn.ini',
                 DEFAULT_CONFIG)
+
+        l = logging.getLogger('requests.packages.urllib3.connectionpool')
+        l.setLevel(logging.WARN)
+
         return self.__config
 
     def open_fetch_history(self, storage, origin_id):

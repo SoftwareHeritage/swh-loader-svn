@@ -1,0 +1,205 @@
+#+title: Errors encountered during testing
+#+author: ardumont
+
+No author found:
+#+BEGIN_SRC sh
+346a2fa8c] raised unexpected: AttributeError("PysvnLog instance has no attribute 'author'",)
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/celery/app/trace.py", line 240, in trace_task
+    R = retval = fun(*args, **kwargs)
+  File "/usr/lib/python3/dist-packages/celery/app/trace.py", line 438, in __protected_call__
+    return self.run(*args, **kwargs)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/tasks.py", line 82, in run
+    result = SvnLoader(config).process(svn_url, origin, local_path)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/loader.py", line 163, in process
+    self.config['revision_packet_size']):
+  File "/home/tony/work/inria/repo/swh-environment/swh-core/swh/core/utils.py", line 25, in grouper
+    for _data in itertools.zip_longest(*args, fillvalue=fv):
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/loader.py", line 57, in process_revisions
+    revision_start, revision_end):
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 245, in swh_hash_data_per_revision
+    for rev, commit in self.logs(start_revision, end_revision):
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+p    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
+    yield from self.logs(r2 + 1, revision_end, block_size)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 184, in logs
+    author = log_entry.author
+  File "/home/tony/.local/lib/python3.5/site-packages/pysvn/__init__.py", line 29, in __getattr__
+    raise AttributeError( "%s instance has no attribute '%s'" % (self.__class__.__name__, name) )
+AttributeError: PysvnLog instance has no attribute 'author'
+#+END_SRC

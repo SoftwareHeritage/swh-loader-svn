@@ -65,6 +65,12 @@ def init_repo(remote_repo_url, destination_path=None):
             'local_url': local_repo_url}
 
 
+# When log message contains empty data
+DEFAULT_AUTHOR_NAME = ''
+DEFAULT_AUTHOR_DATE = ''
+DEFAULT_AUTHOR_MESSAGE = ''
+
+
 class SvnRepo():
     """Swh representation of a svn repository.
 
@@ -133,16 +139,45 @@ class SvnRepo():
         return self.client.log(self.remote_url)[-1].data.get(
             'revision').number
 
-    def _to_change_paths(self, changed_paths):
-        """Convert changed paths to dict.
+    def _to_change_paths(self, log_entry):
+        """Convert changed paths to dict if any.
 
         """
+        try:
+            changed_paths = log_entry.changed_paths
+        except AttributeError:
+            changed_paths = []
+
         for paths in changed_paths:
             path = os.path.join(self.local_url, paths.path.lstrip('/'))
-            yield{
+            yield {
                 'path': path.encode('utf-8'),
                 'action': paths.action  # A(dd), M(odified), D(eleted)
             }
+
+    def _to_entry(self, log_entry):
+        try:
+            author_date = log_entry.date or DEFAULT_AUTHOR_DATE
+        except AttributeError:
+            author_date = DEFAULT_AUTHOR_DATE
+
+        try:
+            author = log_entry.author or DEFAULT_AUTHOR_NAME
+        except AttributeError:
+            author = DEFAULT_AUTHOR_NAME
+
+        try:
+            message = log_entry.message or DEFAULT_AUTHOR_MESSAGE
+        except AttributeError:
+            message = DEFAULT_AUTHOR_MESSAGE
+
+        return {
+            'rev': log_entry.revision.number,
+            'author_date': author_date,
+            'author_name': author,
+            'message': message,
+            'changed_paths': self._to_change_paths(log_entry),
+        }
 
     def logs(self, revision_start, revision_end, block_size=100):
         """Stream svn logs between revision_start and revision_end by chunks of
@@ -180,10 +215,6 @@ class SvnRepo():
                                          revision_start=rev_start,
                                          revision_end=rev_end,
                                          discover_changed_paths=True):
-            author_date = log_entry.date
-            author = log_entry.author
-            message = log_entry.message
-            rev = log_entry.revision.number
             # determine the full diff between (rev - 1) and rev
             # diff = self.client.diff(url_or_path=self.local_url,
             #                         tmp_path='/tmp',
@@ -194,20 +225,13 @@ class SvnRepo():
             #                             opt_revision_kind.number, rev),
             #                         ignore_content_type=True)
 
-            yield rev, {
-                'author_date': author_date if author_date else '',
-                'author_name': author if author else '',
-                'message': message if message else '',
-                'changed_paths': self._to_change_paths(
-                    log_entry.changed_paths),
-                # 'diff': diff
-            }
+            yield self._to_entry(log_entry)
 
         if not done:
             yield from self.logs(r2 + 1, revision_end, block_size)
 
     def swh_previous_revision(self):
-        """Look for possible existing revision.
+        """Look for possible existing revision in swh.
 
         Returns:
             The previous swh revision if found, None otherwise.
@@ -242,7 +266,8 @@ class SvnRepo():
             return b'.svn' not in dirpath
 
         local_url = self.local_url.encode('utf-8')
-        for rev, commit in self.logs(start_revision, end_revision):
+        for commit in self.logs(start_revision, end_revision):
+            rev = commit['rev']
             # checkout to the revision rev
             self.checkout(revision=rev)
 

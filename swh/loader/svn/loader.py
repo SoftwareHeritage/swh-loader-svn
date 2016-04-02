@@ -18,7 +18,9 @@ class SvnLoader(libloader.SWHLoader):
     """
 
     def __init__(self, config):
-        super().__init__(config, 'swh.loader.svn.SvnLoader')
+        super().__init__(config,
+                         revision_type='svn',
+                         logging_class='swh.loader.svn.SvnLoader')
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.

@@ -256,13 +256,29 @@ class SWHLoader(config.SWHConfig):
                         objects=objects,
                         log=self.log)
 
+    def shallow_commit(self, commit):
+        return commit['id']
+
+    def filter_missing_commits(self, commits):
+        """Filter missing commit from swh.
+
+        """
+        commits_per_sha1 = {}
+        for commit in commits:
+            commits_per_sha1[commit['id']] = commit
+
+        for sha in self.storage.revision_missing((self.shallow_commit(b)
+                                                  for b in commits)):
+            yield commits_per_sha1[sha]
+
     def bulk_send_commits(self, commits):
         """Format commits as swh revisions and send them to the database.
 
         """
         packet_size = self.config['revision_packet_size']
 
-        send_in_packets(commits, (lambda x, objects={}, log=None: x),
+        send_in_packets(self.filter_missing_commits(commits),
+                        (lambda x, objects={}, log=None: x),
                         self.send_revisions, packet_size,
                         log=self.log)
 

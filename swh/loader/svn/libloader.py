@@ -248,9 +248,9 @@ class SWHLoader(config.SWHConfig):
         send_in_packets(refs, converters.ref_to_occurrence,
                         self.send_occurrences, packet_size)
 
-    def maybe_load_contents(self, contents, objects_per_path, origin_id):
+    def maybe_load_contents(self, contents, origin_id):
         if self.config['send_contents']:
-            self.bulk_send_blobs(objects_per_path, contents, origin_id)
+            self.bulk_send_blobs(contents, origin_id)
         else:
             self.log.info('Not sending contents')
 
@@ -280,7 +280,6 @@ class SWHLoader(config.SWHConfig):
 
     def load(self, objects_per_type, objects_per_path, origin_id):
         self.maybe_load_contents(objects_per_type[GitType.BLOB],
-                                 objects_per_path,
                                  origin_id)
         self.maybe_load_directories(objects_per_type[GitType.TREE],
                                     objects_per_path)

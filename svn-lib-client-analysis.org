@@ -22,4 +22,4 @@
 |                                         |                                                                      | docs: https://www.samba.org/~jelmer/subvertpy/apidocs/                       |             |                                          |
 |                                         |                                                                      | full support svn api                                                         |             |                                          |
 |-----------------------------------------+----------------------------------------------------------------------+------------------------------------------------------------------------------+-------------+------------------------------------------|
-Note: All are free software, so it's not entertained as pros.
+Note: All are free software, so it's not entertained as pros (as it is implicit).

@@ -196,24 +196,62 @@ class SWHLoader(config.SWHConfig):
                            'swh_id': log_id,
                        })
 
-    def bulk_send_blobs(self, objects, blobs, origin_id):
+    def shallow_blob(self, obj):
+        return {
+            'sha1': obj['sha1'],
+            'sha256': obj['sha256'],
+            'sha1_git': obj['sha1_git'],
+            'length': obj['length']
+        }
+
+    def filter_missing_blobs(self, blobs):
+        """Filter missing blob from swh.
+
+        """
+        blobs_per_sha1 = {}
+        for blob in blobs:
+            blobs_per_sha1[blob['sha1']] = blob
+
+        for sha1 in self.storage.content_missing((self.shallow_blob(b)
+                                                 for b in blobs),
+                                                 key_hash='sha1'):
+            yield blobs_per_sha1[sha1]
+
+    def bulk_send_blobs(self, blobs, origin_id):
         """Format blobs as swh contents and send them to the database"""
         packet_size = self.config['content_packet_size']
         packet_size_bytes = self.config['content_packet_size_bytes']
         max_content_size = self.config['content_size_limit']
 
-        send_in_packets(blobs, converters.blob_to_content,
+        send_in_packets(self.filter_missing_blobs(blobs),
+                        converters.blob_to_content,
                         self.send_contents, packet_size,
                         packet_size_bytes=packet_size_bytes,
                         log=self.log,
                         max_content_size=max_content_size,
                         origin_id=origin_id)
 
+    def shallow_tree(self, tree):
+        return tree['sha1_git']
+
+    def filter_missing_trees(self, trees):
+        """Filter missing tree from swh.
+
+        """
+        trees_per_sha1 = {}
+        for tree in trees:
+            trees_per_sha1[tree['sha1_git']] = tree
+
+        for sha in self.storage.directory_missing((self.shallow_tree(b)
+                                                   for b in trees)):
+            yield trees_per_sha1[sha]
+
     def bulk_send_trees(self, objects, trees):
         """Format trees as swh directories and send them to the database"""
         packet_size = self.config['directory_packet_size']
 
-        send_in_packets(trees, converters.tree_to_directory,
+        send_in_packets(self.filter_missing_trees(trees),
+                        converters.tree_to_directory,
                         self.send_directories, packet_size,
                         objects=objects,
                         log=self.log)

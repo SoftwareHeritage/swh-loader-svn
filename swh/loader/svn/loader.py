@@ -6,7 +6,7 @@
 import datetime
 
 from swh.core import utils
-from swh.model import git
+from swh.model import git, hashutil
 from swh.model.git import GitType
 
 from swh.loader.svn import libloader, svn, converters
@@ -17,9 +17,10 @@ class SvnLoader(libloader.SWHLoader):
 
     """
 
-    def __init__(self, config):
+    def __init__(self, config, origin_id):
         super().__init__(config,
                          revision_type='svn',
+                         origin_id=origin_id,
                          logging_class='swh.loader.svn.SvnLoader')
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
@@ -74,8 +75,8 @@ class SvnLoader(libloader.SWHLoader):
                                                          dir_id,
                                                          revision_parents[rev])
             swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
-            # self.log.debug('svnrev: %s, swhrev: %s, nextsvnrev: %s' % (
-            #     rev, swh_revision['id'], nextrev))
+            self.log.debug('rev: %s, swhrev: %s' % (
+                rev, hashutil.hash_to_hex(swh_revision['id'])))
 
             if nextrev:
                 revision_parents[nextrev] = [swh_revision['id']]
@@ -86,7 +87,7 @@ class SvnLoader(libloader.SWHLoader):
                 for obj in objs:
                     objects_per_type[obj['type']].append(obj)
 
-            self.load(objects_per_type, objects_per_path, svnrepo.origin_id)
+            self.load(objects_per_type, objects_per_path)
 
             yield swh_revision
 
@@ -167,6 +168,9 @@ class SvnLoader(libloader.SWHLoader):
                                                   datetime.datetime.utcnow())
             self.log.debug('occ: %s' % occ)
             self.maybe_load_occurrences([occ])
+
+            # flush eventual remaining data
+            self.flush()
         finally:
             svnrepo.clean_fs()
 

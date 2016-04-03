@@ -22,7 +22,8 @@ DEFAULT_CONFIG = {
     'send_releases': ('bool', True),
     'send_occurrences': ('bool', True),
     'content_packet_size': ('int', 10000),
-    'content_packet_size_bytes': ('int', 1073741824),
+    'content_packet_block_size_bytes': ('int', 100 * 1024 * 1024),
+    'content_packet_size_bytes': ('int', 1 * 1024 * 1024 * 1024),
     'directory_packet_size': ('int', 25000),
     'revision_packet_size': ('int', 100),
     'release_packet_size': ('int', 100000),
@@ -85,7 +86,9 @@ class LoadSvnRepositoryTsk(Task):
         fetch_history_id = self.open_fetch_history(storage, origin['id'])
 
         # try:
-        result = SvnLoader(config).process(svn_url, origin, local_path)
+        result = SvnLoader(config, origin['id']).process(svn_url,
+                                                         origin,
+                                                         local_path)
         # except:
         #     e_info = sys.exc_info()
         #     self.log.error('Problem during svn load for repo %s - %s' % (

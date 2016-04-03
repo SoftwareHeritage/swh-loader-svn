@@ -179,6 +179,15 @@ class SvnRepo():
             'changed_paths': self._to_change_paths(log_entry),
         }
 
+    @retry(stop_max_attempt_number=3)
+    def _logs(self, revision_start, revision_end):
+        rev_start = Revision(opt_revision_kind.number, revision_start)
+        rev_end = Revision(opt_revision_kind.number, revision_end)
+        return self.client.log(url_or_path=self.local_url,
+                               revision_start=rev_start,
+                               revision_end=rev_end,
+                               discover_changed_paths=True)
+
     def logs(self, revision_start, revision_end, block_size=100):
         """Stream svn logs between revision_start and revision_end by chunks of
         block_size logs.
@@ -209,12 +218,7 @@ class SvnRepo():
             r2 = revision_end
             done = True
 
-        rev_start = Revision(opt_revision_kind.number, r1)
-        rev_end = Revision(opt_revision_kind.number, r2)
-        for log_entry in self.client.log(url_or_path=self.local_url,
-                                         revision_start=rev_start,
-                                         revision_end=rev_end,
-                                         discover_changed_paths=True):
+        for log_entry in self._logs(r1, r2):
             # determine the full diff between (rev - 1) and rev
             # diff = self.client.diff(url_or_path=self.local_url,
             #                         tmp_path='/tmp',

@@ -1,7 +1,35 @@
 #+title: Errors encountered during testing
 #+author: ardumont
 
-No author found:
+* Malformed xml exception when asking for log
+
+#+BEGIN_SRC sh
+[2016-04-03 11:10:43,740: ERROR/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[8ffa1cf0-6e88-40f5-9918-f659de0810f3] raised unexpected: ClientError('The XML response contains invalid XML\nMalformed XML: not well-formed (invalid token)',)
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/celery/app/trace.py", line 240, in trace_task
+    R = retval = fun(*args, **kwargs)
+  File "/usr/lib/python3/dist-packages/celery/app/trace.py", line 438, in __protected_call__
+    return self.run(*args, **kwargs)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/tasks.py", line 88, in run
+    result = SvnLoader(config).process(svn_url, origin, local_path)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/loader.py", line 159, in process
+    self.config['revision_packet_size']):
+  File "/home/tony/work/inria/repo/swh-environment/swh-core/swh/core/utils.py", line 25, in grouper
+    for _data in itertools.zip_longest(*args, fillvalue=fv):
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/loader.py", line 59, in process_revisions
+    revision_start, revision_end):
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 269, in swh_hash_data_per_revision
+    for commit in self.logs(start_revision, end_revision):
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 217, in logs
+    discover_changed_paths=True):
+pysvn._pysvn_3_5.ClientError: The XML response contains invalid XML
+Malformed XML: not well-formed (invalid token)
+#+END_SRC
+
+* No author found
+
+In general, author, message and even date can be empty in svn revision log entry.
+
 #+BEGIN_SRC sh
 346a2fa8c] raised unexpected: AttributeError("PysvnLog instance has no attribute 'author'",)
 Traceback (most recent call last):
@@ -178,7 +206,7 @@ Traceback (most recent call last):
   File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
     yield from self.logs(r2 + 1, revision_end, block_size)
   File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
-p    yield from self.logs(r2 + 1, revision_end, block_size)
+    yield from self.logs(r2 + 1, revision_end, block_size)
   File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs
     yield from self.logs(r2 + 1, revision_end, block_size)
   File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 207, in logs

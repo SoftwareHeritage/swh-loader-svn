@@ -168,6 +168,6 @@ class SvnLoader(libloader.SWHLoader):
             self.log.debug('occ: %s' % occ)
             self.maybe_load_occurrences([occ])
         finally:
-            svnrepo.cleanup()
+            svnrepo.clean_fs()
 
         return {'status': True}

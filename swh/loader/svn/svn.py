@@ -292,7 +292,7 @@ class SvnRepo():
 
             yield rev, nextrev, commit, objects_per_path
 
-    def cleanup(self):
+    def clean_fs(self):
         """Clean up the local url checkout.
 
         """

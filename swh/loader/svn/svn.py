@@ -71,6 +71,20 @@ DEFAULT_AUTHOR_DATE = ''
 DEFAULT_AUTHOR_MESSAGE = ''
 
 
+class SvnRepoException(ValueError):
+    def __init__(self, svnrepo, e):
+        super().__init__(e)
+        self.svnrepo = svnrepo
+
+
+def retry_with_cleanup(exception):
+    """Clean the repository from locks before retrying.
+
+    """
+    exception.svnrepo.cleanup()
+    return True
+
+
 class SvnRepo():
     """Swh representation of a svn repository.
 
@@ -97,7 +111,14 @@ class SvnRepo():
             uuid = subprocess.check_output(cmd, shell=True)
             return uuid.strip().decode('utf-8')
 
-    @retry(stop_max_attempt_number=3)
+    def cleanup(self):
+        """Clean up any locks in the working copy at path.
+
+        """
+        self.client.cleanup(self.local_url)
+
+    @retry(retry_on_exception=retry_with_cleanup,
+           stop_max_attempt_number=3)
     def checkout(self, revision):
         """Checkout repository repo at revision.
 
@@ -105,10 +126,13 @@ class SvnRepo():
             revision: the revision number to checkout the repo to.
 
         """
-        self.client.checkout(
-            self.remote_url,
-            self.local_url,
-            revision=Revision(opt_revision_kind.number, revision))
+        try:
+            self.client.checkout(
+                self.remote_url,
+                self.local_url,
+                revision=Revision(opt_revision_kind.number, revision))
+        except Exception as e:
+            raise SvnRepoException(self, e)
 
     def fork(self, svn_revision=None):
         """Checkout remote repository to a local working copy (at revision 1

@@ -43,8 +43,8 @@ class SvnLoader(libloader.SWHLoader):
 
         return swh_revision_id == revision_id
 
-    def process_revisions(self, svnrepo, revision_start, revision_end,
-                          revision_parents):
+    def process_svn_revisions(self, svnrepo, revision_start, revision_end,
+                              revision_parents):
         """Process revisions from revision_start to revision_end and send to swh for
         storage.
 
@@ -90,6 +90,38 @@ class SvnLoader(libloader.SWHLoader):
             self.load(objects_per_type, objects_per_path)
 
             yield swh_revision
+
+    def process_swh_revisions(self,
+                              svnrepo,
+                              revision_start,
+                              revision_end,
+                              revision_parents):
+        """Process and store revision to swh (sent by by blocks of
+           'revision_packet_size')
+
+           Returns:
+                The latest revision stored.
+        """
+        for revisions in utils.grouper(
+                self.process_svn_revisions(svnrepo,
+                                           revision_start,
+                                           revision_end,
+                                           revision_parents),
+                self.config['revision_packet_size']):
+            revs = list(revisions)
+            self.maybe_load_revisions(revs)
+
+        return revs[-1]
+
+    def process_swh_occurrence(self, revision, origin):
+        """Process and load the occurrence pointing to the latest revision.
+
+        """
+        occ = converters.build_swh_occurrence(revision['id'],
+                                              origin['id'],
+                                              datetime.datetime.utcnow())
+        self.log.debug('occ: %s' % hashutil.hash_to_hex(occ['id']))
+        self.maybe_load_occurrences([occ])
 
     def process(self, svn_url, origin, destination_path):
         """Load a svn repository in swh.
@@ -152,22 +184,11 @@ class SvnLoader(libloader.SWHLoader):
 
             # process and store revision to swh (sent by by blocks of
             # 'revision_packet_size')
-            for revisions in utils.grouper(
-                    self.process_revisions(svnrepo,
-                                           revision_start,
-                                           revision_end,
-                                           revision_parents),
-                    self.config['revision_packet_size']):
-                revs = list(revisions)
-                self.maybe_load_revisions(revs)
-
-            # create occurrence pointing to the latest revision (the last one)
-            swh_revision = revs[-1]
-            occ = converters.build_swh_occurrence(swh_revision['id'],
-                                                  origin['id'],
-                                                  datetime.datetime.utcnow())
-            self.log.debug('occ: %s' % occ)
-            self.maybe_load_occurrences([occ])
+            latest_rev = self.process_swh_revisions(svnrepo,
+                                                    revision_start,
+                                                    revision_end,
+                                                    revision_parents)
+            self.process_swh_occurrence(latest_rev, origin)
 
             # flush eventual remaining data
             self.flush()

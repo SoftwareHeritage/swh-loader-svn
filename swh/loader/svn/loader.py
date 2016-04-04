@@ -12,6 +12,29 @@ from swh.model.git import GitType
 from swh.loader.svn import libloader, svn, converters
 
 
+def objects_per_type(objects_per_path):
+    """Given an object dictionary returned by
+    `swh.model.git.walk_and_compute_sha1_from_directory`, return a map
+    grouped by type.
+
+    Returns:
+        Dictionary with keys:
+        - GitType.BLOB: list of blobs
+        - GitType.TREE: list of directories
+
+    """
+    objects = {
+        GitType.BLOB: [],
+        GitType.TREE: [],
+    }
+    for tree_path in objects_per_path:
+        objs = objects_per_path[tree_path]
+        for obj in objs:
+            objects[obj['type']].append(obj)
+
+    return objects
+
+
 class SvnLoader(libloader.SWHLoader):
     """Svn loader to load one svn repository.
 
@@ -58,15 +81,6 @@ class SvnLoader(libloader.SWHLoader):
         """
         for rev, nextrev, commit, objects_per_path in svnrepo.swh_hash_data_per_revision(  # noqa
                 revision_start, revision_end):
-
-            objects_per_type = {
-                GitType.BLOB: [],
-                GitType.TREE: [],
-                GitType.COMM: [],
-                GitType.RELE: [],
-                GitType.REFS: [],
-            }
-
             # compute the fs tree's checksums
             dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
             swh_revision = converters.build_swh_revision(svnrepo.uuid,
@@ -81,13 +95,11 @@ class SvnLoader(libloader.SWHLoader):
             if nextrev:
                 revision_parents[nextrev] = [swh_revision['id']]
 
-            # send blobs
-            for tree_path in objects_per_path:
-                objs = objects_per_path[tree_path]
-                for obj in objs:
-                    objects_per_type[obj['type']].append(obj)
+            objects = objects_per_type(objects_per_path)
 
-            self.load(objects_per_type, objects_per_path)
+            self.maybe_load_contents(objects[GitType.BLOB])
+            self.maybe_load_directories(objects[GitType.TREE],
+                                        objects_per_path)
 
             yield swh_revision
 

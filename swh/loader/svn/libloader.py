@@ -17,7 +17,9 @@ from swh.loader.dir import converters
 from swh.model.git import GitType
 from swh.storage import get_storage
 
-from swh.loader.svn.queue import QueuePerSize, QueuePerNbElements
+from swh.loader.svn.queue import QueuePerSizeAndNbUniqueElements
+from swh.loader.svn.queue import QueuePerNbUniqueElements
+from swh.loader.svn.queue import QueuePerNbElements
 
 
 def retry_loading(error):
@@ -64,27 +66,25 @@ class SWHLoader(config.SWHConfig):
 
         self.log = logging.getLogger(logging_class)
 
-        self.contents = QueuePerSize(key='sha1',
-                                     max_nb_elements=self.config[
-                                         'content_packet_size'],
-                                     max_size=self.config[
-                                         'content_packet_block_size_bytes'])
+        self.contents = QueuePerSizeAndNbUniqueElements(
+            key='sha1',
+            max_nb_elements=self.config['content_packet_size'],
+            max_size=self.config['content_packet_block_size_bytes'])
 
-        self.directories = QueuePerNbElements(key='id',
-                                              max_nb_elements=self.config[
-                                                 'directory_packet_size'])
+        self.directories = QueuePerNbUniqueElements(
+            key='id',
+            max_nb_elements=self.config['directory_packet_size'])
 
-        self.revisions = QueuePerNbElements(key='id',
-                                            max_nb_elements=self.config[
-                                               'revision_packet_size'])
+        self.revisions = QueuePerNbUniqueElements(
+            key='id',
+            max_nb_elements=self.config['revision_packet_size'])
 
-        self.releases = QueuePerNbElements(key='id',
-                                           max_nb_elements=self.config[
-                                               'release_packet_size'])
+        self.releases = QueuePerNbUniqueElements(
+            key='id',
+            max_nb_elements=self.config['release_packet_size'])
 
-        self.occurrences = QueuePerNbElements(key='id',
-                                              max_nb_elements=self.config[
-                                                'occurrence_packet_size'])
+        self.occurrences = QueuePerNbElements(
+            self.config['occurrence_packet_size'])
 
         l = logging.getLogger('requests.packages.urllib3.connectionpool')
         l.setLevel(logging.WARN)
@@ -298,7 +298,7 @@ class SWHLoader(config.SWHConfig):
 
         """
         threshold_reached = self.occurrences.add(
-            map(converters.ref_to_occurrence, refs))
+            (converters.ref_to_occurrence(r) for r in refs))
         if threshold_reached:
             self.send_contents(self.contents.pop())
             self.send_directories(self.directories.pop())

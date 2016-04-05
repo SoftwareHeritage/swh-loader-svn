@@ -50,6 +50,55 @@ def retry_loading(error):
     return True
 
 
+def shallow_blob(obj):
+    """Convert a full swh content/blob to just what's needed by
+    swh-storage for filtering.
+
+    Returns:
+        A shallow copy of a full swh content/blob object.
+
+    """
+    return {
+        'sha1': obj['sha1'],
+        'sha256': obj['sha256'],
+        'sha1_git': obj['sha1_git'],
+        'length': obj['length']
+    }
+
+
+def shallow_tree(tree):
+    """Convert a full swh directory/tree to just what's needed by
+    swh-storage for filtering.
+
+    Returns:
+        A shallow copy of a full swh directory/tree object.
+
+    """
+    return tree['sha1_git']
+
+
+def shallow_commit(commit):
+    """Convert a full swh revision/commit to just what's needed by
+    swh-storage for filtering.
+
+    Returns:
+        A shallow copy of a full swh revision/commit object.
+
+    """
+    return commit['id']
+
+
+def shallow_tag(tag):
+    """Convert a full swh release/tag to just what's needed by
+    swh-storage for filtering.
+
+    Returns:
+        A shallow copy of a full swh release/tag object.
+
+    """
+    return tag['id']
+
+
 class SWHLoader(config.SWHConfig):
     """A svn loader.
 
@@ -71,17 +120,25 @@ class SWHLoader(config.SWHConfig):
             max_nb_elements=self.config['content_packet_size'],
             max_size=self.config['content_packet_block_size_bytes'])
 
+        self.contents_seen = set()
+
         self.directories = QueuePerNbUniqueElements(
             key='id',
             max_nb_elements=self.config['directory_packet_size'])
+
+        self.directories_seen = set()
 
         self.revisions = QueuePerNbUniqueElements(
             key='id',
             max_nb_elements=self.config['revision_packet_size'])
 
+        self.revisions_seen = set()
+
         self.releases = QueuePerNbUniqueElements(
             key='id',
             max_nb_elements=self.config['release_packet_size'])
+
+        self.releases_seen = set()
 
         self.occurrences = QueuePerNbElements(
             self.config['occurrence_packet_size'])
@@ -199,25 +256,20 @@ class SWHLoader(config.SWHConfig):
                                'swh_id': log_id,
                            })
 
-    def shallow_blob(self, obj):
-        return {
-            'sha1': obj['sha1'],
-            'sha256': obj['sha256'],
-            'sha1_git': obj['sha1_git'],
-            'length': obj['length']
-        }
-
     def filter_missing_blobs(self, blobs):
         """Filter missing blob from swh.
 
         """
         max_content_size = self.config['content_packet_size_bytes']
         blobs_per_sha1 = {}
-        for blob in blobs:
-            blobs_per_sha1[blob['sha1']] = blob
+        shallow_blobs = []
+        for key, blob in ((b['sha1'], b) for b in blobs
+                          if b['sha1'] not in self.contents_seen):
+            blobs_per_sha1[key] = blob
+            shallow_blobs.append(shallow_blob(blob))
+            self.contents_seen.add(key)
 
-        for sha1 in self.storage.content_missing((self.shallow_blob(b)
-                                                 for b in blobs),
+        for sha1 in self.storage.content_missing(shallow_blobs,
                                                  key_hash='sha1'):
             yield converters.blob_to_content(blobs_per_sha1[sha1],
                                              max_content_size=max_content_size,
@@ -230,19 +282,19 @@ class SWHLoader(config.SWHConfig):
         if threshold_reached:
             self.send_contents(self.contents.pop())
 
-    def shallow_tree(self, tree):
-        return tree['sha1_git']
-
     def filter_missing_trees(self, trees, objects):
         """Filter missing tree from swh.
 
         """
         trees_per_sha1 = {}
-        for tree in trees:
-            trees_per_sha1[tree['sha1_git']] = tree
+        shallow_trees = []
+        for key, tree in ((t['sha1_git'], t) for t in trees
+                          if t['sha1_git'] not in self.directories_seen):
+            trees_per_sha1[key] = tree
+            shallow_trees.append(shallow_tree(tree))
+            self.directories_seen.add(key)
 
-        for sha in self.storage.directory_missing((self.shallow_tree(b)
-                                                   for b in trees)):
+        for sha in self.storage.directory_missing(shallow_trees):
             yield converters.tree_to_directory(trees_per_sha1[sha], objects)
 
     def bulk_send_trees(self, objects, trees):
@@ -253,19 +305,19 @@ class SWHLoader(config.SWHConfig):
             self.send_contents(self.contents.pop())
             self.send_directories(self.directories.pop())
 
-    def shallow_commit(self, commit):
-        return commit['id']
-
     def filter_missing_commits(self, commits):
         """Filter missing commit from swh.
 
         """
         commits_per_sha1 = {}
-        for commit in commits:
-            commits_per_sha1[commit['id']] = commit
+        shallow_commits = []
+        for key, commit in ((c['id'], c) for c in commits
+                            if c['id'] not in self.revisions_seen):
+            commits_per_sha1[key] = commit
+            shallow_commits.append(shallow_commit(commit))
+            self.revisions_seen.add(key)
 
-        for sha in self.storage.revision_missing((self.shallow_commit(b)
-                                                  for b in commits),
+        for sha in self.storage.revision_missing(shallow_commits,
                                                  type=self.revision_type):
             yield commits_per_sha1[sha]
 
@@ -280,12 +332,29 @@ class SWHLoader(config.SWHConfig):
             self.send_directories(self.directories.pop())
             self.send_revisions(self.revisions.pop())
 
+    def filter_missing_tags(self, tags):
+        """Filter missing tags from swh.
+
+        """
+        tags_per_sha1 = {}
+        shallow_tags = []
+        for key, tag in ((t['id'], t) for t in tags
+                         if t['id'] not in self.releases_seen):
+            tags_per_sha1[key] = tag
+            shallow_tags.append(shallow_tag(tag))
+            self.releases_seen.add(key)
+
+        for sha in self.storage.release_missing(shallow_tags,
+                                                type=self.revision_type):
+            yield tags_per_sha1[sha]
+
     def bulk_send_annotated_tags(self, tags):
         """Format annotated tags (pygit2.Tag objects) as swh releases and send
         them to the database.
 
         """
-        threshold_reached = self.releases.add(tags)
+        threshold_reached = self.releases.add(
+            self.filter_missing_tags(tags))
         if threshold_reached:
             self.send_contents(self.contents.pop())
             self.send_directories(self.directories.pop())

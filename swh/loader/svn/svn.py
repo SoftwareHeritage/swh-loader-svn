@@ -301,7 +301,8 @@ class SvnRepo():
 
             if rev == start_revision:  # first time we walk the complete tree
                 objects_per_path = git.walk_and_compute_sha1_from_directory(
-                    local_url, dir_ok_fn=ignore_svn_folder)
+                    local_url,
+                    dir_ok_fn=ignore_svn_folder)
             else:  # then we update only what needs to be
                 objects_per_path = git.update_checksums_from(
                     commit['changed_paths'],

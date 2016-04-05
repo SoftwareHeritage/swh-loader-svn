@@ -23,7 +23,7 @@ DEFAULT_CONFIG = {
     'send_occurrences': ('bool', True),
     'content_packet_size': ('int', 10000),
     'content_packet_block_size_bytes': ('int', 100 * 1024 * 1024),
-    'content_packet_size_bytes': ('int', 1 * 1024 * 1024 * 1024),
+    'content_packet_size_bytes': ('int', 1024 * 1024 * 1024),
     'directory_packet_size': ('int', 25000),
     'revision_packet_size': ('int', 100),
     'release_packet_size': ('int', 100000),

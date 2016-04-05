@@ -132,7 +132,7 @@ class SvnLoader(libloader.SWHLoader):
         occ = converters.build_swh_occurrence(revision['id'],
                                               origin['id'],
                                               datetime.datetime.utcnow())
-        self.log.debug('occ: %s' % hashutil.hash_to_hex(occ['id']))
+        self.log.debug('occ: %s' % occ)
         self.maybe_load_occurrences([occ])
 
     def process(self, svn_url, origin, destination_path):

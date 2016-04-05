@@ -79,8 +79,9 @@ class SvnLoader(libloader.SWHLoader):
             swh revision
 
         """
-        for rev, nextrev, commit, objects_per_path in svnrepo.swh_hash_data_per_revision(  # noqa
-                revision_start, revision_end):
+        gen_revs = svnrepo.swh_hash_data_per_revision(revision_start,
+                                                      revision_end)
+        for rev, nextrev, commit, objects_per_path in gen_revs:
             # compute the fs tree's checksums
             dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
             swh_revision = converters.build_swh_revision(svnrepo.uuid,

@@ -3,14 +3,10 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-import logging
-
 from swh.core.config import load_named_config
-from swh.scheduler.task import Task
-from swh.storage import get_storage
-from swh.model.git import GitType
-
+from swh.loader.core import tasks
 from swh.loader.svn.loader import SvnLoader
+from swh.storage import get_storage
 
 
 DEFAULT_CONFIG = {
@@ -31,7 +27,7 @@ DEFAULT_CONFIG = {
 }
 
 
-class LoadSvnRepositoryTsk(Task):
+class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
     """Import a svn repository to Software Heritage
 
     """
@@ -44,31 +40,7 @@ class LoadSvnRepositoryTsk(Task):
                 'loader/svn.ini',
                 DEFAULT_CONFIG)
 
-        l = logging.getLogger('requests.packages.urllib3.connectionpool')
-        l.setLevel(logging.WARN)
-
         return self.__config
-
-    def open_fetch_history(self, storage, origin_id):
-        return storage.fetch_history_start(origin_id)
-
-    def close_fetch_history(self, storage, fetch_history_id, res):
-        result = None
-        if 'objects' in res:
-            result = {
-                'contents': len(res['objects'].get(GitType.BLOB, [])),
-                'directories': len(res['objects'].get(GitType.TREE, [])),
-                'revisions': len(res['objects'].get(GitType.COMM, [])),
-                'releases': len(res['objects'].get(GitType.RELE, [])),
-                'occurrences': len(res['objects'].get(GitType.REFS, [])),
-            }
-
-        data = {
-            'status': res['status'],
-            'result': result,
-            'stderr': res.get('stderr')
-        }
-        return storage.fetch_history_end(fetch_history_id, data)
 
     def run(self, svn_url, local_path):
         """Import a svn repository.

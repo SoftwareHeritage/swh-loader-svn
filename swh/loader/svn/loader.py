@@ -186,7 +186,7 @@ class SvnLoader(loader.SWHLoader):
 
             revision_end = svnrepo.head_revision()
 
-            self.log.debug('[revision_start-revision_end]: [%s-%s]' % (
+            self.log.info('[revision_start-revision_end]: [%s-%s]' % (
                 revision_start, revision_end))
 
             if revision_start == revision_end and revision_start is not 1:

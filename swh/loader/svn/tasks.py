@@ -4,7 +4,7 @@
 # See top-level LICENSE file for more information
 
 from swh.core.config import load_named_config
-from swh.loader.core import tasks
+from swh.loader.vcs import tasks
 from swh.loader.svn.loader import SvnLoader
 from swh.storage import get_storage
 

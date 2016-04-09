@@ -12,25 +12,33 @@ from swh.loader.svn import converters
 
 class TestConverters(unittest.TestCase):
     @istest
-    def uid_to_person(self):
-        actual_person1 = converters.uid_to_person('tony <ynot@dagobah>',
-                                                  encode=False)
+    def svn_author_to_person_as_bytes(self):
+        actual_person1 = converters.svn_author_to_person(
+            b'tony <ynot@dagobah>')
         self.assertEquals(actual_person1, {
-            'name': 'tony',
-            'email': 'ynot@dagobah'
+            'fullname': b'tony <ynot@dagobah>',
+            'name': b'tony <ynot@dagobah>',
+            'email': None,
         })
 
-        actual_person2 = converters.uid_to_person('ardumont <ard@dagobah>',
-                                                  encode=True)
+    @istest
+    def svn_author_to_person_as_str(self):
+        # should not happen - input is bytes but nothing prevents it
+        actual_person1 = converters.svn_author_to_person('tony <tony@dagobah>')
+        self.assertEquals(actual_person1, {
+            'fullname': 'tony <tony@dagobah>',
+            'name': 'tony <tony@dagobah>',
+            'email': None,
+        })
+
+    @istest
+    def svn_author_to_person_None(self):
+        # should not happen - nothing prevents it though
+        actual_person2 = converters.svn_author_to_person(None)
         self.assertEquals(actual_person2, {
-            'name': b'ardumont',
-            'email': b'ard@dagobah'
-        })
-
-        actual_person3 = converters.uid_to_person('someone')
-        self.assertEquals(actual_person3, {
-            'name': b'someone',
-            'email': b''
+            'fullname': None,
+            'name': None,
+            'email': None,
         })
 
     @istest
@@ -38,8 +46,8 @@ class TestConverters(unittest.TestCase):
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid='uuid',
             dir_id='dir-id',
-            commit={'author_name': 'theo',
-                    'message': 'commit message',
+            commit={'author_name': b'theo',
+                    'message': b'commit message',
                     'author_date': '2009-04-18 06:55:53 +0200'},
             rev=10,
             parents=['123'])
@@ -51,8 +59,8 @@ class TestConverters(unittest.TestCase):
             'type': 'svn',
             'directory': 'dir-id',
             'message': b'commit message',
-            'author': {'name': b'theo', 'email': b''},
-            'committer': {'name': b'theo', 'email': b''},
+            'author': {'name': b'theo', 'email': None, 'fullname': b'theo'},
+            'committer': {'name': b'theo', 'email': None, 'fullname': b'theo'},
             'synthetic': True,
             'metadata': {
                 'extra_headers': [
@@ -68,8 +76,8 @@ class TestConverters(unittest.TestCase):
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid='uuid',
             dir_id='dir-id',
-            commit={'author_name': '',
-                    'message': '',
+            commit={'author_name': b'',
+                    'message': b'',
                     'author_date': '2009-04-10 06:55:53'},
             rev=8,
             parents=[])
@@ -81,8 +89,8 @@ class TestConverters(unittest.TestCase):
             'type': 'svn',
             'directory': 'dir-id',
             'message': b'',
-            'author': {'name': b'', 'email': b''},
-            'committer': {'name': b'', 'email': b''},
+            'author': {'name': b'', 'email': None, 'fullname': b''},
+            'committer': {'name': b'', 'email': None, 'fullname': b''},
             'synthetic': True,
             'metadata': {
                 'extra_headers': [

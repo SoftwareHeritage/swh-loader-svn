@@ -66,9 +66,9 @@ def init_repo(remote_repo_url, destination_path=None):
 
 
 # When log message contains empty data
-DEFAULT_AUTHOR_NAME = ''
-DEFAULT_AUTHOR_DATE = ''
-DEFAULT_AUTHOR_MESSAGE = ''
+DEFAULT_AUTHOR_NAME = b''
+DEFAULT_AUTHOR_DATE = b''
+DEFAULT_AUTHOR_MESSAGE = b''
 
 
 class SvnRepoException(ValueError):
@@ -186,12 +186,13 @@ class SvnRepo():
             author_date = DEFAULT_AUTHOR_DATE
 
         try:
-            author = log_entry.author or DEFAULT_AUTHOR_NAME
+            author = log_entry.author.encode('utf-8') or DEFAULT_AUTHOR_NAME
         except AttributeError:
             author = DEFAULT_AUTHOR_NAME
 
         try:
-            message = log_entry.message or DEFAULT_AUTHOR_MESSAGE
+            message = log_entry.message.encode('utf-8') \
+                      or DEFAULT_AUTHOR_MESSAGE
         except AttributeError:
             message = DEFAULT_AUTHOR_MESSAGE
 

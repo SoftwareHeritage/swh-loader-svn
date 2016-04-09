@@ -4,47 +4,32 @@
 # See top-level LICENSE file for more information
 
 
-import email.utils
-
-
-def uid_to_person(uid, encode=True):
-    """Convert an uid to a person suitable for insertion.
+def svn_author_to_person(author):
+    """Convert an svn author to a person suitable for insertion.
 
     Args:
-        uid: an uid of the form "Name <email@ddress>"
-        encode: whether to convert the output to bytes or not
+        author: the svn author (in bytes)
+
     Returns: a dictionary with keys:
-        name: the name associated to the uid
-        email: the mail associated to the uid
+        fullname: the name associate to the author
+        name: the name associated to the author
+        email: None (no email in svn)
+
     """
-
-    ret = {
-        'name': '',
-        'email': '',
+    return {
+        'fullname': author,
+        'name': author,
+        'email': None,
     }
-
-    name, mail = email.utils.parseaddr(uid)
-
-    if name and email:
-        ret['name'] = name
-        ret['email'] = mail
-    else:
-        ret['name'] = uid
-
-    if encode:
-        for key in ('name', 'email'):
-            ret[key] = ret[key].encode('utf-8')
-
-    return ret
 
 
 def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):
     """Given a svn revision, build a swh revision.
 
     """
-    author = uid_to_person(commit['author_name'])
+    author = svn_author_to_person(commit['author_name'])
 
-    msg = commit['message'].encode('utf-8')
+    msg = commit['message']
 
     date = {
         'timestamp': commit['author_date'],

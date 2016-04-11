@@ -1,3 +1,8 @@
+*.pyc
+*.sw?
+*~
+.coverage
+.eggs/
 __pycache__
-repo
-/.coverage
+*.egg-info/
+version.txt

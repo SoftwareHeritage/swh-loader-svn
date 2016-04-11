@@ -15,17 +15,23 @@ task_name = 'swh.loader.svn.tasks.LoadSvnRepositoryTsk'
               help="svn repository's remote url.")
 @click.option('--destination-path',
               help="(optional) svn checkout destination.")
-def main(svn_url, destination_path):
+@click.option('--synchroneous',
+              is_flag=True,
+              help="To execute directly the svn loading.")
+def main(svn_url, destination_path, synchroneous):
     from swh.scheduler.celery_backend.config import app
     from swh.loader.svn import tasks  # noqa
 
-    if svn_url:
-        app.tasks[task_name].delay(svn_url, destination_path)
-    else:
+    task = app.tasks[task_name]
+    if not synchroneous and svn_url:
+        task.delay(svn_url, destination_path)
+    elif synchroneous and svn_url:  # for debug purpose
+        task(svn_url, destination_path)
+    else:  # synchroneous flag is ignored in that case
         for svn_url in sys.stdin:
             svn_url = svn_url.rstrip()
             print(svn_url)
-            app.tasks[task_name].delay(svn_url, destination_path)
+            task.delay(svn_url, destination_path)
 
 
 if __name__ == '__main__':

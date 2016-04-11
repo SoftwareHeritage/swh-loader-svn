@@ -10,15 +10,7 @@ import sys
 task_name = 'swh.loader.svn.tasks.LoadSvnRepositoryTsk'
 
 
-@click.command()
-@click.option('--svn-url',
-              help="svn repository's remote url.")
-@click.option('--destination-path',
-              help="(optional) svn checkout destination.")
-@click.option('--synchroneous',
-              is_flag=True,
-              help="To execute directly the svn loading.")
-def main(svn_url, destination_path, synchroneous):
+def libproduce(svn_url, destination_path=None, synchroneous=False):
     from swh.scheduler.celery_backend.config import app
     from swh.loader.svn import tasks  # noqa
 
@@ -34,5 +26,17 @@ def main(svn_url, destination_path, synchroneous):
             task.delay(svn_url, destination_path)
 
 
+@click.command()
+@click.option('--svn-url',
+              help="svn repository's remote url.")
+@click.option('--destination-path',
+              help="(optional) svn checkout destination.")
+@click.option('--synchroneous',
+              is_flag=True,
+              help="To execute directly the svn loading.")
+def produce(svn_url, destination_path, synchroneous):
+    libproduce(svn_url, destination_path, synchroneous)
+
+
 if __name__ == '__main__':
-    main()
+    produce()

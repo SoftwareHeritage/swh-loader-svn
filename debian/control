@@ -20,5 +20,9 @@ Homepage: https://forge.softwareheritage.org/diffusion/DLDSVN/
 
 Package: python3-swh.loader.svn
 Architecture: all
-Depends: ${misc:Depends}, ${python3:Depends}
+Depends: python3-swh.storage,
+         python3-swh.model (>= 0.0.4),
+         python3-swh.scheduler (>= 0.0.6),
+         python3-swh.loader.vcs,
+         ${misc:Depends}, ${python3:Depends}
 Description: Software Heritage <module-description>

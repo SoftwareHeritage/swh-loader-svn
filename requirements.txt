@@ -6,5 +6,5 @@ swh.core >= 0.0.18
 swh.model >= 0.0.4
 swh.scheduler >= 0.0.6
 swh.loader.vcs
-Click
+click
 retrying

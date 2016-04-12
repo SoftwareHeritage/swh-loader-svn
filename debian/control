@@ -25,4 +25,5 @@ Depends: python3-swh.storage,
          python3-swh.scheduler (>= 0.0.6),
          python3-swh.loader.vcs,
          ${misc:Depends}, ${python3:Depends}
-Description: Software Heritage <module-description>
+Description: Software Heritage Loader Svn
+ Module in charge of loading svn repositories into swh storage.

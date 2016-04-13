@@ -1,5 +1,6 @@
-swh-loader-svn (0.0.1-1) unstable; urgency=low
+swh-loader-svn (0.0.1-1~swh1) unstable-swh; urgency=medium
 
-  [ Antoine R. Dumont ]
+  * Initial release
+  * v0.0.1
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com> Mon Apr 11 2016 19:42:55 +0100
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 13 Apr 2016 16:46:37 +0200

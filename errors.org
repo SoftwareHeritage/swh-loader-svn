@@ -268,3 +268,40 @@ Traceback (most recent call last):
     revision=Revision(opt_revision_kind.number, revision))
 pysvn._pysvn_3_5.ClientError: '/tmp/tmp.fc9qu8sx.swh.loader/org-trello' is already locked via '/tmp/tmp.fc9qu8sx.swh.loader/org-trello'.
 #+END_SRC
+
+* node not found
+
+???
+
+#+BEGIN_SRC sh
+[2016-04-03 12:45:41,468: ERROR/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[9bf99330-4960-41ab-989f-3b172ffa92e6] raised unexpected: ValueError(ClientError("The node '/tmp/tmp.kra26_aa.swh.loader/dot-files/LICENSE.txt' was not found.",),)
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/celery/app/trace.py", line 240, in trace_task
+    R = retval = fun(*args, **kwargs)
+  File "/usr/lib/python3/dist-packages/celery/app/trace.py", line 438, in __protected_call__
+    return self.run(*args, **kwargs)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/tasks.py", line 88, in run
+    result = SvnLoader(config).process(svn_url, origin, local_path)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/loader.py", line 159, in process
+    self.config['revision_packet_size']):
+  File "/home/tony/work/inria/repo/swh-environment/swh-core/swh/core/utils.py", line 25, in grouper
+    for _data in itertools.zip_longest(*args, fillvalue=fv):
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/loader.py", line 59, in process_revisions
+    revision_start, revision_end):
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 300, in swh_hash_data_per_revision
+    self.checkout(revision=rev)
+  File "/usr/lib/python3/dist-packages/retrying.py", line 49, in wrapped_f
+    return Retrying(*dargs, **dkw).call(f, *args, **kw)
+  File "/usr/lib/python3/dist-packages/retrying.py", line 212, in call
+    raise attempt.get()
+  File "/usr/lib/python3/dist-packages/retrying.py", line 247, in get
+    six.reraise(self.value[0], self.value[1], self.value[2])
+  File "/usr/local/lib/python3.5/dist-packages/six.py", line 611, in reraise
+    raise value
+  File "/usr/lib/python3/dist-packages/retrying.py", line 200, in call
+    attempt = Attempt(fn(*args, **kwargs), attempt_number, False)
+  File "/home/tony/work/inria/repo/swh-environment/swh-loader-svn/swh/loader/svn/svn.py", line 135, in checkout
+    raise SvnRepoException(self, e)
+ValueError: The node '/tmp/tmp.kra26_aa.swh.loader/dot-files/LICENSE.txt' was not found.
+
+#+END_SRC

@@ -39,7 +39,7 @@ class SvnRepo():
 
     """
     def __init__(self, remote_url, origin_id, storage, destination_path=None):
-        self.remote_url = remote_url
+        self.remote_url = remote_url.rstrip('/')
         self.storage = storage
         self.origin_id = origin_id
 
@@ -49,15 +49,14 @@ class SvnRepo():
         else:
             root_dir = '/tmp'
 
-        local_dirname = tempfile.mkdtemp(suffix='.swh.loader',
-                                         prefix='tmp.',
-                                         dir=root_dir)
+        self.local_dirname = tempfile.mkdtemp(suffix='.swh.loader',
+                                              prefix='tmp.',
+                                              dir=root_dir)
 
-        name = os.path.basename(remote_url)
-        local_repo_url = os.path.join(local_dirname, name)
+        local_name = os.path.basename(self.remote_url)
 
         self.client = pysvn.Client()
-        self.local_url = local_repo_url
+        self.local_url = os.path.join(self.local_dirname, local_name)
         self.uuid = None  # Cannot know it yet since we need a working copy
 
     def __str__(self):
@@ -273,7 +272,7 @@ class SvnRepo():
             yield rev, nextrev, commit, objects_per_path
 
     def clean_fs(self):
-        """Clean up the local url checkout.
+        """Clean up the local working copy.
 
         """
-        shutil.rmtree(os.path.dirname(self.local_url))
+        shutil.rmtree(self.local_dirname)

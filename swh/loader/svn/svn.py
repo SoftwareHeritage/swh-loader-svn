@@ -30,41 +30,6 @@ def cwd(path):
         os.chdir(prev_cwd)
 
 
-def init_repo(remote_repo_url, destination_path=None):
-    """Initialize a repository without any svn action on disk. There may be
-    temporary folder creation on disk as side effect (if destination_path is
-    not provided)
-
-    Args:
-        remote_repo_url: The remote svn url
-        destination_path: The optional local parent folder to checkout the
-        repository to.
-
-    Returns:
-        Dictionary with the following keys:
-            - client: client instance to manipulate the repository
-            - remote_url: remote url (same as input)
-            - local_url: local url which has been computed
-
-    """
-    name = os.path.basename(remote_repo_url)
-    if destination_path:
-        os.makedirs(destination_path, exist_ok=True)
-        local_dirname = destination_path
-    else:
-        local_dirname = tempfile.mkdtemp(suffix='.swh.loader',
-                                         prefix='tmp.',
-                                         dir='/tmp')
-
-    local_repo_url = os.path.join(local_dirname, name)
-
-    client = pysvn.Client()
-
-    return {'client': client,
-            'remote_url': remote_repo_url,
-            'local_url': local_repo_url}
-
-
 # When log message contains empty data
 DEFAULT_AUTHOR_NAME = b''
 DEFAULT_AUTHOR_DATE = b''
@@ -89,14 +54,26 @@ class SvnRepo():
     """Swh representation of a svn repository.
 
     """
-    def __init__(self, remote_url, origin_id, storage, local_url=None):
+    def __init__(self, remote_url, origin_id, storage, destination_path=None):
         self.remote_url = remote_url
         self.storage = storage
         self.origin_id = origin_id
 
-        r = init_repo(remote_url, local_url)
-        self.client = r['client']
-        self.local_url = r['local_url']
+        if destination_path:
+            os.makedirs(destination_path, exist_ok=True)
+            root_dir = destination_path
+        else:
+            root_dir = '/tmp'
+
+        local_dirname = tempfile.mkdtemp(suffix='.swh.loader',
+                                         prefix='tmp.',
+                                         dir=root_dir)
+
+        name = os.path.basename(remote_url)
+        local_repo_url = os.path.join(local_dirname, name)
+
+        self.client = pysvn.Client()
+        self.local_url = local_repo_url
         self.uuid = None
 
     def __str__(self):
@@ -321,4 +298,4 @@ class SvnRepo():
         """Clean up the local url checkout.
 
         """
-        shutil.rmtree(self.local_url)
+        shutil.rmtree(os.path.dirname(self.local_url))

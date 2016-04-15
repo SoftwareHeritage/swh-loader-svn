@@ -1,3 +1,13 @@
+swh-loader-svn (0.0.3-1~swh1) unstable-swh; urgency=medium
+
+  * v0.0.3
+  * Improve filesystem cleanup (before: left empty directory)
+  * Use pysvn to extract uuid information (before: subprocess with
+    subversion call)
+  * Keep the working copy's name on the local checkout
+
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 15 Apr 2016 16:10:51 +0200
+
 swh-loader-svn (0.0.2-1~swh1) unstable-swh; urgency=medium
 
   * v0.0.2

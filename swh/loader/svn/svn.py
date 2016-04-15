@@ -1,4 +1,4 @@
-# Copyright (C) 2015  The Software Heritage developers
+# Copyright (C) 2015-2016  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -6,63 +6,12 @@
 import os
 import pysvn
 import tempfile
-import subprocess
 import shutil
 
-from contextlib import contextmanager
 from pysvn import Revision, opt_revision_kind
 from retrying import retry
 
 from swh.model import git
-
-
-@contextmanager
-def cwd(path):
-    """Contextually change the working directory to do thy bidding.
-    Then gets back to the original location.
-
-    """
-    prev_cwd = os.getcwd()
-    os.chdir(path)
-    try:
-        yield
-    finally:
-        os.chdir(prev_cwd)
-
-
-def init_repo(remote_repo_url, destination_path=None):
-    """Initialize a repository without any svn action on disk. There may be
-    temporary folder creation on disk as side effect (if destination_path is
-    not provided)
-
-    Args:
-        remote_repo_url: The remote svn url
-        destination_path: The optional local parent folder to checkout the
-        repository to.
-
-    Returns:
-        Dictionary with the following keys:
-            - client: client instance to manipulate the repository
-            - remote_url: remote url (same as input)
-            - local_url: local url which has been computed
-
-    """
-    name = os.path.basename(remote_repo_url)
-    if destination_path:
-        os.makedirs(destination_path, exist_ok=True)
-        local_dirname = destination_path
-    else:
-        local_dirname = tempfile.mkdtemp(suffix='.swh.loader',
-                                         prefix='tmp.',
-                                         dir='/tmp')
-
-    local_repo_url = os.path.join(local_dirname, name)
-
-    client = pysvn.Client()
-
-    return {'client': client,
-            'remote_url': remote_repo_url,
-            'local_url': local_repo_url}
 
 
 # When log message contains empty data
@@ -89,27 +38,32 @@ class SvnRepo():
     """Swh representation of a svn repository.
 
     """
-    def __init__(self, remote_url, origin_id, storage, local_url=None):
-        self.remote_url = remote_url
+    def __init__(self, remote_url, origin_id, storage, destination_path=None):
+        self.remote_url = remote_url.rstrip('/')
         self.storage = storage
         self.origin_id = origin_id
 
-        r = init_repo(remote_url, local_url)
-        self.client = r['client']
-        self.local_url = r['local_url']
-        self.uuid = None
+        if destination_path:
+            os.makedirs(destination_path, exist_ok=True)
+            root_dir = destination_path
+        else:
+            root_dir = '/tmp'
+
+        self.local_dirname = tempfile.mkdtemp(suffix='.swh.loader',
+                                              prefix='tmp.',
+                                              dir=root_dir)
+
+        local_name = os.path.basename(self.remote_url)
+
+        self.client = pysvn.Client()
+        self.local_url = os.path.join(self.local_dirname, local_name)
+        self.uuid = None  # Cannot know it yet since we need a working copy
 
     def __str__(self):
         return str({'remote_url': self.remote_url,
                     'local_url': self.local_url,
                     'uuid': self.uuid,
                     'swh-origin': self.origin_id})
-
-    def read_uuid(self):
-        with cwd(self.local_url):
-            cmd = 'svn info | grep UUID | cut -f2 -d:'
-            uuid = subprocess.check_output(cmd, shell=True)
-            return uuid.strip().decode('utf-8')
 
     def cleanup(self):
         """Clean up any locks in the working copy at path.
@@ -142,7 +96,7 @@ class SvnRepo():
 
         """
         self.checkout(1 if not svn_revision else svn_revision)
-        self.uuid = self.read_uuid()
+        self.uuid = self.client.info(self.local_url).uuid
 
     def head_revision(self):
         """Retrieve current revision of the repository's working copy.
@@ -318,7 +272,7 @@ class SvnRepo():
             yield rev, nextrev, commit, objects_per_path
 
     def clean_fs(self):
-        """Clean up the local url checkout.
+        """Clean up the local working copy.
 
         """
-        shutil.rmtree(self.local_url)
+        shutil.rmtree(self.local_dirname)

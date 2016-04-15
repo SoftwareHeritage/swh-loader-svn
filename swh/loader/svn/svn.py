@@ -1,4 +1,4 @@
-# Copyright (C) 2015  The Software Heritage developers
+# Copyright (C) 2015-2016  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -6,28 +6,12 @@
 import os
 import pysvn
 import tempfile
-import subprocess
 import shutil
 
-from contextlib import contextmanager
 from pysvn import Revision, opt_revision_kind
 from retrying import retry
 
 from swh.model import git
-
-
-@contextmanager
-def cwd(path):
-    """Contextually change the working directory to do thy bidding.
-    Then gets back to the original location.
-
-    """
-    prev_cwd = os.getcwd()
-    os.chdir(path)
-    try:
-        yield
-    finally:
-        os.chdir(prev_cwd)
 
 
 # When log message contains empty data
@@ -74,19 +58,13 @@ class SvnRepo():
 
         self.client = pysvn.Client()
         self.local_url = local_repo_url
-        self.uuid = None
+        self.uuid = None  # Cannot know it yet since we need a working copy
 
     def __str__(self):
         return str({'remote_url': self.remote_url,
                     'local_url': self.local_url,
                     'uuid': self.uuid,
                     'swh-origin': self.origin_id})
-
-    def read_uuid(self):
-        with cwd(self.local_url):
-            cmd = 'svn info | grep UUID | cut -f2 -d:'
-            uuid = subprocess.check_output(cmd, shell=True)
-            return uuid.strip().decode('utf-8')
 
     def cleanup(self):
         """Clean up any locks in the working copy at path.
@@ -119,7 +97,7 @@ class SvnRepo():
 
         """
         self.checkout(1 if not svn_revision else svn_revision)
-        self.uuid = self.read_uuid()
+        self.uuid = self.client.info(self.local_url).uuid
 
     def head_revision(self):
         """Retrieve current revision of the repository's working copy.

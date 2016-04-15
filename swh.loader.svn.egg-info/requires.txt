@@ -1,0 +1,8 @@
+click
+pysvn
+retrying
+swh.core>=0.0.19
+swh.loader.vcs
+swh.model>=0.0.5
+swh.scheduler>=0.0.6
+vcversioner

@@ -1,8 +1,12 @@
-swh-loader-svn (0.0.2-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.3-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.3
+  * Improve filesystem cleanup (before: left empty directory)
+  * Use pysvn to extract uuid information (before: subprocess with
+    subversion call)
+  * Keep the working copy's name on the local checkout
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 15 Apr 2016 13:02:04 +0200
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 15 Apr 2016 16:10:51 +0200
 
 swh-loader-svn (0.0.2-1~swh1) unstable-swh; urgency=medium
 

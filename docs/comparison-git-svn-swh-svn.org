@@ -252,7 +252,7 @@ Here is a small comparison sample:
 | small      |    145 | svn://svn.debian.org/svn/pkg-fox/        |                 447.074 |       1445.8084549359046s | 3.2339354 s   | OK                                        |
 | medium     |   6006 | svn://svn.debian.org/svn/glibc-bsd/      |                4740.928 |        10118.787201701081 | 2.1343474     | OK                                        |
 | large      |  10707 | svn://svn.debian.org/svn/pkg-voip/       |                8592.398 |        46112.436119881924 | 5.3666551     | OK                                        |
-| very large |  34523 | svn://svn.debian.org/svn/python-modules/ |                         |       288410.36918153404s |               | RUNNING                                   |
+| very large |  34523 | svn://svn.debian.org/svn/python-modules/ |               36627.907 |       288410.36918153404s | 7.8740609 s   | RUNNING                                   |
 | very large |  48013 | svn://svn.debian.org/svn/pkg-gnome/      |                       0 |          594822.724728007 | 594822.72 / 0 | FAILURE (git svn clone does not complete) |
 |------------+--------+------------------------------------------+-------------------------+---------------------------+---------------+-------------------------------------------|
 #+TBLFM: $6=$5/$4
@@ -403,7 +403,8 @@ user    22m0.212s
 sys     29m10.096s
 ardumont@worker01:~/test$
 #+END_SRC
-*** IN-PROGRESS python-modules
+*** DONE python-modules
+CLOSED: [2016-05-12 Thu 20:53]
 
 #+BEGIN_SRC sh
 ardumont@worker01:~/test$ time git svn clone svn://svn.debian.org/svn/python-modules/
@@ -437,9 +438,25 @@ r7 = 2e23d5f2e8e75f6c1050fe69b978d6d4b9405577 (refs/remotes/git-svn)
         M       www/python-modules-policy.rst
 r8 = a64c844ef002876929e63c08cafe9c0d7913dbd5 (refs/remotes/git-svn)
 ...
+
+r34523 = d7ad2aa9f03614e98131a45d12ca85f0db6200b0 (refs/remotes/git-svn)
+Checking out files: 100% (96660/96660), done.
+Checked out HEAD:
+  svn://svn.debian.org/svn/python-modules r34523
+creating empty directory: packages/adhocracy/tags
+creating empty directory: packages/aiopg/tags
+creating empty directory: packages/alembic/branches/upstream/0.3.2
+...
+creating empty directory: packages/wheel/tags/0.26.0-1/debian/manpages/_static
+creating empty directory: packages/wheel/tags/0.26.0-1/debian/manpages/_templates
+creating empty directory: packages/wheel/trunk/debian/manpages/_static
+creating empty directory: packages/wheel/trunk/debian/manpages/_templates
+
+real    610m27.907s
+user    140m19.436s
+sys     147m44.760s
 #+END_SRC
-*** FAILED pkg-gnome
-CLOSED: [2016-05-12 Thu 14:54]
+*** IN-PROGRESS pkg-gnome
 
 `git svn clone` does not finish for this repository.
 And no retake on error is possible, we need to clean up and restart from scratch.
@@ -570,4 +587,23 @@ expected: 43a5a26795d42c25ebdaa90c3673ed87
 real    0m33.228s
 user    0m1.992s
 sys     0m0.892s
+#+END_SRC
+**** 4th tryout
+
+Trying another manner, first fetch a simple revision and then fetch the rest:
+#+BEGIN_SRC sh
+r34523 = d7ad2aa9f03614e98131a45d12ca85f0db6200b0 (refs/remotes/git-svn)
+Checking out files: 100% (96660/96660), done.
+Checked out HEAD:
+  svn://svn.debian.org/svn/python-modules r34523
+creating empty directory: packages/adhocracy/tags
+creating empty directory: packages/aiopg/tags
+creating empty directory: packages/alembic/branches/upstream/0.3.2
+ardumont@worker01:~/test $ cd pkg-gnome
+ardumont@worker01:~/test/pkg-gnome$ time git svn fetch
+W: +empty_dir: packages
+r2 = 17064cc88bbf5bf9c85a10c44d57846c694158a1 (refs/remotes/git-svn)
+W: +empty_dir: packages/file-roller
+r3 = dec3b8e994b3d8fa4d409c7195bcbd4706b6cdfa (refs/remotes/git-svn)
+...
 #+END_SRC

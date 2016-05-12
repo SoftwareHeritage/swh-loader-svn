@@ -1,0 +1,573 @@
+#+title: Comparison git-svn and swh-svn
+#+author: ardumont
+
+* How
+
+`git svn` checkouts an svn repository, follows the `svn log` history
+and for each svn commit, computes a git revision by adding metadata to
+an svn commit message and then store results in the .git folder.
+
+`swh loader svn` checkouts an svn repository, follows the `svn log`
+history and for each svn revision, computes the an swh revision from
+it and stores the result in an swh-storage instance.
+
+As of now, 202 svn debian repositories have been injected in an
+swh-storage instance.  Logs have been injected in softwareheritage-log
+for that injection.
+
+We'll `git clone` some of those same repositories and compare the
+results from the injection logs.
+
+This comparison is not completely fair:
+- `git svn` stores on disk (remote svn, disk)
+- `swh svn` does store in a swh-storage instance (remote svn, network,
+  db, disk).
+
+* Definition
+
+Considering the following definitions:
+
+|------------+--------------------|
+| Size       | Revision threshold |
+|------------+--------------------|
+| very large | > 40k              |
+| large      | > 10k              |
+| medium     | > 5k               |
+| small      | > 150              |
+| very small | > 10               |
+|------------+--------------------|
+
+Here is the svn repositories list:
+#+BEGIN_SRC sql
+                      url                       | svn_revision
+------------------------------------------------+--------------
+ svn://svn.debian.org/svn/pkg-doc-linux         | 294
+ svn://svn.debian.org/svn/adduser/              | 840
+ svn://svn.debian.org/svn/glibc-bsd/            | 6006
+ svn://svn.debian.org/svn/pkg-fox/              | 145
+ svn://svn.debian.org/svn/spip/                 | 170
+ svn://svn.debian.org/svn/console-common/       | 324
+ svn://svn.debian.org/svn/partial-mirror/       | 592
+ svn://svn.debian.org/svn/debian-ha/            | 103
+ svn://svn.debian.org/svn/pkg-omnievents/       | 8
+ svn://svn.debian.org/svn/online-desktop/       | 109
+ svn://svn.debian.org/svn/vamos/                | 24
+ svn://svn.debian.org/svn/pkg-ralink/           | 191
+ svn://svn.debian.org/svn/pkg-libburnia/        | 372
+ svn://svn.debian.org/svn/pkg-sysvinit/         | 1966
+ svn://svn.debian.org/svn/pkg-synfig/           | 438
+ svn://svn.debian.org/svn/kernel-handbook/      | 89
+ svn://svn.debian.org/svn/pkg-vlock/            | 59
+ svn://svn.debian.org/svn/pkg-phpgroupware/     | 125
+ svn://svn.debian.org/svn/pkg-squeak/           | 41
+ svn://svn.debian.org/svn/pkg-turbogears/       | 26
+ svn://svn.debian.org/svn/megahal/              | 55
+ svn://svn.debian.org/svn/ssmtp/                | 65
+ svn://svn.debian.org/svn/dmraid-debian/        | 31
+ svn://svn.debian.org/svn/pkg-kwiki/            | 231
+ svn://svn.debian.org/svn/pkg-gnome/            | 48013
+ svn://svn.debian.org/svn/pkg-varnish/          | 115
+ svn://svn.debian.org/svn/logidee-tools/        | 149
+ svn://svn.debian.org/svn/pkg-ruby-extras/      | 6142
+ svn://svn.debian.org/svn/xml-dtc/              | 6
+ svn://svn.debian.org/svn/pkg-voip/             | 10707
+ svn://svn.debian.org/svn/perl-tk/              | 95
+ svn://svn.debian.org/svn/pkg-qemu/             | 426
+ svn://svn.debian.org/svn/pkg-coolkey/          | 67
+ svn://svn.debian.org/svn/pkg-gmt/              | 52
+ svn://svn.debian.org/svn/pkg-catalyst/         | 1718
+ svn://svn.debian.org/svn/debichem/             | 6339
+ svn://svn.debian.org/svn/pkg-ime/              | 1056
+ svn://svn.debian.org/svn/pkg-fdt-tools/        | 68
+ svn://svn.debian.org/svn/pkg-kolab/            | 1606
+ svn://svn.debian.org/svn/pkg-openxchange/      | 316
+ svn://svn.debian.org/svn/pkg-gourmet/          | 6
+ svn://svn.debian.org/svn/egtk/                 | 19
+ svn://svn.debian.org/svn/pkg-mythtv/           | 257
+ svn://svn.debian.org/svn/nstx-ng/              | 16
+ svn://svn.debian.org/svn/pkg-xen/              | 1216
+ svn://svn.debian.org/svn/pkg-orbit2/           | 21
+ svn://svn.debian.org/svn/pkg-asv/              | 77
+ svn://svn.debian.org/svn/pkg-gtk2-perl/        | 275
+ svn://svn.debian.org/svn/pkg-lirc/             | 542
+ svn://svn.debian.org/svn/pkg-smalltools/       | 106
+ svn://svn.debian.org/svn/debian-br-cdd/        | 327
+ svn://svn.debian.org/svn/aptitude/             | 4434
+ svn://svn.debian.org/svn/pkg-opensync/         | 472
+ svn://svn.debian.org/svn/nsspampgsql/          | 99
+ svn://svn.debian.org/svn/piuparts/             | 931
+ svn://svn.debian.org/svn/secvpn/               | 50
+ svn://svn.debian.org/svn/pkg-cvs/              | 84
+ svn://svn.debian.org/svn/fai/                  | 6785
+ svn://svn.debian.org/svn/pkg-xfce/             | 9393
+ svn://svn.debian.org/svn/aqbanking/            | 1909
+ svn://svn.debian.org/svn/libpst/               | 92
+ svn://svn.debian.org/svn/pkg-fedora-ds/        | 262
+ svn://svn.debian.org/svn/pkg-fim/              | 4
+ svn://svn.debian.org/svn/debianjr/             | 26
+ svn://svn.debian.org/svn/moreutils/            | 102
+ svn://svn.debian.org/svn/soc/                  | 211
+ svn://svn.debian.org/svn/cruft/                | 213
+ svn://svn.debian.org/svn/yaird/                | 129
+ svn://svn.debian.org/svn/debianzine/           | 11
+ svn://svn.debian.org/svn/pkg-mailutils/        | 431
+ svn://svn.debian.org/svn/pkg-upslug2/          | 22
+ svn://svn.debian.org/svn/pkg-libnuma/          | 74
+ svn://svn.debian.org/svn/pkg-boinc/            | 929
+ svn://svn.debian.org/svn/ddp/                  | 11130
+ svn://svn.debian.org/svn/l10n-russian/         | 399
+ svn://svn.debian.org/svn/ninjajump/            | 4
+ svn://svn.debian.org/svn/demudi/               | 2000
+ svn://svn.debian.org/svn/debnest/              | 26
+ svn://svn.debian.org/svn/pkg-kbd/              | 263
+ svn://svn.debian.org/svn/debian-olpc/          | 29
+ svn://svn.debian.org/svn/pkg-ace/              | 757
+ svn://svn.debian.org/svn/chrpath/              | 174
+ svn://svn.debian.org/svn/pkg-uml/              | 335
+ svn://svn.debian.org/svn/xbox/                 | 1
+ svn://svn.debian.org/svn/resolvconf/           | 367
+ svn://svn.debian.org/svn/dbconfig-common/      | 468
+ svn://svn.debian.org/svn/pkg-pan/              | 10
+ svn://svn.debian.org/svn/pkg-fgfs/             | 229
+ svn://svn.debian.org/svn/pkg-pulseaudio/       | 187
+ svn://svn.debian.org/svn/fai-config-dir/       | 19
+ svn://svn.debian.org/svn/pkg-bioc/             | 381
+ svn://svn.debian.org/svn/pkg-hamradio/         | 9
+ svn://svn.debian.org/svn/debootloaders/        | 261
+ svn://svn.debian.org/svn/tasksel/              | 2114
+ svn://svn.debian.org/svn/chase/                | 16
+ svn://svn.debian.org/svn/pkg-sks/              | 245
+ svn://svn.debian.org/svn/pkg-mol/              | 171
+ svn://svn.debian.org/svn/cabot/                | 203
+ svn://svn.debian.org/svn/pkg-libatomic-ops/    | 23
+ svn://svn.debian.org/svn/kgb/                  | 976
+ svn://svn.debian.org/svn/apt-howto/            | 132
+ svn://svn.debian.org/svn/pkg-xcdroast/         | 49
+ svn://svn.debian.org/svn/pkg-citadel/          | 393
+ svn://svn.debian.org/svn/pkg-ofed/             | 1070
+ svn://svn.debian.org/svn/atrace/               | 3
+ svn://svn.debian.org/svn/guessnet/             | 337
+ svn://svn.debian.org/svn/pkg-mwavem/           | 34
+ svn://svn.debian.org/svn/pkg-ofbis/            | 48
+ svn://svn.debian.org/svn/cdd/                  | 1351
+ svn://svn.debian.org/svn/pear-package/         | 716
+ svn://svn.debian.org/svn/debian-hebrew/        | 1026
+ svn://svn.debian.org/svn/pkg-xdialog/          | 17
+ svn://svn.debian.org/svn/demi/                 | 84
+ svn://svn.debian.org/svn/chinese/              | 208
+ svn://svn.debian.org/svn/cipux/                | 5158
+ svn://svn.debian.org/svn/splashy/              | 1449
+ svn://svn.debian.org/svn/pkg-directfb/         | 402
+ svn://svn.debian.org/svn/python-modules/       | 34523
+ svn://svn.debian.org/svn/tetexcvs/             | 538
+ svn://svn.debian.org/svn/pkg-qalculate/        | 110
+ svn://svn.debian.org/svn/pkg-freedict/         | 206
+ svn://svn.debian.org/svn/pkg-ocaml-maint/      | 6495
+ svn://svn.debian.org/svn/pkg-llvm/             | 1915
+ svn://svn.debian.org/svn/pkg-tetex/            | 538
+ svn://svn.debian.org/svn/sumusu/               | 47
+ svn://svn.debian.org/svn/pkg-dutch/            | 165
+ svn://svn.debian.org/svn/pkg-modperl2/         | 2
+ svn://svn.debian.org/svn/net-ssleay/           | 465
+ svn://svn.debian.org/svn/pkg-nagios/           | 2150
+ svn://svn.debian.org/svn/bts-webui/            | 178
+ svn://svn.debian.org/svn/pkg-rrdtool/          | 49
+ svn://svn.debian.org/svn/debburn/              | 860
+ svn://svn.debian.org/svn/catdoc/               | 34
+ svn://svn.debian.org/svn/pkg-italian/          | 89
+ svn://svn.debian.org/svn/logrotate/            | 1
+ svn://svn.debian.org/svn/oval/                 | 450
+ svn://svn.debian.org/svn/pkg-flock/            | 16
+ svn://svn.debian.org/svn/pkg-mixmaster/        | 1028
+ svn://svn.debian.org/svn/hwdb/                 | 1
+ svn://svn.debian.org/svn/pkg-inetutils/        | 254
+ svn://svn.debian.org/svn/libacpi/              | 5
+ svn://svn.debian.org/svn/pkg-mesa/             | 38
+ svn://svn.debian.org/svn/pkg-dkms/             | 45
+ svn://svn.debian.org/svn/pkg-mysql/            | 2261
+ svn://svn.debian.org/svn/modvhostldap/         | 69
+ svn://svn.debian.org/svn/pancutan/             | 80
+ svn://svn.debian.org/svn/pkg-gd/               | 197
+ svn://svn.debian.org/svn/pkg-caudium/          | 28
+ svn://svn.debian.org/svn/pkg-jed/              | 1205
+ svn://svn.debian.org/svn/pkg-escience/         | 593
+ svn://svn.debian.org/svn/libapt-front/         | 1166
+ svn://svn.debian.org/svn/pkg-plt-scheme/       | 127
+ svn://svn.debian.org/svn/pkg-gmagick/          | 130
+ svn://svn.debian.org/svn/tts/                  | 1
+ svn://svn.debian.org/svn/parted/               | 898
+ svn://svn.debian.org/svn/ddtp/                 | 42
+ svn://svn.debian.org/svn/pkg-net-tools/        | 74
+ svn://svn.debian.org/svn/pkg-icewm/            | 331
+ svn://svn.debian.org/svn/pkg-nx/               | 75
+ svn://svn.debian.org/svn/pyroman/              | 99
+ svn://svn.debian.org/svn/pkg-swig/             | 417
+ svn://svn.debian.org/svn/pkg-postgresql/       | 837
+ svn://svn.debian.org/svn/php-apt-parser/       | 36
+ svn://svn.debian.org/svn/pkg-multidistrotools/ | 21
+ svn://svn.debian.org/svn/pkg-grass/            | 3148
+ svn://svn.debian.org/svn/pkg-polygen/          | 15
+ svn://svn.debian.org/svn/debpool/              | 80
+ svn://svn.debian.org/svn/pkg-python/           | 1
+ svn://svn.debian.org/svn/pkg-findutils/        | 434
+ svn://svn.debian.org/svn/deb-usability/        | 183
+ svn://svn.debian.org/svn/pkg-mailscanner/      | 29
+ svn://svn.debian.org/svn/edos/                 | 7
+ svn://svn.debian.org/svn/vmware-package/       | 65
+ svn://svn.debian.org/svn/pkg-fetchmail/        | 565
+ svn://svn.debian.org/svn/imediff2/             | 22
+ svn://svn.debian.org/svn/dwn-trans/            | 48
+ svn://svn.debian.org/svn/pkg-pcmcia-cs/        | 137
+ svn://svn.debian.org/svn/pkg-fonty/            | 86
+ svn://svn.debian.org/svn/python-apps/          | 13161
+ svn://svn.debian.org/svn/nagios-aptwatch/      | 11
+ svn://svn.debian.org/svn/pkg-nethack/          | 128
+ svn://svn.debian.org/svn/pkg-xiph/             | 61
+ svn://svn.debian.org/svn/pkg-terp/             | 27
+ svn://svn.debian.org/svn/pkg-evolution/        | 2885
+ svn://svn.debian.org/svn/pkg-freebob/          | 489
+ svn://svn.debian.org/svn/pkg-glusterfs/        | 55
+ svn://svn.debian.org/svn/pkg-awstats/          | 131
+ svn://svn.debian.org/svn/pkg-gridengine/       | 91
+ svn://svn.debian.org/svn/pkg-geneweb/          | 33
+ svn://svn.debian.org/svn/women/                | 57
+ svn://svn.debian.org/svn/publicity/            | 6596
+ svn://svn.debian.org/svn/pkg-cracklib/         | 123
+ svn://svn.debian.org/svn/pkg-tikiwiki/         | 164
+ svn://svn.debian.org/svn/pkg-k3b/              | 346
+ svn://svn.debian.org/svn/pkg-zope/             | 3017
+#+END_SRC
+
+* Machine
+
+worker01.internal.softwareheritage.org has been the
+
+* Comparison
+
+Here is a small comparison sample:
+
+|------------+--------+------------------------------------------+-------------------------+---------------------------+---------------+-------------------------------------------|
+| Type       | # Revs | Url                                      | git-svn (git svn clone) | swh-svn (load repository) | Ratio         | Status                                    |
+|------------+--------+------------------------------------------+-------------------------+---------------------------+---------------+-------------------------------------------|
+| small      |    145 | svn://svn.debian.org/svn/pkg-fox/        |                 447.074 |       1445.8084549359046s | 3.2339354 s   | OK                                        |
+| medium     |   6006 | svn://svn.debian.org/svn/glibc-bsd/      |                4740.928 |        10118.787201701081 | 2.1343474     | OK                                        |
+| large      |  10707 | svn://svn.debian.org/svn/pkg-voip/       |                8592.398 |        46112.436119881924 | 5.3666551     | OK                                        |
+| very large |  34523 | svn://svn.debian.org/svn/python-modules/ |                         |       288410.36918153404s |               | RUNNING                                   |
+| very large |  48013 | svn://svn.debian.org/svn/pkg-gnome/      |                       0 |          594822.724728007 | 594822.72 / 0 | FAILURE (git svn clone does not complete) |
+|------------+--------+------------------------------------------+-------------------------+---------------------------+---------------+-------------------------------------------|
+#+TBLFM: $6=$5/$4
+
+Note:
+- Time is in seconds
+- We compare storing in our swh backend (swh-loader) and storing on
+  disk (git-svn).
+
+The git-svn clones, when it finishes goes faster.
+But, it remains the swh loading in swh to do.
+
+Below are the details about the extracted times.
+Feel free to skip.
+
+** Log extraction
+
+swh-loader-svn logs extracted from the period between April 15th 2016
+and up to April 30th 2016.
+
+#+BEGIN_SRC sh
+psql -c "select level, message from log where src_host='worker01.softwareheritage.org' and ts between '2016-04-15 00:00:00.00+01' and '2016-04-30 00:00:00.00+01' ;" service=swh-log
+#+END_SRC
+
+*** DONE pkg-fox
+CLOSED: [2016-05-12 Thu 14:54]
+
+#+BEGIN_SRC sh
+ info  | [2016-04-15 18:21:27,874: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[7d697a6b-ae8b-4718-b226-1406af717954]
+ debug | [2016-04-15 18:22:18,522: DEBUG/Worker-1] svn co svn://svn.debian.org/svn/pkg-fox/@1
+ info  | [2016-04-15 18:22:19,193: INFO/Worker-1] [revision_start-revision_end]: [1-145]
+ info  | [2016-04-15 18:22:19,207: INFO/Worker-1] Repo {'remote_url': 'svn://svn.debian.org/svn/pkg-fox', 'local_url': '/tmp/tmp.wzzvlwuw.swh.loader/pkg-fox', 'uuid': 'd908f651-7add-0310-a5d1-c7ac9dfebe41', 'swh-origin': 4} ready to be processed.
+ info  | [2016-04-15 18:45:33,703: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[7d697a6b-ae8b-4718-b226-1406af717954] succeeded in 1445.8084549359046s: None
+#+END_SRC
+
+*** DONE glibc-bsd
+CLOSED: [2016-05-12 Thu 14:54]
+
+#+BEGIN_SRC log
+ info  | [2016-04-15 15:32:48,048: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[a41fba9b-f397-493a-a95f-deb673f91156]
+ info  | [2016-04-15 15:32:59,607: INFO/Worker-1] [revision_start-revision_end]: [1-6006]
+ info  | [2016-04-15 15:32:59,620: INFO/Worker-1] Repo {'remote_url': 'svn://svn.debian.org/svn/glibc-bsd', 'local_url': '/tmp/tmp.bfeb_zdv.swh.loader/glibc-bsd', 'uuid': 'ae44cbe4-c7d5-0310-ae45-95c72a56cd7d', 'swh-origin': 3} ready to be processed.
+ info  | [2016-04-15 18:21:27,855: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[a41fba9b-f397-493a-a95f-deb673f91156] succeeded in 10118.787201701081s: None
+#+END_SRC
+
+*** DONE pkg-voip
+CLOSED: [2016-05-12 Thu 14:54]
+#+BEGIN_SRC sh
+ info  | [2016-04-23 21:32:56,252: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[9a78bddb-227f-4f8a-b245-482a462e0000]
+ debug | [2016-04-23 21:32:57,781: DEBUG/Worker-9] svn co svn://svn.debian.org/svn/pkg-voip/@1
+ info  | [2016-04-23 21:32:56,252: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[9a78bddb-227f-4f8a-b245-482a462e0000]
+ info  | [2016-04-23 21:32:58,221: INFO/Worker-9] Repo {'remote_url': 'svn://svn.debian.org/svn/pkg-voip', 'local_url': '/tmp/tmp.nwuhzku9.swh.loader/pkg-voip', 'uuid': '5e74be4b-f5d6-0310-a852-e9e23c5afa6a', 'swh-origin': 32} ready to be processed.
+ info  | [2016-04-23 21:32:58,186: INFO/Worker-9] [revision_start-revision_end]: [1-10707]
+ info  | [2016-04-24 10:21:28,897: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[9a78bddb-227f-4f8a-b245-482a462e0000] succeeded in 46112.436119881924s: None
+#+END_SRC
+
+*** DONE python-modules
+CLOSED: [2016-05-12 Thu 14:54]
+#+BEGIN_SRC sh
+ info  | [2016-04-28 17:35:59,087: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[776d23aa-e3c6-452d-95bd-7ae35409e9a5]
+ debug | [2016-04-28 17:36:00,036: DEBUG/Worker-27] svn co svn://svn.debian.org/svn/python-modules/@1
+ info  | [2016-04-28 17:36:00,509: INFO/Worker-27] [revision_start-revision_end]: [1-34523]
+ info  | [2016-04-28 17:36:00,522: INFO/Worker-27] Repo {'remote_url': 'svn://svn.debian.org/svn/python-modules', 'local_url': '/tmp/tmp.7t45udhc.swh.loader/python-modules', 'uuid': '771dd761-d7fa-0310-a302-f036d1c1ebb6', 'swh-origin': 122} ready to be processed.
+ info  | [2016-05-02 01:42:49,471: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[776d23aa-e3c6-452d-95bd-7ae35409e9a5] succeeded in 288410.36918153404s: None
+#+END_SRC
+*** DONE pkg-gnome
+CLOSED: [2016-05-12 Thu 14:54]
+
+#+BEGIN_SRC log
+ info  | [2016-04-16 20:02:34,346: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[b05b9228-7842-4cf1-9f8e-79edb462c262]
+ debug | [2016-04-16 20:02:35,262: DEBUG/Worker-7] svn co svn://svn.debian.org/svn/pkg-gnome/@1
+ info  | [2016-04-16 20:02:35,625: INFO/Worker-7] [revision_start-revision_end]: [1-48013]
+ info  | [2016-04-16 20:02:35,629: INFO/Worker-48806] Archive gs://google-code-archive-source/v2/code.google.com/dennisbabiak-gccgcm/source-archive.zip fetched.
+ info  | [2016-04-16 20:02:35,641: INFO/Worker-7] Repo {'remote_url': 'svn://svn.debian.org/svn/pkg-gnome', 'local_url': '/tmp/tmp.uxt6n47f.swh.loader/pkg-gnome', 'uuid': 'db0db5de-e4c8-0310-9441-90abf70311f7', 'swh-origin': 27} ready to be processed.
+ info  | [2016-04-23 17:16:17,149: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[b05b9228-7842-4cf1-9f8e-79edb462c262] succeeded in 594822.724728007s: None
+#+END_SRC
+
+** git svn clone/fetch
+*** DONE pkg-fox
+CLOSED: [2016-05-12 Thu 14:54]
+
+#+BEGIN_SRC sh
+ardumont@worker01:~/test$ time git svn clone svn://svn.debian.org/svn/pkg-fox/
+...
+r144 = 755f744998acfb873b1b1557c788494dbac7f5b4 (refs/remotes/git-svn)
+        M       fox-1.6/trunk/debian/changelog
+        M       fox-1.6/trunk/debian/rules
+r145 = 1170cd05a054f814ebbd239090f0f3fd927f0fa7 (refs/remotes/git-svn)
+Checking out files: 100% (47319/47319), done.
+Checked out HEAD:
+  svn://svn.debian.org/svn/pkg-fox r145
+creating empty directory: fox-1.0/debian/fox_1.0.52-1/windows/vcpp/window/CVS
+creating empty directory: fox-1.0/debian/fox_1.0.52-1/windows/watcom/CVS
+creating empty directory: fox-1.0/debian/fox_1.0.52-2/windows/vcpp/window/CVS
+creating empty directory: fox-1.0/debian/fox_1.0.52-2/windows/watcom/CVS
+creating empty directory: fox-1.0/vendor/fox-1.0.52/windows/vcpp/window/CVS
+creating empty directory: fox-1.0/vendor/fox-1.0.52/windows/watcom/CVS
+
+real    7m27.074s
+user    1m15.752s
+sys     0m54.740s
+#+END_SRC
+*** DONE glibc-bsd
+CLOSED: [2016-05-12 Thu 14:54]
+
+#+BEGIN_SRC sh
+ardumont@worker01:~/test$ time git svn clone svn://svn.debian.org/svn/glibc-bsd/
+...
+r6050 = c1d2473b17d04529c13f9ed87ecddf617e0f655c (refs/remotes/git-svn)
+Checking out files: 100% (7805/7805), done.
+Checked out HEAD:
+  svn://svn.debian.org/svn/glibc-bsd r6050
+creating empty directory: trunk/glibc-ports-2.23/kfreebsd/i386/i486/fbtl
+creating empty directory: trunk/glibc-ports-2.23/kfreebsd/i386/i586/fbtl
+creating empty directory: trunk/glibc-ports/kfreebsd/i386/i486/fbtl
+creating empty directory: trunk/glibc-ports/kfreebsd/i386/i586/fbtl
+
+real    79m0.928s
+user    5m12.044s
+sys     11m28.424s
+#+END_SRC
+
+*** DONE pkg-voip
+CLOSED: [2016-05-12 Thu 14:54]
+
+#+BEGIN_SRC sh
+ardumont@worker01:~/test$ time git svn clone svn://svn.debian.org/svn/pkg-voip/
+...
+r10706 = 4ddf0d53596f9246c8329742f8853d88863d9196 (refs/remotes/git-svn)
+        M       sip-tester/trunk/debian/compat
+        M       sip-tester/trunk/debian/changelog
+r10707 = 19ebf4dfc63b657f8a93f697552c72925afa75f9 (refs/remotes/git-svn)
+Auto packing the repository in background for optimum performance.
+See "git help gc" for manual housekeeping.
+Checking out files: 100% (40381/40381), done.
+Checked out HEAD:
+  svn://svn.debian.org/svn/pkg-voip r10707
+creating empty directory: ATTIC/ari/branches
+creating empty directory: ATTIC/asterisk-sounds-extra/branches/upstream/1.4.7
+creating empty directory: ATTIC/asterisk-sounds-extra/branches/upstream/current
+...
+creating empty directory: yate/tags/2.1.0-1~dfsg-1/debian/patches
+creating empty directory: yxa/branches/upstream/0.91
+creating empty directory: yxa/branches/upstream/current
+(+ (* 60 143) 12.398)
+real    143m12.398s
+user    22m0.212s
+sys     29m10.096s
+ardumont@worker01:~/test$
+#+END_SRC
+*** IN-PROGRESS python-modules
+
+#+BEGIN_SRC sh
+ardumont@worker01:~/test$ time git svn clone svn://svn.debian.org/svn/python-modules/
+Initialized empty Git repository in /home/ardumont/test/python-modules/.git/
+        A       gnupginterface/debian/changelog
+        A       gnupginterface/debian/copyright
+        A       gnupginterface/debian/docs
+        A       gnupginterface/debian/rules
+        A       gnupginterface/debian/doc-base
+        A       gnupginterface/debian/control
+        A       gnupginterface/debian/compat
+r1 = febf6b2dc1469d10201e231a3b08805429abdb24 (refs/remotes/git-svn)
+        A       gnupginterface/debian/control.in
+        M       gnupginterface/debian/changelog
+        M       gnupginterface/debian/rules
+        A       metainfo/python-modules.team
+r2 = 3205aceb3431ebb08fbefef91e04a9c10d85a5b7 (refs/remotes/git-svn)
+        M       gnupginterface/debian/control.in
+        M       gnupginterface/debian/changelog
+        M       gnupginterface/debian/rules
+        A       gnupginterface/debian/uploaders
+        M       gnupginterface/debian/control
+r3 = 26ae7cf95826f7bd6c430a9a311a6586df80bdba (refs/remotes/git-svn)
+r4 = 1336cf42fb7fd305884fb81238a68a1627b5e635 (refs/remotes/git-svn)
+W: +empty_dir: www
+r5 = 7ef355783ad3dc02d74b0e133e8666597f33e231 (refs/remotes/git-svn)
+        A       www/python-modules-policy.rst
+r6 = a0c4721f5bdaf60fabd548503029c842aa8039fd (refs/remotes/git-svn)
+        M       www/python-modules-policy.rst
+r7 = 2e23d5f2e8e75f6c1050fe69b978d6d4b9405577 (refs/remotes/git-svn)
+        M       www/python-modules-policy.rst
+r8 = a64c844ef002876929e63c08cafe9c0d7913dbd5 (refs/remotes/git-svn)
+...
+#+END_SRC
+*** FAILED pkg-gnome
+CLOSED: [2016-05-12 Thu 14:54]
+
+`git svn clone` does not finish for this repository.
+And no retake on error is possible, we need to clean up and restart from scratch.
+
+**** 1st tryout
+
+Failure:
+#+BEGIN_SRC sh
+ardumont@worker01:~/test$ time git svn clone svn://svn.debian.org/svn/pkg-gnome/
+Initialized empty Git repository in /home/ardumont/test/pkg-gnome/.git/
+r1 = 15e91b0046a42767752f7cbf0614d27721e1af12 (refs/remotes/git-svn)
+W: +empty_dir: packages
+r2 = 17064cc88bbf5bf9c85a10c44d57846c694158a1 (refs/remotes/git-svn)
+W: +empty_dir: packages/file-roller
+r3 = dec3b8e994b3d8fa4d409c7195bcbd4706b6cdfa (refs/remotes/git-svn)
+        A       packages/gnome-pkg-tools/team_members
+        A       packages/gnome-pkg-tools/debian/changelog
+        A       packages/gnome-pkg-tools/debian/gnome-pkg-tools.install
+        A       packages/gnome-pkg-tools/debian/copyright
+        A       packages/gnome-pkg-tools/debian/rules
+        A       packages/gnome-pkg-tools/debian/control
+        A       packages/gnome-pkg-tools/debian/compat
+...
+r16689 = 39f2a34508fd3605408875d29d8b73baa1ac4bdd (refs/remotes/git-svn)
+        M       desktop/unstable/vte/debian/rules
+        M       desktop/unstable/vte/debian/changelog
+        D       desktop/unstable/vte/debian/patches/25_enable_static_ncurses.patch
+        A       desktop/unstable/vte/debian/patches/25_optional-ncurses.patch
+        M       desktop/unstable/vte/debian/patches/90_autoreconf.patch
+Connection reset by peer: Can't read from connection: Connection reset by peer at /usr/share/perl5/Git/SVN/Ra.pm line 300.
+
+
+real    265m2.537s
+user    25m9.600s
+sys     43m18.704s
+#+END_SRC
+
+**** 2nd tryout
+
+Failure:
+#+BEGIN_SRC sh
+ardumont@worker01:~/test$ time git svn clone svn://svn.debian.org/svn/pkg-gnome/
+ ...
+r7983 = 5db47427ea4135418ac008d5acfcbaa5a2ab41a6 (refs/remotes/git-svn)
+Connection reset by peer: Can't read from connection: Connection reset by peer at /usr/share/perl5/Git/SVN.pm line 1210.
+.
+
+
+real    131m37.338s
+user    6m57.104s
+sys     14m6.808s
+ardumont@worker01:~/test$ time git svn clone svn://svn.debian.org/svn/pkg-gnome
+#+END_SRC
+
+**** 3rd tryout
+
+3rd is the charm... or not!
+FAILURE:
+#+BEGIN_SRC sh
+ardumont@worker01:~/test$ time git svn clone svn://svn.debian.org/svn/pkg-gnome/
+ ...
+r13093 = 9a4c30f1242671a73ad5618d95671e0f2a569965 (refs/remotes/git-svn)
+        M       desktop/unstable/gtkmm2.4/debian/watch
+        M       desktop/unstable/gtkmm2.4/debian/copyright
+r13094 = f791964e6a1789d79b5db809066ab5c6a944f151 (refs/remotes/git-svn)
+        M       packages/experimental/rhythmbox/debian/changelog
+r13095 = 0f04c0efe06865fec3c9b825c0300f9620eee342 (refs/remotes/git-svn)
+Connection reset by peer: Can't read from connection: Connection reset by peer at /usr/share/perl5/Git/SVN.pm line 1210.
+
+
+real    180m39.494s
+user    15m0.696s
+sys     28m22.148s
+ardumont@worker01:~/test$
+#+END_SRC
+
+Resuming the clone, it progresses and fails:
+#+BEGIN_SRC sh
+ardumont@worker01:~/test/pkg-gnome$ time git svn fetch
+...
+r36696 = f50d47c1f4503e94d5a14120b5ae28ddc89d5459 (refs/remotes/git-svn)
+        M       desktop/experimental/gnome-mahjongg/debian/control
+        M       desktop/experimental/gnome-mahjongg/debian/control.in
+        M       desktop/experimental/five-or-more/debian/control.in
+        M       desktop/experimental/five-or-more/debian/control
+        M       desktop/experimental/gnome-mines/debian/control
+        M       desktop/experimental/gnome-mines/debian/control.in
+        M       desktop/experimental/swell-foop/debian/control
+        M       desktop/experimental/swell-foop/debian/control.in
+        M       desktop/experimental/four-in-a-row/debian/control
+        M       desktop/experimental/four-in-a-row/debian/control.in
+        M       desktop/experimental/gnome-chess/debian/control
+        M       desktop/experimental/gnome-chess/debian/control.in
+Checksum mismatch: desktop/experimental/quadrapassel/debian/control 5f307bd77cf88802bd8bf29f53bf79c56c025bd0
+expected: d0a3e82c6cf89884b7a437d95698e944
+     got: 1a88372a29c589d72350b615235eabde
+
+
+real    802m28.076s
+user    149m40.680s
+sys     130m10.140s
+#+END_SRC
+
+And now we are stuck:
+#+BEGIN_SRC sh
+ardumont@worker01:~/test/pkg-gnome$ time git svn fetch
+Index mismatch: 7e42143b744220d2fb9bc02e3b95b52240227a13 != e038931478d9739bb149296393a50df7a9114f86
+rereading f50d47c1f4503e94d5a14120b5ae28ddc89d5459
+        M       desktop/experimental/lightsoff/debian/control
+        M       desktop/experimental/lightsoff/debian/control.in
+        M       desktop/experimental/swell-foop/debian/control
+        M       desktop/experimental/swell-foop/debian/control.in
+        M       desktop/experimental/tali/debian/control.in
+        M       desktop/experimental/tali/debian/control
+        M       desktop/experimental/gnome-sudoku/debian/control.in
+        M       desktop/experimental/gnome-sudoku/debian/control
+        M       desktop/experimental/four-in-a-row/debian/control
+        M       desktop/experimental/four-in-a-row/debian/control.in
+        M       desktop/experimental/five-or-more/debian/control
+        M       desktop/experimental/five-or-more/debian/control.in
+        M       desktop/experimental/gnome-mines/debian/control
+        M       desktop/experimental/gnome-mines/debian/control.in
+Checksum mismatch: desktop/experimental/quadrapassel/debian/control.in f22732d39f98416ae930781a2011261fb40e1f4b
+expected: 43a5a26795d42c25ebdaa90c3673ed87
+     got: c527c56f66f2e8d9383d57f3938bf135
+
+
+real    0m33.228s
+user    0m1.992s
+sys     0m0.892s
+#+END_SRC

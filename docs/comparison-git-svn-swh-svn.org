@@ -33,8 +33,8 @@ Considering the following definitions:
 | very large | > 40k              |
 | large      | > 10k              |
 | medium     | > 5k               |
-| small      | > 150              |
-| very small | > 10               |
+| small      | < 150              |
+| very small | < 10               |
 |------------+--------------------|
 
 Here is the svn repositories list:
@@ -244,17 +244,15 @@ worker01.internal.softwareheritage.org has been the
 
 * Comparison
 
-Here is a small comparison sample:
-
-|------------+--------+------------------------------------------+-------------------------+---------------------------+---------------+-------------------------------------------|
-| Type       | # Revs | Url                                      | git-svn (git svn clone) | swh-svn (load repository) | Ratio         | Status                                    |
-|------------+--------+------------------------------------------+-------------------------+---------------------------+---------------+-------------------------------------------|
-| small      |    145 | svn://svn.debian.org/svn/pkg-fox/        |                 447.074 |       1445.8084549359046s | 3.2339354 s   | OK                                        |
-| medium     |   6006 | svn://svn.debian.org/svn/glibc-bsd/      |                4740.928 |        10118.787201701081 | 2.1343474     | OK                                        |
-| large      |  10707 | svn://svn.debian.org/svn/pkg-voip/       |                8592.398 |        46112.436119881924 | 5.3666551     | OK                                        |
-| very large |  34523 | svn://svn.debian.org/svn/python-modules/ |               36627.907 |       288410.36918153404s | 7.8740609 s   | RUNNING                                   |
-| very large |  48013 | svn://svn.debian.org/svn/pkg-gnome/      |                       0 |          594822.724728007 | 594822.72 / 0 | FAILURE (git svn clone does not complete) |
-|------------+--------+------------------------------------------+-------------------------+---------------------------+---------------+-------------------------------------------|
+|------------+--------+------------------------------------------+-------------------------+---------------------------+-------------|
+| Type       | # Revs | Url                                      | git-svn (git svn clone) | swh-svn (load repository) |       Ratio |
+|------------+--------+------------------------------------------+-------------------------+---------------------------+-------------|
+| small      |    145 | svn://svn.debian.org/svn/pkg-fox/        |                 447.074 |       1445.8084549359046s | 3.2339354 s |
+| medium     |   6006 | svn://svn.debian.org/svn/glibc-bsd/      |                4740.928 |        10118.787201701081 |   2.1343474 |
+| large      |  10707 | svn://svn.debian.org/svn/pkg-voip/       |                8592.398 |        46112.436119881924 |   5.3666551 |
+| very large |  34523 | svn://svn.debian.org/svn/python-modules/ |               36627.907 |       288410.36918153404s | 7.8740609 s |
+| very large |  48013 | svn://svn.debian.org/svn/pkg-gnome/      |               71902.080 |          594822.724728007 |   8.2726776 |
+|------------+--------+------------------------------------------+-------------------------+---------------------------+-------------|
 #+TBLFM: $6=$5/$4
 
 Note:
@@ -456,7 +454,8 @@ real    610m27.907s
 user    140m19.436s
 sys     147m44.760s
 #+END_SRC
-*** IN-PROGRESS pkg-gnome
+*** DONE pkg-gnome
+CLOSED: [2016-05-13 Fri 17:17]
 
 `git svn clone` does not finish for this repository.
 And no retake on error is possible, we need to clean up and restart from scratch.
@@ -590,15 +589,15 @@ sys     0m0.892s
 #+END_SRC
 **** 4th tryout
 
-Trying another manner, first fetch a simple revision and then fetch the rest:
+Trying another way, first clone at the first revision and then fetch the rest:
 #+BEGIN_SRC sh
-r34523 = d7ad2aa9f03614e98131a45d12ca85f0db6200b0 (refs/remotes/git-svn)
-Checking out files: 100% (96660/96660), done.
+ardumont@worker01:~/test $ time git svn clone svn://svn.debian.org/svn/pkg-gnome -r1
+Initialized empty Git repository in /home/ardumont/pkg-gnome/.git/
+W: +empty_dir: tools
+r1 = 15e91b0046a42767752f7cbf0614d27721e1af12 (refs/remotes/git-svn)
 Checked out HEAD:
-  svn://svn.debian.org/svn/python-modules r34523
-creating empty directory: packages/adhocracy/tags
-creating empty directory: packages/aiopg/tags
-creating empty directory: packages/alembic/branches/upstream/0.3.2
+  svn://svn.debian.org/svn/pkg-gnome r1
+creating empty directory: tools
 ardumont@worker01:~/test $ cd pkg-gnome
 ardumont@worker01:~/test/pkg-gnome$ time git svn fetch
 W: +empty_dir: packages
@@ -606,4 +605,11 @@ r2 = 17064cc88bbf5bf9c85a10c44d57846c694158a1 (refs/remotes/git-svn)
 W: +empty_dir: packages/file-roller
 r3 = dec3b8e994b3d8fa4d409c7195bcbd4706b6cdfa (refs/remotes/git-svn)
 ...
+r48675 = ad0a56ae71a479b1502ec6e99d2c5c90176718fa (refs/remotes/git-svn)
+        M       desktop/unstable/gnome-klotski/debian/changelog
+r48676 = 494ad851898051b2e6d86e3de0b428094ed37d3d (refs/remotes/git-svn)
+
+real    1198m22.080s
+user    314m23.704s
+sys     327m49.552s
 #+END_SRC

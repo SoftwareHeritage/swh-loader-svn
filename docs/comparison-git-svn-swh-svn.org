@@ -613,3 +613,41 @@ real    1198m22.080s
 user    314m23.704s
 sys     327m49.552s
 #+END_SRC
+
+* Comparison take 2
+
+Improving the comparison between swh-svn and git-svn.
+
+git svn clone <url> --no-metadata
+
+Still, git svn, uses author in the form <svn-author>@<repo-uuid> and no option exists to remove that.
+
+** Original form (from first round)
+
+#+BEGIN_SRC sh
+ardumont@worker01:~/test/round-1/pkg-fox$ git cat-file -p a6754307dd84cd63b63a68b2627c9835133d6cd5
+tree 3063fbac48f07a47b2fef09d9d1903a621a91fe7
+author torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000
+committer torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000
+
+Imported upstream version 1.2.4.
+
+
+git-svn-id: svn://svn.debian.org/svn/pkg-fox@1 d908f651-7add-0310-a5d1-c7ac9dfebe41
+ardumont@worker01:~/test/round-1/pkg-fox$
+#+END_SRC
+
+** Improved form
+
+#+BEGIN_SRC sh
+ardumont@worker01:~/test/round-2/pkg-fox$ git cat-file -p 1d7ad0634b1a518b6015eb27d93347d3b420fd12
+tree 06b23629228fc98e45201917eaf8658f48637d75
+author torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000
+committer torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000
+
+Imported upstream version 1.2.4.
+
+ardumont@worker01:~/test/round-2/pkg-fox$
+#+END_SRC
+
+Adapted swh-loader-svn to match the author's policy.

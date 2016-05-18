@@ -12,30 +12,44 @@ from swh.loader.svn import converters
 
 class TestConverters(unittest.TestCase):
     @istest
-    def svn_author_to_person_as_bytes(self):
-        actual_person1 = converters.svn_author_to_person(
-            b'tony <ynot@dagobah>')
-        self.assertEquals(actual_person1, {
+    def svn_author_to_person(self):
+        actual_person = converters.svn_author_to_person(
+            b'tony <ynot@dagobah>',
+            repo_uuid=None)
+        self.assertEquals(actual_person, {
             'fullname': b'tony <ynot@dagobah>',
-            'name': b'tony <ynot@dagobah>',
-            'email': None,
+            'name': b'tony',
+            'email': b'ynot@dagobah',
         })
 
     @istest
-    def svn_author_to_person_as_str(self):
+    def svn_author_to_person_no_email(self):
         # should not happen - input is bytes but nothing prevents it
-        actual_person1 = converters.svn_author_to_person('tony <tony@dagobah>')
-        self.assertEquals(actual_person1, {
-            'fullname': 'tony <tony@dagobah>',
-            'name': 'tony <tony@dagobah>',
-            'email': None,
+        actual_person = converters.svn_author_to_person(b'tony',
+                                                        repo_uuid='some-uuid')
+        self.assertEquals(actual_person, {
+            'fullname': b'tony <tony@some-uuid>',
+            'name': b'tony',
+            'email': b'tony@some-uuid',
         })
 
     @istest
     def svn_author_to_person_None(self):
         # should not happen - nothing prevents it though
-        actual_person2 = converters.svn_author_to_person(None)
-        self.assertEquals(actual_person2, {
+        actual_person = converters.svn_author_to_person(None,
+                                                        repo_uuid=None)
+        self.assertEquals(actual_person, {
+            'fullname': None,
+            'name': None,
+            'email': None,
+        })
+
+    @istest
+    def svn_author_to_person_empty_person(self):
+        # should not happen - nothing prevents it though
+        actual_person = converters.svn_author_to_person(b'',
+                                                        repo_uuid=None)
+        self.assertEquals(actual_person, {
             'fullname': None,
             'name': None,
             'email': None,
@@ -59,8 +73,16 @@ class TestConverters(unittest.TestCase):
             'type': 'svn',
             'directory': 'dir-id',
             'message': b'commit message',
-            'author': {'name': b'theo', 'email': None, 'fullname': b'theo'},
-            'committer': {'name': b'theo', 'email': None, 'fullname': b'theo'},
+            'author': {
+                'name': b'theo',
+                'email': b'theo@uuid',
+                'fullname': b'theo <theo@uuid>'
+            },
+            'committer': {
+                'name': b'theo',
+                'email': b'theo@uuid',
+                'fullname': b'theo <theo@uuid>'
+            },
             'synthetic': True,
             'metadata': {
                 'extra_headers': [
@@ -90,8 +112,16 @@ class TestConverters(unittest.TestCase):
             'type': 'svn',
             'directory': 'dir-id',
             'message': b'commit message',
-            'author': {'name': b'theo', 'email': None, 'fullname': b'theo'},
-            'committer': {'name': b'theo', 'email': None, 'fullname': b'theo'},
+            'author': {
+                'name': b'theo',
+                'email': b'theo@uuid',
+                'fullname': b'theo <theo@uuid>'
+            },
+            'committer': {
+                'name': b'theo',
+                'email': b'theo@uuid',
+                'fullname': b'theo <theo@uuid>'
+            },
             'synthetic': True,
             'metadata': None,
             'parents': ['123'],
@@ -115,8 +145,8 @@ class TestConverters(unittest.TestCase):
             'type': 'svn',
             'directory': 'dir-id',
             'message': b'',
-            'author': {'name': b'', 'email': None, 'fullname': b''},
-            'committer': {'name': b'', 'email': None, 'fullname': b''},
+            'author': {'name': None, 'email': None, 'fullname': None},
+            'committer': {'name': None, 'email': None, 'fullname': None},
             'synthetic': True,
             'metadata': {
                 'extra_headers': [

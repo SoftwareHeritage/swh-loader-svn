@@ -23,7 +23,8 @@ def svn_author_to_person(author):
     }
 
 
-def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):
+def build_swh_revision(repo_uuid, commit, rev, dir_id, parents,
+                       with_extra_headers=True):
     """Given a svn revision, build a swh revision.
 
     """
@@ -36,6 +37,16 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):
         'offset': 0,
     }
 
+    if with_extra_headers:
+        metadata = {
+            'extra_headers': [
+                ['svn_repo_uuid', repo_uuid],
+                ['svn_revision', rev]
+            ]
+        }
+    else:
+        metadata = None
+
     return {
         'date': date,
         'committer_date': date,
@@ -45,12 +56,7 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id, parents):
         'author': author,
         'committer': author,
         'synthetic': True,
-        'metadata': {
-            'extra_headers': [
-                ['svn_repo_uuid', repo_uuid],
-                ['svn_revision', rev]
-            ]
-        },
+        'metadata': metadata,
         'parents': parents,
     }
 

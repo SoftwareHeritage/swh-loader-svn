@@ -42,7 +42,7 @@ class TestConverters(unittest.TestCase):
         })
 
     @istest
-    def build_swh_revision(self):
+    def build_swh_revision_default(self):
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid='uuid',
             dir_id='dir-id',
@@ -68,6 +68,32 @@ class TestConverters(unittest.TestCase):
                     ['svn_revision', 10],
                 ]
             },
+            'parents': ['123'],
+        })
+
+    @istest
+    def build_swh_revision_no_extra_headers(self):
+        actual_swh_revision = converters.build_swh_revision(
+            repo_uuid='uuid',
+            dir_id='dir-id',
+            commit={'author_name': b'theo',
+                    'message': b'commit message',
+                    'author_date': '2009-04-18 06:55:53 +0200'},
+            rev=10,
+            parents=['123'],
+            with_extra_headers=False)
+
+        self.assertEquals(actual_swh_revision, {
+            'date': {'timestamp': '2009-04-18 06:55:53 +0200', 'offset': 0},
+            'committer_date': {'timestamp': '2009-04-18 06:55:53 +0200',
+                               'offset': 0},
+            'type': 'svn',
+            'directory': 'dir-id',
+            'message': b'commit message',
+            'author': {'name': b'theo', 'email': None, 'fullname': b'theo'},
+            'committer': {'name': b'theo', 'email': None, 'fullname': b'theo'},
+            'synthetic': True,
+            'metadata': None,
             'parents': ['123'],
         })
 

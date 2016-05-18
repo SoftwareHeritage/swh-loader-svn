@@ -62,13 +62,13 @@ class TestConverters(unittest.TestCase):
             dir_id='dir-id',
             commit={'author_name': b'theo',
                     'message': b'commit message',
-                    'author_date': '2009-04-18 06:55:53 +0200'},
+                    'author_date': 1095446497.574042},
             rev=10,
             parents=['123'])
 
         self.assertEquals(actual_swh_revision, {
-            'date': {'timestamp': '2009-04-18 06:55:53 +0200', 'offset': 0},
-            'committer_date': {'timestamp': '2009-04-18 06:55:53 +0200',
+            'date': {'timestamp': 1095446497, 'offset': 0},
+            'committer_date': {'timestamp': 1095446497,
                                'offset': 0},
             'type': 'svn',
             'directory': 'dir-id',
@@ -100,14 +100,14 @@ class TestConverters(unittest.TestCase):
             dir_id='dir-id',
             commit={'author_name': b'theo',
                     'message': b'commit message',
-                    'author_date': '2009-04-18 06:55:53 +0200'},
+                    'author_date': 1095446497.574042},
             rev=10,
             parents=['123'],
             with_extra_headers=False)
 
         self.assertEquals(actual_swh_revision, {
-            'date': {'timestamp': '2009-04-18 06:55:53 +0200', 'offset': 0},
-            'committer_date': {'timestamp': '2009-04-18 06:55:53 +0200',
+            'date': {'timestamp': 1095446497, 'offset': 0},
+            'committer_date': {'timestamp': 1095446497,
                                'offset': 0},
             'type': 'svn',
             'directory': 'dir-id',
@@ -134,13 +134,13 @@ class TestConverters(unittest.TestCase):
             dir_id='dir-id',
             commit={'author_name': b'',
                     'message': b'',
-                    'author_date': '2009-04-10 06:55:53'},
+                    'author_date': 1095446497.574042},
             rev=8,
             parents=[])
 
         self.assertEquals(actual_swh_revision, {
-            'date': {'timestamp': '2009-04-10 06:55:53', 'offset': 0},
-            'committer_date': {'timestamp': '2009-04-10 06:55:53',
+            'date': {'timestamp': 1095446497, 'offset': 0},
+            'committer_date': {'timestamp': 1095446497,
                                'offset': 0},
             'type': 'svn',
             'directory': 'dir-id',

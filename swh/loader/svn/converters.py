@@ -54,7 +54,7 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id, parents,
     msg = commit['message']
 
     date = {
-        'timestamp': commit['author_date'],
+        'timestamp': int(commit['author_date']),
         'offset': 0,
     }
 

@@ -241,14 +241,14 @@ class SvnRepo():
         local_url = self.local_url.encode('utf-8')
         for commit in self.logs(start_revision, end_revision):
             rev = commit['rev']
-            # checkout to the revision rev
-            self.checkout(revision=rev)
-
-            if rev == start_revision:  # first time we walk the complete tree
+            if rev == start_revision:  # first time, we walk the complete tree
                 objects_per_path = git.walk_and_compute_sha1_from_directory(
                     local_url,
                     dir_ok_fn=ignore_svn_folder)
-            else:  # then we update only what needs to be
+            else:
+                # checkout to the next revision rev
+                self.checkout(revision=rev)
+                # and we update  only what needs to be
                 objects_per_path = git.update_checksums_from(
                     commit['changed_paths'],
                     objects_per_path,

@@ -198,16 +198,6 @@ class SvnRepo():
             done = True
 
         for log_entry in self._logs(r1, r2):
-            # determine the full diff between (rev - 1) and rev
-            # diff = self.client.diff(url_or_path=self.local_url,
-            #                         tmp_path='/tmp',
-            #                         url_or_path2=self.local_url,
-            #                         revision1=Revision(
-            #                             opt_revision_kind.number, rev-1),
-            #                         revision2=Revision(
-            #                             opt_revision_kind.number, rev),
-            #                         ignore_content_type=True)
-
             yield self._to_entry(log_entry)
 
         if not done:

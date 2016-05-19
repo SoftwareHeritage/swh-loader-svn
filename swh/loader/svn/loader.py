@@ -45,7 +45,8 @@ class SvnLoader(loader.SWHLoader):
         super().__init__(config,
                          origin_id,
                          logging_class='swh.loader.svn.SvnLoader')
-        self.with_extra_headers = self.config['revision_with_headers'].lower() == 'true'  # noqa
+        self.with_revision_headers = self.config['with_revision_headers'].lower() == 'true'  # noqa
+        self.with_empty_folder = self.config['with_empty_folder'].lower() == 'true'  # noqa
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.
@@ -91,7 +92,7 @@ class SvnLoader(loader.SWHLoader):
                 rev,
                 dir_id,
                 revision_parents[rev],
-                with_extra_headers=self.with_extra_headers)  # BEWARE: if False, svn repo update won't work...  # noqa
+                with_revision_headers=self.with_revision_headers)  # BEWARE: if False, svn repo update won't work...  # noqa
             swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
             self.log.debug('rev: %s, swhrev: %s, dir: %s' % (
                 rev,

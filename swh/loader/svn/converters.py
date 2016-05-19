@@ -45,7 +45,7 @@ def svn_author_to_person(author, repo_uuid):
 
 
 def build_swh_revision(repo_uuid, commit, rev, dir_id, parents,
-                       with_extra_headers=True):
+                       with_revision_headers=True):
     """Given a svn revision, build a swh revision.
 
     """
@@ -58,7 +58,7 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id, parents,
         'offset': 0,
     }
 
-    if with_extra_headers:
+    if with_revision_headers:
         metadata = {
             'extra_headers': [
                 ['svn_repo_uuid', repo_uuid],

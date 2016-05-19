@@ -103,7 +103,7 @@ class TestConverters(unittest.TestCase):
                     'author_date': 1095446497.574042},
             rev=10,
             parents=['123'],
-            with_extra_headers=False)
+            with_revision_headers=False)
 
         self.assertEquals(actual_swh_revision, {
             'date': {'timestamp': 1095446497, 'offset': 0},

@@ -38,7 +38,10 @@ class SvnRepo():
     """Swh representation of a svn repository.
 
     """
-    def __init__(self, remote_url, origin_id, storage, destination_path=None):
+    def __init__(self, remote_url, origin_id, storage,
+                 destination_path=None,
+                 with_empty_folder=False,
+                 with_extra_commit_line=False):
         self.remote_url = remote_url.rstrip('/')
         self.storage = storage
         self.origin_id = origin_id
@@ -58,6 +61,8 @@ class SvnRepo():
         self.client = pysvn.Client()
         self.local_url = os.path.join(self.local_dirname, local_name)
         self.uuid = None  # Cannot know it yet since we need a working copy
+        self.with_empty_folder = with_empty_folder
+        self.with_extra_commit_line = with_extra_commit_line
 
     def __str__(self):
         return str({'remote_url': self.remote_url,
@@ -145,8 +150,15 @@ class SvnRepo():
             author = DEFAULT_AUTHOR_NAME
 
         try:
-            message = log_entry.message.encode('utf-8') \
-                      or DEFAULT_AUTHOR_MESSAGE
+
+            msg = log_entry.message
+            if msg and self.with_extra_commit_line:
+                message = ('%s\n' % msg).encode('utf-8')
+            elif msg:
+                message = msg.encode('utf-8')
+            else:
+                message = DEFAULT_AUTHOR_MESSAGE
+
         except AttributeError:
             message = DEFAULT_AUTHOR_MESSAGE
 
@@ -235,8 +247,12 @@ class SvnRepo():
             - objects_per_path: dictionary of path, swh hash data with type
 
         """
-        def ignore_svn_folder(dirpath):
-            return b'.svn' not in dirpath
+        if not self.with_empty_folder:
+            def dir_ok_fn(dirpath):
+                return b'.svn' not in dirpath and len(os.listdir(dirpath)) > 0
+        else:
+            def dir_ok_fn(dirpath):
+                return b'.svn' not in dirpath
 
         local_url = self.local_url.encode('utf-8')
         for commit in self.logs(start_revision, end_revision):
@@ -244,7 +260,7 @@ class SvnRepo():
             if rev == start_revision:  # first time, we walk the complete tree
                 objects_per_path = git.walk_and_compute_sha1_from_directory(
                     local_url,
-                    dir_ok_fn=ignore_svn_folder)
+                    dir_ok_fn=dir_ok_fn)
             else:
                 # checkout to the next revision rev
                 self.checkout(revision=rev)
@@ -252,7 +268,7 @@ class SvnRepo():
                 objects_per_path = git.update_checksums_from(
                     commit['changed_paths'],
                     objects_per_path,
-                    dir_ok_fn=ignore_svn_folder)
+                    dir_ok_fn=dir_ok_fn)
 
             if rev == end_revision:
                 nextrev = None

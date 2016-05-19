@@ -47,6 +47,7 @@ class SvnLoader(loader.SWHLoader):
                          logging_class='swh.loader.svn.SvnLoader')
         self.with_revision_headers = self.config['with_revision_headers'].lower() == 'true'  # noqa
         self.with_empty_folder = self.config['with_empty_folder'].lower() == 'true'  # noqa
+        self.with_extra_commit_line = self.config['with_extra_commit_line'].lower() == 'true'  # noqa
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.
@@ -81,8 +82,9 @@ class SvnLoader(loader.SWHLoader):
             swh revision
 
         """
-        gen_revs = svnrepo.swh_hash_data_per_revision(revision_start,
-                                                      revision_end)
+        gen_revs = svnrepo.swh_hash_data_per_revision(
+            revision_start,
+            revision_end)
         for rev, nextrev, commit, objects_per_path in gen_revs:
             # compute the fs tree's checksums
             dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
@@ -160,8 +162,12 @@ class SvnLoader(loader.SWHLoader):
             - stderr: optional when status is True, mandatory otherwise
 
         """
-        svnrepo = svn.SvnRepo(svn_url, origin['id'], self.storage,
-                              destination_path)
+        svnrepo = svn.SvnRepo(
+            svn_url, origin['id'], self.storage,
+            destination_path=destination_path,
+            with_empty_folder=self.with_empty_folder,
+            with_extra_commit_line=self.with_extra_commit_line
+        )
 
         try:
             swh_rev = svnrepo.swh_previous_revision()

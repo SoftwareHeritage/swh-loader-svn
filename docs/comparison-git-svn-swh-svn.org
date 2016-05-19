@@ -614,15 +614,18 @@ user    314m23.704s
 sys     327m49.552s
 #+END_SRC
 
-* Comparison take 2
+* Comparison, take 2
 
 Improving the comparison between swh-svn and git-svn.
+
+** author format
 
 git svn clone <url> --no-metadata
 
 Still, git svn, uses author in the form <svn-author>@<repo-uuid> and no option exists to remove that.
+Does not clone empty directories unless specified otherwise (--preserve-empty-dirs but then adds a placeholder file by default .gitignore)
 
-** Original form (from first round)
+*** Original form (from first round)
 
 #+BEGIN_SRC sh
 ardumont@worker01:~/test/round-1/pkg-fox$ git cat-file -p a6754307dd84cd63b63a68b2627c9835133d6cd5
@@ -637,7 +640,7 @@ git-svn-id: svn://svn.debian.org/svn/pkg-fox@1 d908f651-7add-0310-a5d1-c7ac9dfeb
 ardumont@worker01:~/test/round-1/pkg-fox$
 #+END_SRC
 
-** Improved form
+*** Improved form
 
 #+BEGIN_SRC sh
 ardumont@worker01:~/test/round-2/pkg-fox$ git cat-file -p 1d7ad0634b1a518b6015eb27d93347d3b420fd12
@@ -650,4 +653,30 @@ Imported upstream version 1.2.4.
 ardumont@worker01:~/test/round-2/pkg-fox$
 #+END_SRC
 
+*** Conclusion
+
 Adapted swh-loader-svn to match the author's policy.
+
+** empty folder
+
+Remains a divergence on dealing with empty folder.
+
+Code convergence between git-svn and swh-svn (with options to simulate some git-svn behavior)
+
+*** Analysis
+
+This is the commit created by git-svn:
+#+BEGIN_SRC sh
+$ echo -e 'tree 3063fbac48f07a47b2fef09d9d1903a621a91fe7\nauthor torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000\ncommitter torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000\n\nImported upstream version 1.2.4.\n' | git hash-object -t commit --stdin
+1dda85506a12af80c5a701a02aba5a02c703642f
+#+END_SRC
+
+This is the commit created by swh-loader-svn (-> swh-model)
+#+BEGIN_SRC sh
+$ echo -e 'tree 3063fbac48f07a47b2fef09d9d1903a621a91fe7\nauthor torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000\ncommitter torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000\n\nImported upstream version 1.2.4.' | git hash-object -t commit --stdin
+9fac5d7356db92a01d276667cd1e7eb29b850a3c
+#+END_SRC
+
+*** Conclusion
+
+Turns out that the svn commit message is missing an '\n', so added an extra option to have the same behavior as git-svn.

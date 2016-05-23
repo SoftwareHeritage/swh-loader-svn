@@ -28,24 +28,20 @@ def hashtree(path, ignore_empty_folder=False, ignore=None):
         for exc in ignore:
             patterns.append(exc.encode('utf-8'))
 
-        if ignore_empty_folder:
-            def dir_ok_fn(dirpath, patterns=patterns):
-                if len(os.listdir(dirpath)) == 0:
+        def dir_ok_fn_basic(dirpath, patterns=patterns):
+            dname = os.path.basename(dirpath)
+            for pattern_to_ignore in patterns:
+                if pattern_to_ignore == dname or pattern_to_ignore in dirpath:
                     return False
 
-                for pattern_to_ignore in patterns:
-                    if pattern_to_ignore in dirpath:
-                        return False
+            return True
 
-                return True
-
-        else:
+        if ignore_empty_folder:
             def dir_ok_fn(dirpath, patterns=patterns):
-                for pattern_to_ignore in patterns:
-                    if pattern_to_ignore in dirpath:
-                        return False
-
-                return True
+                return dir_ok_fn_basic(dirpath) \
+                    and len(os.listdir(dirpath)) > 0
+        else:
+            dir_ok_fn = dir_ok_fn_basic
 
         objects = git.walk_and_compute_sha1_from_directory(
             path,

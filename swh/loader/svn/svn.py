@@ -247,12 +247,25 @@ class SvnRepo():
             - objects_per_path: dictionary of path, swh hash data with type
 
         """
+        def dir_ok_fn_basic(dirpath):
+            """Ignore basic .svn folder and .svn folder's content.
+
+            """
+            dname = os.path.basename(dirpath)
+            if dname == b'.svn':
+                return False
+            return b'.svn/' not in dirpath
+
         if not self.with_empty_folder:
             def dir_ok_fn(dirpath):
-                return b'.svn' not in dirpath and len(os.listdir(dirpath)) > 0
+                """Ignore .svn folder and .svn folder contents + empty
+                directories.
+
+                """
+                return dir_ok_fn_basic(dirpath) and \
+                    len(os.listdir(dirpath)) > 0
         else:
-            def dir_ok_fn(dirpath):
-                return b'.svn' not in dirpath
+            dir_ok_fn = dir_ok_fn_basic
 
         local_url = self.local_url.encode('utf-8')
         for commit in self.logs(start_revision, end_revision):

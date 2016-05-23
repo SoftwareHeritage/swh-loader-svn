@@ -38,7 +38,7 @@ def hashtree(path, ignore_empty_folder=False, ignore=None):
         if ignore_empty_folder:
             def dir_ok_fn(dirpath, patterns=patterns):
                 return dir_ok_fn_basic(dirpath) \
-                    and len(os.listdir(dirpath)) > 0
+                    and os.listdir(dirpath) != []
         else:
             dir_ok_fn = dir_ok_fn_basic
 

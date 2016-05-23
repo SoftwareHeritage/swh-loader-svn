@@ -263,7 +263,7 @@ class SvnRepo():
 
                 """
                 return dir_ok_fn_basic(dirpath) and \
-                    len(os.listdir(dirpath)) > 0
+                    os.listdir(dirpath) != []
         else:
             dir_ok_fn = dir_ok_fn_basic
 

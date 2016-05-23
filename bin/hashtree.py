@@ -2,8 +2,7 @@
 
 # Use sample:
 # hashtree.py --path . --ignore '.svn' --ignore '.git-svn'
-# path: b'.'
-# hash: 38f8d2c3a951f6b94007896d0981077e48bbd702
+# 38f8d2c3a951f6b94007896d0981077e48bbd702
 
 import click
 import os
@@ -51,7 +50,7 @@ def hashtree(path, ignore_empty_folder=False, ignore=None):
 
     h = objects[git.ROOT_TREE_KEY][0]['sha1_git']
 
-    print('path: %s\nhash: %s' % (path, hashutil.hash_to_hex(h)))
+    print(hashutil.hash_to_hex(h))
 
 
 if __name__ == '__main__':

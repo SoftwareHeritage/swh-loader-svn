@@ -1,8 +1,15 @@
-swh-loader-svn (0.0.3-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.4-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.4
+  * Add options for git-svn like behavior (git svn clone <url> --no-
+    metadata)
+  * Ignore empty folder
+  * Add extra-line in svn commit message
+  * No revision metadata (beware that this break the update repo
+  * mechanism)
+  * Also, use <user>@<repo-uuid> pattern for committer/author
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 15 Apr 2016 16:10:50 +0200
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Tue, 24 May 2016 17:04:40 +0200
 
 swh-loader-svn (0.0.3-1~swh1) unstable-swh; urgency=medium
 

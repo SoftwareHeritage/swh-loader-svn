@@ -9,6 +9,7 @@ requirements.txt
 setup.py
 svn-lib-client-analysis.org
 version.txt
+bin/hashtree.py
 bin/init-svn-repository.sh
 debian/changelog
 debian/compat
@@ -16,6 +17,7 @@ debian/control
 debian/copyright
 debian/rules
 debian/source/format
+docs/comparison-git-svn-swh-svn.org
 install/install-pysvn.sh
 install/install-subvertpy.sh
 resources/svn.ini

@@ -86,8 +86,8 @@ class TestConverters(unittest.TestCase):
             'synthetic': True,
             'metadata': {
                 'extra_headers': [
-                    ['svn_repo_uuid', 'uuid'],
-                    ['svn_revision', 10],
+                    ['svn_repo_uuid', b'uuid'],
+                    ['svn_revision', b'10'],
                 ]
             },
             'parents': ['123'],
@@ -150,8 +150,8 @@ class TestConverters(unittest.TestCase):
             'synthetic': True,
             'metadata': {
                 'extra_headers': [
-                    ['svn_repo_uuid', 'uuid'],
-                    ['svn_revision', 8],
+                    ['svn_repo_uuid', b'uuid'],
+                    ['svn_revision', b'8'],
                 ]
             },
             'parents': [],

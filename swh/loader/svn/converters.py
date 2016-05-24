@@ -61,8 +61,8 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id, parents,
     if with_revision_headers:
         metadata = {
             'extra_headers': [
-                ['svn_repo_uuid', repo_uuid],
-                ['svn_revision', rev]
+                ['svn_repo_uuid', repo_uuid.encode('utf-8')],
+                ['svn_revision', str(rev).encode('utf-8')]
             ]
         }
     else:

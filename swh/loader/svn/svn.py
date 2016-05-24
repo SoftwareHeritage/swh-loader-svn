@@ -262,8 +262,14 @@ class SvnRepo():
                 directories.
 
                 """
-                return dir_ok_fn_basic(dirpath) and \
-                    os.listdir(dirpath) != []
+                if dir_ok_fn_basic(dirpath):
+                    if not os.path.exists(dirpath):
+                        return False
+                    if os.listdir(dirpath) == []:
+                        shutil.rmtree(dirpath)
+                        return False
+                    return True
+                return False
         else:
             dir_ok_fn = dir_ok_fn_basic
 

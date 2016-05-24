@@ -26,7 +26,7 @@ class TestConverters(unittest.TestCase):
     def svn_author_to_person_no_email(self):
         # should not happen - input is bytes but nothing prevents it
         actual_person = converters.svn_author_to_person(b'tony',
-                                                        repo_uuid='some-uuid')
+                                                        repo_uuid=b'some-uuid')
         self.assertEquals(actual_person, {
             'fullname': b'tony <tony@some-uuid>',
             'name': b'tony',
@@ -58,7 +58,7 @@ class TestConverters(unittest.TestCase):
     @istest
     def build_swh_revision_default(self):
         actual_swh_revision = converters.build_swh_revision(
-            repo_uuid='uuid',
+            repo_uuid=b'uuid',
             dir_id='dir-id',
             commit={'author_name': b'theo',
                     'message': b'commit message',
@@ -96,7 +96,7 @@ class TestConverters(unittest.TestCase):
     @istest
     def build_swh_revision_no_extra_headers(self):
         actual_swh_revision = converters.build_swh_revision(
-            repo_uuid='uuid',
+            repo_uuid=b'uuid',
             dir_id='dir-id',
             commit={'author_name': b'theo',
                     'message': b'commit message',
@@ -130,7 +130,7 @@ class TestConverters(unittest.TestCase):
     @istest
     def build_swh_revision_empty_data(self):
         actual_swh_revision = converters.build_swh_revision(
-            repo_uuid='uuid',
+            repo_uuid=b'uuid',
             dir_id='dir-id',
             commit={'author_name': b'',
                     'message': b'',

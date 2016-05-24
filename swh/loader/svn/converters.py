@@ -36,7 +36,7 @@ def svn_author_to_person(author, repo_uuid):
     # we'll construct the author's fullname the same way git svn does
     # 'user <user@repo-uuid>'
 
-    email = b'%s@%s' % (author, repo_uuid.encode('utf-8'))
+    email = b'%s@%s' % (author, repo_uuid)
     return {
         'fullname': b'%s <%s>' % (author, email),
         'name': author,
@@ -61,7 +61,7 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id, parents,
     if with_revision_headers:
         metadata = {
             'extra_headers': [
-                ['svn_repo_uuid', repo_uuid.encode('utf-8')],
+                ['svn_repo_uuid', repo_uuid],
                 ['svn_revision', str(rev).encode('utf-8')]
             ]
         }

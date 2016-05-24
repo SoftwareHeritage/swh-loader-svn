@@ -101,7 +101,11 @@ class SvnRepo():
 
         """
         self.checkout(1 if not svn_revision else svn_revision)
-        self.uuid = self.client.info(self.local_url).uuid
+        uuid = self.client.info(self.local_url).uuid
+        if isinstance(uuid, str):
+            self.uuid = uuid.encode('utf-8')
+        else:
+            self.uuid = uuid
 
     def head_revision(self):
         """Retrieve current revision of the repository's working copy.

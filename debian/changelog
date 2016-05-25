@@ -1,3 +1,12 @@
+swh-loader-svn (0.0.6-1~swh1) unstable-swh; urgency=medium
+
+  * v0.0.6
+  * d/control: Bump swh-model dependency
+  * Simplify ignore folder corner cases
+  * Rework log
+
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 25 May 2016 23:53:10 +0200
+
 swh-loader-svn (0.0.5-1~swh1) unstable-swh; urgency=medium
 
   * v0.0.5

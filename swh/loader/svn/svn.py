@@ -34,6 +34,13 @@ def retry_with_cleanup(exception):
     return True
 
 
+def ignore_dot_svn_folder(dirpath):
+    """Ignore basic .svn folder and .svn folder's content.
+
+    """
+    return b'.svn' not in dirpath
+
+
 class SvnRepo():
     """Swh representation of a svn repository.
 
@@ -251,31 +258,7 @@ class SvnRepo():
             - objects_per_path: dictionary of path, swh hash data with type
 
         """
-        def dir_ok_fn_basic(dirpath):
-            """Ignore basic .svn folder and .svn folder's content.
-
-            """
-            dname = os.path.basename(dirpath)
-            if dname == b'.svn':
-                return False
-            return b'.svn/' not in dirpath
-
-        if not self.with_empty_folder:
-            def dir_ok_fn(dirpath):
-                """Ignore .svn folder and .svn folder contents + empty
-                directories.
-
-                """
-                if dir_ok_fn_basic(dirpath):
-                    if not os.path.exists(dirpath):
-                        return False
-                    if os.listdir(dirpath) == []:
-                        shutil.rmtree(dirpath)
-                        return False
-                    return True
-                return False
-        else:
-            dir_ok_fn = dir_ok_fn_basic
+        remove_empty_folder = not self.with_empty_folder
 
         local_url = self.local_url.encode('utf-8')
         for commit in self.logs(start_revision, end_revision):
@@ -283,7 +266,8 @@ class SvnRepo():
             if rev == start_revision:  # first time, we walk the complete tree
                 objects_per_path = git.walk_and_compute_sha1_from_directory(
                     local_url,
-                    dir_ok_fn=dir_ok_fn)
+                    dir_ok_fn=ignore_dot_svn_folder,
+                    remove_empty_folder=remove_empty_folder)
             else:
                 # checkout to the next revision rev
                 self.checkout(revision=rev)
@@ -291,7 +275,8 @@ class SvnRepo():
                 objects_per_path = git.update_checksums_from(
                     commit['changed_paths'],
                     objects_per_path,
-                    dir_ok_fn=dir_ok_fn)
+                    dir_ok_fn=ignore_dot_svn_folder,
+                    remove_empty_folder=remove_empty_folder)
 
             if rev == end_revision:
                 nextrev = None

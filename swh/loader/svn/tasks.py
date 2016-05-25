@@ -3,7 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from swh.loader import tasks
+from swh.loader.core import tasks
 from swh.loader.svn.loader import SvnLoader
 
 

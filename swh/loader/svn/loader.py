@@ -9,7 +9,7 @@ from swh.core import utils
 from swh.model import git, hashutil
 from swh.model.git import GitType
 
-from swh.loader import loader
+from swh.loader.core.loader import SWHLoader
 from swh.loader.svn import svn, converters
 
 
@@ -36,7 +36,7 @@ def objects_per_type(objects_per_path):
     return objects
 
 
-class SvnLoader(loader.SWHLoader):
+class SvnLoader(SWHLoader):
     """Svn loader to load one svn repository.
 
     """

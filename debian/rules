@@ -7,3 +7,6 @@ export PYBUILD_NAME=swh-loader-svn
 
 
 override_dh_auto_test:
+	PYBUILD_SYSTEM=custom \
+	PYBUILD_TEST_ARGS="python{version} -m nose swh -sva '!db,!fs'" \
+	dh_auto_test

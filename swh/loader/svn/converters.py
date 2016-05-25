@@ -36,9 +36,9 @@ def svn_author_to_person(author, repo_uuid):
     # we'll construct the author's fullname the same way git svn does
     # 'user <user@repo-uuid>'
 
-    email = b'%s@%s' % (author, repo_uuid)
+    email = b'@'.join([author, repo_uuid])
     return {
-        'fullname': b'%s <%s>' % (author, email),
+        'fullname': author + b' ' + b'<' + email + b'>',
         'name': author,
         'email': email,
     }

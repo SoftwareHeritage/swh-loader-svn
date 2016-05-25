@@ -9,7 +9,7 @@ from swh.core import utils
 from swh.model import git, hashutil
 from swh.model.git import GitType
 
-from swh.loader.vcs import loader
+from swh.loader import loader
 from swh.loader.svn import svn, converters
 
 

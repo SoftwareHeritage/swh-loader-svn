@@ -1,3 +1,11 @@
+swh-loader-svn (0.0.5-1~swh1) unstable-swh; urgency=medium
+
+  * v0.0.5
+  * Add svn update behavior as option (default to True)
+  * d/control: Bump dependency version to swh-loader-core
+
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 25 May 2016 12:44:35 +0200
+
 swh-loader-svn (0.0.4-1~swh1) unstable-swh; urgency=medium
 
   * v0.0.4

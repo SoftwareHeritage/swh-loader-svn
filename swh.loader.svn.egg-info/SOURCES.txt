@@ -34,3 +34,4 @@ swh/loader/svn/producer.py
 swh/loader/svn/svn.py
 swh/loader/svn/tasks.py
 swh/loader/svn/tests/test_converters.py
+swh/loader/svn/tests/test_svn.py

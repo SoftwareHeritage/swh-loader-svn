@@ -138,6 +138,8 @@ class SvnLoader(SWHLoader):
                                            revision_parents),
                 self.config['revision_packet_size']):
             revs = list(revisions)
+            self.log.info('Processed %s revisions: [%s, ...]' % (
+                len(revs), hashutil.hash_to_hex(revs[0]['id'])))
             self.maybe_load_revisions(revs)
 
         return revs[-1]
@@ -220,7 +222,7 @@ class SvnLoader(SWHLoader):
                                                            revision_end))
                 return {'status': True}
 
-            self.log.info('Repo %s ready to be processed.' % svnrepo)
+            self.log.info('Processing %s.' % svnrepo)
 
             # process and store revision to swh (sent by by blocks of
             # 'revision_packet_size')

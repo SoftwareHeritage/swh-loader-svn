@@ -5,7 +5,7 @@ vcversioner
 swh.core >= 0.0.19
 swh.model >= 0.0.6
 swh.scheduler >= 0.0.6
-swh.loader.vcs >= 0.0.2
+swh.loader.core >= 0.0.4
 click
 retrying
 pysvn

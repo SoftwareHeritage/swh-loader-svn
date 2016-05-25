@@ -43,6 +43,7 @@ class SvnLoader(loader.SWHLoader):
     CONFIG_BASE_FILENAME = 'loader/svn.ini'
 
     ADDITIONAL_CONFIG = {
+        'with_svn_update': ('bool', True),
         'with_revision_headers': ('bool', True),
         'with_empty_folder': ('bool', False),
         'with_extra_commit_line': ('bool', False),
@@ -54,6 +55,7 @@ class SvnLoader(loader.SWHLoader):
         self.with_revision_headers = self.config['with_revision_headers']
         self.with_empty_folder = self.config['with_empty_folder']
         self.with_extra_commit_line = self.config['with_extra_commit_line']
+        self.with_svn_update = self.config['with_svn_update'] and self.with_revision_headers  # noqa
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.
@@ -176,30 +178,37 @@ class SvnLoader(loader.SWHLoader):
         )
 
         try:
-            swh_rev = svnrepo.swh_previous_revision()
+            # default configuration
+            revision_start = 1
+            revision_parents = {
+                revision_start: []
+            }
 
-            if swh_rev:
-                extra_headers = dict(swh_rev['metadata']['extra_headers'])
-                revision_start = extra_headers['svn_revision']
-                revision_parents = {
-                    revision_start: swh_rev['parents']
-                }
+            if self.with_svn_update:  # Do we want to deal with update?
+                swh_rev = svnrepo.swh_previous_revision()
+
+                if swh_rev:  # Yes, we do. Try and update it.
+                    extra_headers = dict(swh_rev['metadata']['extra_headers'])
+                    revision_start = extra_headers['svn_revision']
+                    revision_parents = {
+                        revision_start: swh_rev['parents']
+                    }
+
+                    svnrepo.fork(revision_start)
+                    self.log.debug('svn co %s@%s' % (svn_url, revision_start))
+
+                    if swh_rev and not self.check_history_not_altered(
+                            svnrepo,
+                            revision_start,
+                            swh_rev):
+                        msg = 'History of svn %s@%s history modified. Skipping...' % (  # noqa
+                            svn_url, revision_start)
+                        self.log.warn(msg)
+                        return {'status': False, 'stderr': msg}
+                else:
+                    svnrepo.fork(revision_start)
             else:
-                revision_start = 1
-                revision_parents = {
-                    revision_start: []
-                }
-
-            svnrepo.fork(revision_start)
-            self.log.debug('svn co %s@%s' % (svn_url, revision_start))
-
-            if swh_rev and not self.check_history_not_altered(svnrepo,
-                                                              revision_start,
-                                                              swh_rev):
-                msg = 'History of svn %s@%s history modified. Skipping...' % (
-                    svn_url, revision_start)
-                self.log.warn(msg)
-                return {'status': False, 'stderr': msg}
+                svnrepo.fork(revision_start)
 
             revision_end = svnrepo.head_revision()
 

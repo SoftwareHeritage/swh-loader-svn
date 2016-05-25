@@ -40,14 +40,20 @@ class SvnLoader(loader.SWHLoader):
     """Svn loader to load one svn repository.
 
     """
+    CONFIG_BASE_FILENAME = 'loader/svn.ini'
 
-    def __init__(self, config, origin_id):
-        super().__init__(config,
-                         origin_id,
+    ADDITIONAL_CONFIG = {
+        'with_revision_headers': ('bool', True),
+        'with_empty_folder': ('bool', False),
+        'with_extra_commit_line': ('bool', False),
+    }
+
+    def __init__(self, origin_id=None):
+        super().__init__(origin_id,
                          logging_class='swh.loader.svn.SvnLoader')
-        self.with_revision_headers = self.config['with_revision_headers'].lower() == 'true'  # noqa
-        self.with_empty_folder = self.config['with_empty_folder'].lower() == 'true'  # noqa
-        self.with_extra_commit_line = self.config['with_extra_commit_line'].lower() == 'true'  # noqa
+        self.with_revision_headers = self.config['with_revision_headers']
+        self.with_empty_folder = self.config['with_empty_folder']
+        self.with_extra_commit_line = self.config['with_extra_commit_line']
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.

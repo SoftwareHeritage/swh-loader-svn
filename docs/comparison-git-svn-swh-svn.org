@@ -625,24 +625,41 @@ To compare what's comparable.
 
 Here is the divergences sum up and the action undertook in swh-svn to converge.
 
-|----------------------+----------------------------------+--------------------------------------------------------+----------------------------------------------------------------|
-|                      | git-svn                          | swh-svn                                                | Action                                                         |
-|----------------------+----------------------------------+--------------------------------------------------------+----------------------------------------------------------------|
-| svn commit author    | author@<repo-uuid>               | take the author as is                                  | swh-svn uses the same format as git-svn                        |
-| svn commit timestamp | as int                           | take the date as is                                    | swh-svn uses the same format as git-svn                        |
-| empty folder         | not checked out                  | svn does checkout them so extra cleanup step is needed | Option has been added in swh-svn to remove those empty folders |
-| svn commit message   | add extra line in commit message | take the commit message as is                          | Option has been added to add those extra lines                 |
-| storage              | stores on disk                   | store in swh-storage                                   | Option has been added to avoid swh-storage                     |
-|----------------------+----------------------------------+--------------------------------------------------------+----------------------------------------------------------------|
+|--------------------------+--------------------------------------------------+-------------------------------------------------------+-----------------------------------------------------------------------|
+| Divergence nature        | git-svn                                          | swh-svn                                               | Action (on swh-loader-svn)                                            |
+|--------------------------+--------------------------------------------------+-------------------------------------------------------+-----------------------------------------------------------------------|
+| svn commit author        | author@<repo-uuid>                               | Take the svn author as is                             | swh-svn now uses the same format as git-svn                           |
+| svn commit date          | As int                                           | Take the svn commit date as is                        | swh-svn now uses the same format as git-svn                           |
+| empty folder             | Not checked out                                  | Svn API checkouts empty folder                        | Option added in swh-svn to remove those empty folders as extra step   |
+| svn commit message       | Add extra line in commit message                 | Take the commit message as is                         | Option added to add that extra line to revision message               |
+| svn update               | `git svn fetch`                                  | If repository know, update from last know commit      | Option added to inhibit this update                                   |
+| extra metadata in commit | By default add some at the end of the svn commit | Add extra-headers in a git compliant way (for update) | Option  added to inhibit those extra headers (inhibit the update too) |
+| storage                  | Stores on disk                                   | Store in swh-storage                                  | Option activated to avoid sending data to swh-storage                 |
+|--------------------------+--------------------------------------------------+-------------------------------------------------------+-----------------------------------------------------------------------|
 
 ** Comparison
+
+Here is the comparison with the following options:
+#+BEGIN_SRC ini
+# inhibit the swh-storage part
+send_contents = False
+send_directories = False
+send_revisions = False
+send_releases = False
+send_occurrences = False
+
+with_svn_update = False
+with_revision_headers = False
+with_empty_folder = False
+with_extra_commit_line = True
+#+END_SRC
 
 |------------+--------+------------------------------------------+-------------------------+--------------------------+------------|
 | Type       | # Revs | Url                                      | git-svn (git svn clone) | swh-svn (+ with storage) |      Ratio |
 |------------+--------+------------------------------------------+-------------------------+--------------------------+------------|
 | small      |    145 | svn://svn.debian.org/svn/pkg-fox/        |                 447.074 |        646.3633944857866 |  1.4457638 |
 | medium     |   6006 | svn://svn.debian.org/svn/glibc-bsd/      |                4740.928 |        4189.665728915483 | 0.88372271 |
-| large      |  10707 | svn://svn.debian.org/svn/pkg-voip/       |                8592.398 |                          |         0. |
+| large      |  10707 | svn://svn.debian.org/svn/pkg-voip/       |                8592.398 |        30022.25572377909 |  3.4940485 |
 | very large |  34523 | svn://svn.debian.org/svn/python-modules/ |               36627.907 |                          |         0. |
 | very large |  48013 | svn://svn.debian.org/svn/pkg-gnome/      |               71902.080 |                          |         0. |
 |------------+--------+------------------------------------------+-------------------------+--------------------------+------------|

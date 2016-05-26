@@ -1,3 +1,10 @@
+swh-loader-svn (0.0.7-1~swh1) unstable-swh; urgency=medium
+
+  * v0.0.7
+  * d/control: Bump dependency version to latest swh-model
+
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Thu, 26 May 2016 16:10:32 +0200
+
 swh-loader-svn (0.0.6-1~swh1) unstable-swh; urgency=medium
 
   * v0.0.6

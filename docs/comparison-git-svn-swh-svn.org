@@ -621,7 +621,7 @@ Improving the comparison between swh-svn and git-svn.
 This take is about converging the swn-svn to match the one from git-svn.
 To compare what's comparable.
 
-** behavior divergencess and their status
+** behavior divergences and their status
 
 Here is the divergences sum up and the action undertook in swh-svn to converge.
 

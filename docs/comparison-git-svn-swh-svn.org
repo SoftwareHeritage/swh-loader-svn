@@ -618,65 +618,49 @@ sys     327m49.552s
 
 Improving the comparison between swh-svn and git-svn.
 
-** author format
+This take is about converging the swn-svn to match the one from git-svn.
+To compare what's comparable.
 
-git svn clone <url> --no-metadata
+** behavior divergences and their status
 
-Still, git svn, uses author in the form <svn-author>@<repo-uuid> and no option exists to remove that.
-Does not clone empty directories unless specified otherwise (--preserve-empty-dirs but then adds a placeholder file by default .gitignore)
+Here is the divergences sum up and the action undertook in swh-svn to converge.
 
-*** Original form (from first round)
+|--------------------------+--------------------------------------------------+-------------------------------------------------------+-----------------------------------------------------------------------|
+| Divergence nature        | git-svn                                          | swh-svn                                               | Action (on swh-loader-svn)                                            |
+|--------------------------+--------------------------------------------------+-------------------------------------------------------+-----------------------------------------------------------------------|
+| svn commit author        | author@<repo-uuid>                               | Take the svn author as is                             | swh-svn now uses the same format as git-svn                           |
+| svn commit date          | As int                                           | Take the svn commit date as is                        | swh-svn now uses the same format as git-svn                           |
+| empty folder             | Not checked out                                  | Svn API checkouts empty folder                        | Option added in swh-svn to remove those empty folders as extra step   |
+| svn commit message       | Add extra line in commit message                 | Take the commit message as is                         | Option added to add that extra line to revision message               |
+| svn update               | `git svn fetch`                                  | If repository know, update from last know commit      | Option added to inhibit this update                                   |
+| extra metadata in commit | By default add some at the end of the svn commit | Add extra-headers in a git compliant way (for update) | Option  added to inhibit those extra headers (inhibit the update too) |
+| storage                  | Stores on disk                                   | Store in swh-storage                                  | Option activated to avoid sending data to swh-storage                 |
+|--------------------------+--------------------------------------------------+-------------------------------------------------------+-----------------------------------------------------------------------|
 
-#+BEGIN_SRC sh
-ardumont@worker01:~/test/round-1/pkg-fox$ git cat-file -p a6754307dd84cd63b63a68b2627c9835133d6cd5
-tree 3063fbac48f07a47b2fef09d9d1903a621a91fe7
-author torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000
-committer torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000
+** Comparison
 
-Imported upstream version 1.2.4.
+Here is the comparison with the following options:
+#+BEGIN_SRC ini
+# inhibit the swh-storage part
+send_contents = False
+send_directories = False
+send_revisions = False
+send_releases = False
+send_occurrences = False
 
-
-git-svn-id: svn://svn.debian.org/svn/pkg-fox@1 d908f651-7add-0310-a5d1-c7ac9dfebe41
-ardumont@worker01:~/test/round-1/pkg-fox$
+with_svn_update = False
+with_revision_headers = False
+with_empty_folder = False
+with_extra_commit_line = True
 #+END_SRC
 
-*** Improved form
-
-#+BEGIN_SRC sh
-ardumont@worker01:~/test/round-2/pkg-fox$ git cat-file -p 1d7ad0634b1a518b6015eb27d93347d3b420fd12
-tree 06b23629228fc98e45201917eaf8658f48637d75
-author torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000
-committer torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000
-
-Imported upstream version 1.2.4.
-
-ardumont@worker01:~/test/round-2/pkg-fox$
-#+END_SRC
-
-*** Conclusion
-
-Adapted swh-loader-svn to match the author's policy.
-
-** empty folder
-
-Remains a divergence on dealing with empty folder.
-
-Code convergence between git-svn and swh-svn (with options to simulate some git-svn behavior)
-
-*** Analysis
-
-This is the commit created by git-svn:
-#+BEGIN_SRC sh
-$ echo -e 'tree 3063fbac48f07a47b2fef09d9d1903a621a91fe7\nauthor torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000\ncommitter torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000\n\nImported upstream version 1.2.4.\n' | git hash-object -t commit --stdin
-1dda85506a12af80c5a701a02aba5a02c703642f
-#+END_SRC
-
-This is the commit created by swh-loader-svn (-> swh-model)
-#+BEGIN_SRC sh
-$ echo -e 'tree 3063fbac48f07a47b2fef09d9d1903a621a91fe7\nauthor torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000\ncommitter torsten <torsten@d908f651-7add-0310-a5d1-c7ac9dfebe41> 1088108379 +0000\n\nImported upstream version 1.2.4.' | git hash-object -t commit --stdin
-9fac5d7356db92a01d276667cd1e7eb29b850a3c
-#+END_SRC
-
-*** Conclusion
-
-Turns out that the svn commit message is missing an '\n', so added an extra option to have the same behavior as git-svn.
+|------------+--------+------------------------------------------+-------------------------+--------------------------+------------|
+| Type       | # Revs | Url                                      | git-svn (git svn clone) | swh-svn (+ with storage) |      Ratio |
+|------------+--------+------------------------------------------+-------------------------+--------------------------+------------|
+| small      |    145 | svn://svn.debian.org/svn/pkg-fox/        |                 447.074 |        646.3633944857866 |  1.4457638 |
+| medium     |   6006 | svn://svn.debian.org/svn/glibc-bsd/      |                4740.928 |        4189.665728915483 | 0.88372271 |
+| large      |  10707 | svn://svn.debian.org/svn/pkg-voip/       |                8592.398 |        30022.25572377909 |  3.4940485 |
+| very large |  34523 | svn://svn.debian.org/svn/python-modules/ |               36627.907 |                          |         0. |
+| very large |  48013 | svn://svn.debian.org/svn/pkg-gnome/      |               71902.080 |                          |         0. |
+|------------+--------+------------------------------------------+-------------------------+--------------------------+------------|
+#+TBLFM: $6=$5/$4

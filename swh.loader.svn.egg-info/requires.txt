@@ -3,6 +3,6 @@ pysvn
 retrying
 swh.core>=0.0.19
 swh.loader.core>=0.0.4
-swh.model>=0.0.7
+swh.model>=0.0.8
 swh.scheduler>=0.0.6
 vcversioner

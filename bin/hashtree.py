@@ -30,15 +30,19 @@ def hashtree(path, ignore_empty_folder=False, ignore=None):
         def dir_ok_fn_basic(dirpath, patterns=patterns):
             dname = os.path.basename(dirpath)
             for pattern_to_ignore in patterns:
-                if pattern_to_ignore == dname or pattern_to_ignore in dirpath:
+                if pattern_to_ignore == dname:
                     return False
-
+                if (pattern_to_ignore + b'/') in dirpath:
+                    return False
             return True
 
         if ignore_empty_folder:
             def dir_ok_fn(dirpath, patterns=patterns):
-                return dir_ok_fn_basic(dirpath) \
-                    and os.listdir(dirpath) != []
+                if not dir_ok_fn_basic(dirpath):
+                    return False
+                if os.listdir(dirpath) == []:
+                    return False
+                return True
         else:
             dir_ok_fn = dir_ok_fn_basic
 

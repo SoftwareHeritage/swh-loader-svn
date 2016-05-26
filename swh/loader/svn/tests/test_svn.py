@@ -17,6 +17,8 @@ class TestBuildUtils(unittest.TestCase):
         self.assertTrue(svn.ignore_dot_svn_folder(b'/some/path/with/svn'))
         self.assertTrue(svn.ignore_dot_svn_folder(
             b'/path/with/no/reference/to/svn'))
+        self.assertTrue(svn.ignore_dot_svn_folder(b'/some/file.svnlike/files'))
+        self.assertTrue(svn.ignore_dot_svn_folder(b'/some/thing.svn/files'))
 
         self.assertFalse(svn.ignore_dot_svn_folder(b'.svn'))
         self.assertFalse(svn.ignore_dot_svn_folder(b'/some/path/.svn/files'))

@@ -37,8 +37,22 @@ def retry_with_cleanup(exception):
 def ignore_dot_svn_folder(dirpath):
     """Ignore basic .svn folder and .svn folder's content.
 
+    Function to be passed at swh.model.git's functions
+    walk_and_compute_sha1_from_directory and update_checksums_from to
+    validate folder.
+
+    Args:
+        dirpath: Absolute directory path to check
+
+    Returns:
+        True if the dirpath does not contains .svn references.
+        False otherwise.
+
     """
-    return b'.svn' not in dirpath
+    dirname = os.path.basename(dirpath)
+    if b'.svn' == dirname:
+        return False
+    return b'/.svn/' not in dirpath
 
 
 class SvnRepo():

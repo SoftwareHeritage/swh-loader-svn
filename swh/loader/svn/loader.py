@@ -232,9 +232,10 @@ class SvnLoader(SWHLoader):
                                                     revision_parents)
             self.process_swh_occurrence(latest_rev, origin)
 
+        finally:
             # flush eventual remaining data
             self.flush()
-        finally:
+            # And clean the working directory
             svnrepo.clean_fs()
 
         return {'status': True}

@@ -7,6 +7,7 @@ import os
 import pysvn
 import tempfile
 import shutil
+import threading
 
 from pysvn import Revision, opt_revision_kind
 from retrying import retry
@@ -18,6 +19,19 @@ from swh.model import git
 DEFAULT_AUTHOR_NAME = b''
 DEFAULT_AUTHOR_DATE = b''
 DEFAULT_AUTHOR_MESSAGE = b''
+
+
+class CleanUpRevisionWorkingCopies(threading.Thread):
+    """A basic thread to clean up working copies.
+
+    """
+    def __init__(self, directory):
+        self.directory = directory
+        threading.Thread.__init__(self)
+
+    def run(self):
+        if os.path.exists(self.directory):
+            shutil.rmtree(self.directory)
 
 
 class SvnRepoException(ValueError):
@@ -80,8 +94,11 @@ class SvnRepo():
         local_name = os.path.basename(self.remote_url)
 
         self.client = pysvn.Client()
+        # for the first checkout
         self.local_url = os.path.join(self.local_dirname, local_name)
-        self.local_wc = os.path.join(self.local_dirname, local_name + '.wc')
+        # working copies prefix name
+        self.local_wc_prefix = os.path.join(self.local_dirname,
+                                            local_name + '.wc')
         self.uuid = None  # Cannot know it yet since we need a working copy
         self.with_empty_folder = with_empty_folder
         self.with_extra_commit_line = with_extra_commit_line
@@ -100,17 +117,19 @@ class SvnRepo():
 
     @retry(retry_on_exception=retry_with_cleanup,
            stop_max_attempt_number=3)
-    def export(self, revision):
+    def export(self, revision, local_path):
         """Checkout repository repo at revision.
 
         Args:
             revision: the revision number to checkout the repo to.
 
         """
+        # Clean up an eventual previous clean up working copy thread
+        wcp = '%s-%s' % (self.local_wc_prefix, revision - 1)
+        CleanUpRevisionWorkingCopies(wcp).start()
         try:
             self.client.export(self.remote_url,
-                               self.local_wc,
-                               force=True,
+                               local_path,
                                revision=Revision(opt_revision_kind.number,
                                                  revision),
                                ignore_keywords=True)
@@ -167,29 +186,16 @@ class SvnRepo():
         return self.client.log(self.remote_url)[-1].data.get(
             'revision').number
 
-    def _to_change_paths(self, log_entry):
+    def _to_change_paths(self, rootpath, changed_paths):
         """Convert changed paths to dict if any.
 
         """
-        try:
-            changed_paths = log_entry.changed_paths
-        except AttributeError:
-            changed_paths = []
-
         for paths in changed_paths:
-            path = os.path.join(self.local_wc, paths.path.lstrip('/'))
-            action = paths.action
-            # Since we now are exporting, it's no longer removed by
-            # the checkout step so we do it ourselves
-            if action == 'D':
-                if os.path.islink(path) or os.path.isfile(path):
-                    os.remove(path)
-                elif os.path.isdir(path):
-                    shutil.rmtree(path)
+            path = os.path.join(rootpath, paths.path.lstrip('/'))
 
             yield {
                 'path': path.encode('utf-8'),
-                'action': action  # A(dd), M(odified), D(eleted)
+                'action': paths.action  # A(dd), M(odified), D(eleted)
             }
 
     def _to_entry(self, log_entry):
@@ -216,12 +222,17 @@ class SvnRepo():
         except AttributeError:
             message = DEFAULT_AUTHOR_MESSAGE
 
+        try:
+            changed_paths = log_entry.changed_paths
+        except AttributeError:
+            changed_paths = []
+
         return {
             'rev': log_entry.revision.number,
             'author_date': author_date,
             'author_name': author,
             'message': message,
-            'changed_paths': self._to_change_paths(log_entry),
+            'changed_paths': changed_paths,
         }
 
     @retry(stop_max_attempt_number=3)
@@ -303,24 +314,16 @@ class SvnRepo():
         """
         remove_empty_folder = not self.with_empty_folder
 
-        local_url = self.local_wc.encode('utf-8')
         for commit in self.logs(start_revision, end_revision):
             rev = commit['rev']
-            # checkout to the next revision rev
-            self.export(revision=rev)
-            if rev == start_revision:  # first time, we walk the complete tree
-                objects_per_path = git.walk_and_compute_sha1_from_directory(
-                    local_url,
-                    # dir_ok_fn=ignore_dot_svn_folder,
-                    remove_empty_folder=remove_empty_folder)
-            else:
-                # and we update  only what needs to be
-                objects_per_path = git.update_checksums_from(
-                    commit['changed_paths'],
-                    objects_per_path,
-                    # dir_ok_fn=ignore_dot_svn_folder,
-                    remove_empty_folder=remove_empty_folder)
+            local_url = '%s-%s' % (self.local_wc_prefix, rev)
 
+            # checkout to the next revision rev
+            self.export(revision=rev, local_path=local_url)
+            objects_per_path = git.walk_and_compute_sha1_from_directory(
+                local_url.encode('utf-8'),
+                # dir_ok_fn=ignore_dot_svn_folder,
+                remove_empty_folder=remove_empty_folder)
             if rev == end_revision:
                 nextrev = None
             else:

@@ -178,9 +178,10 @@ class SvnRepo():
 
         for paths in changed_paths:
             path = os.path.join(self.local_wc, paths.path.lstrip('/'))
+            action = paths.action
             # Since we now are exporting, it's no longer removed by
             # the checkout step so we do it ourselves
-            if paths.action == 'D':
+            if action == 'D':
                 if os.path.islink(path) or os.path.isfile(path):
                     os.remove(path)
                 elif os.path.isdir(path):
@@ -188,7 +189,7 @@ class SvnRepo():
 
             yield {
                 'path': path.encode('utf-8'),
-                'action': paths.action  # A(dd), M(odified), D(eleted)
+                'action': action  # A(dd), M(odified), D(eleted)
             }
 
     def _to_entry(self, log_entry):

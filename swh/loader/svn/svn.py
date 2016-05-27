@@ -82,6 +82,7 @@ class SvnRepo():
         self.client = pysvn.Client()
         self.local_url = os.path.join(self.local_dirname, local_name)
         self.local_wc = os.path.join(self.local_dirname, local_name + '.wc')
+        os.mkdir(self.local_wc)
         self.uuid = None  # Cannot know it yet since we need a working copy
         self.with_empty_folder = with_empty_folder
         self.with_extra_commit_line = with_extra_commit_line
@@ -108,9 +109,10 @@ class SvnRepo():
 
         """
         try:
+            shutil.rmtree(self.local_wc)
             self.client.export(self.remote_url,
                                self.local_wc,
-                               force=True,
+                               # force=True,
                                revision=Revision(opt_revision_kind.number,
                                                  revision),
                                ignore_keywords=True)

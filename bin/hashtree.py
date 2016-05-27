@@ -36,21 +36,23 @@ def hashtree(path, ignore_empty_folder=False, ignore=None):
                     return False
             return True
 
-        if ignore_empty_folder:
-            def dir_ok_fn(dirpath, patterns=patterns):
-                if not dir_ok_fn_basic(dirpath):
-                    return False
-                if os.listdir(dirpath) == []:
-                    return False
-                return True
-        else:
-            dir_ok_fn = dir_ok_fn_basic
+    def empty_folder(dirpath):
+        return os.listdir(dirpath) == []
 
-        objects = git.walk_and_compute_sha1_from_directory(
-            path,
-            dir_ok_fn=dir_ok_fn)
+    if ignore and ignore_empty_folder:
+        def dir_ok_fn(dirpath, patterns=patterns):
+            return dir_ok_fn_basic(dirpath) and not empty_folder(dirpath)
+    elif not ignore and ignore_empty_folder:
+        def dir_ok_fn(dirpath):
+            return not empty_folder(dirpath)
+    elif ignore and not ignore_empty_folder:
+        dir_ok_fn = dir_ok_fn_basic
     else:
-        objects = git.walk_and_compute_sha1_from_directory(path)
+        dir_ok_fn = git.default_validation_dir
+
+    objects = git.walk_and_compute_sha1_from_directory(
+        path,
+        dir_ok_fn=dir_ok_fn)
 
     h = objects[git.ROOT_TREE_KEY][0]['sha1_git']
 

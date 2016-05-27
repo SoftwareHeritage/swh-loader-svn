@@ -82,7 +82,6 @@ class SvnRepo():
         self.client = pysvn.Client()
         self.local_url = os.path.join(self.local_dirname, local_name)
         self.local_wc = os.path.join(self.local_dirname, local_name + '.wc')
-        os.mkdir(self.local_wc)
         self.uuid = None  # Cannot know it yet since we need a working copy
         self.with_empty_folder = with_empty_folder
         self.with_extra_commit_line = with_extra_commit_line
@@ -109,10 +108,9 @@ class SvnRepo():
 
         """
         try:
-            shutil.rmtree(self.local_wc)
             self.client.export(self.remote_url,
                                self.local_wc,
-                               # force=True,
+                               force=True,
                                revision=Revision(opt_revision_kind.number,
                                                  revision),
                                ignore_keywords=True)
@@ -180,6 +178,14 @@ class SvnRepo():
 
         for paths in changed_paths:
             path = os.path.join(self.local_wc, paths.path.lstrip('/'))
+            # Since we now are exporting, it's no longer removed by
+            # the checkout step so we do it ourselves
+            if paths.action == 'D':
+                if os.path.islink(path) or os.path.isfile(path):
+                    os.remove(path)
+                elif os.path.isdir(path):
+                    shutil.rmtree(path)
+
             yield {
                 'path': path.encode('utf-8'),
                 'action': paths.action  # A(dd), M(odified), D(eleted)

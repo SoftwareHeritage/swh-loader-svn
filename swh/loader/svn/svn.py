@@ -186,19 +186,19 @@ class SvnRepo():
         return self.client.log(self.remote_url)[-1].data.get(
             'revision').number
 
-    def _to_change_paths(self, rootpath, changed_paths):
+    def __to_change_paths(self, rootpath, changed_paths):
         """Convert changed paths to dict if any.
 
         """
         for paths in changed_paths:
-            path = os.path.join(rootpath, paths.path.lstrip('/'))
-
+            path = os.path.join(rootpath,
+                                paths.path.lstrip('/').encode('utf-8'))
             yield {
-                'path': path.encode('utf-8'),
+                'path': path,
                 'action': paths.action  # A(dd), M(odified), D(eleted)
             }
 
-    def _to_entry(self, log_entry):
+    def __to_entry(self, log_entry):
         try:
             author_date = log_entry.date or DEFAULT_AUTHOR_DATE
         except AttributeError:
@@ -236,7 +236,7 @@ class SvnRepo():
         }
 
     @retry(stop_max_attempt_number=3)
-    def _logs(self, revision_start, revision_end):
+    def __logs(self, revision_start, revision_end):
         rev_start = Revision(opt_revision_kind.number, revision_start)
         rev_end = Revision(opt_revision_kind.number, revision_end)
         return self.client.log(url_or_path=self.local_url,
@@ -274,8 +274,8 @@ class SvnRepo():
             r2 = revision_end
             done = True
 
-        for log_entry in self._logs(r1, r2):
-            yield self._to_entry(log_entry)
+        for log_entry in self.__logs(r1, r2):
+            yield self.__to_entry(log_entry)
 
         if not done:
             yield from self.logs(r2 + 1, revision_end, block_size)
@@ -320,10 +320,22 @@ class SvnRepo():
 
             # checkout to the next revision rev
             self.export(revision=rev, local_path=local_url)
-            objects_per_path = git.walk_and_compute_sha1_from_directory(
-                local_url.encode('utf-8'),
-                # dir_ok_fn=ignore_dot_svn_folder,
-                remove_empty_folder=remove_empty_folder)
+
+            local_url = local_url.encode('utf-8')
+            if rev == start_revision:  # first time, we walk the complete tree
+                objects_per_path = git.walk_and_compute_sha1_from_directory(
+                    local_url,
+                    # dir_ok_fn=ignore_dot_svn_folder,
+                    remove_empty_folder=remove_empty_folder)
+            else:
+                # and we update  only what needs to be
+                objects_per_path = git.update_checksums_from(
+                    local_url,
+                    self.__to_change_paths(local_url, commit['changed_paths']),
+                    objects_per_path,
+                    # dir_ok_fn=ignore_dot_svn_folder,
+                    remove_empty_folder=remove_empty_folder)
+
             if rev == end_revision:
                 nextrev = None
             else:

@@ -81,6 +81,7 @@ class SvnRepo():
 
         self.client = pysvn.Client()
         self.local_url = os.path.join(self.local_dirname, local_name)
+        self.local_wc = os.path.join(self.local_dirname, local_name + '.wc')
         self.uuid = None  # Cannot know it yet since we need a working copy
         self.with_empty_folder = with_empty_folder
         self.with_extra_commit_line = with_extra_commit_line
@@ -96,6 +97,25 @@ class SvnRepo():
 
         """
         self.client.cleanup(self.local_url)
+
+    @retry(retry_on_exception=retry_with_cleanup,
+           stop_max_attempt_number=3)
+    def export(self, revision):
+        """Checkout repository repo at revision.
+
+        Args:
+            revision: the revision number to checkout the repo to.
+
+        """
+        try:
+            self.client.export(self.remote_url,
+                               self.local_wc,
+                               force=True,
+                               revision=Revision(opt_revision_kind.number,
+                                                 revision),
+                               ignore_keywords=True)
+        except Exception as e:
+            raise SvnRepoException(self, e)
 
     @retry(retry_on_exception=retry_with_cleanup,
            stop_max_attempt_number=3)
@@ -157,7 +177,7 @@ class SvnRepo():
             changed_paths = []
 
         for paths in changed_paths:
-            path = os.path.join(self.local_url, paths.path.lstrip('/'))
+            path = os.path.join(self.local_wc, paths.path.lstrip('/'))
             yield {
                 'path': path.encode('utf-8'),
                 'action': paths.action  # A(dd), M(odified), D(eleted)
@@ -274,22 +294,22 @@ class SvnRepo():
         """
         remove_empty_folder = not self.with_empty_folder
 
-        local_url = self.local_url.encode('utf-8')
+        local_url = self.local_wc.encode('utf-8')
         for commit in self.logs(start_revision, end_revision):
             rev = commit['rev']
+            # checkout to the next revision rev
+            self.export(revision=rev)
             if rev == start_revision:  # first time, we walk the complete tree
                 objects_per_path = git.walk_and_compute_sha1_from_directory(
                     local_url,
-                    dir_ok_fn=ignore_dot_svn_folder,
+                    # dir_ok_fn=ignore_dot_svn_folder,
                     remove_empty_folder=remove_empty_folder)
             else:
-                # checkout to the next revision rev
-                self.checkout(revision=rev)
                 # and we update  only what needs to be
                 objects_per_path = git.update_checksums_from(
                     commit['changed_paths'],
                     objects_per_path,
-                    dir_ok_fn=ignore_dot_svn_folder,
+                    # dir_ok_fn=ignore_dot_svn_folder,
                     remove_empty_folder=remove_empty_folder)
 
             if rev == end_revision:

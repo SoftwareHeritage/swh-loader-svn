@@ -191,10 +191,10 @@ class SvnRepo():
 
         """
         for paths in changed_paths:
-            path = os.path.join(rootpath,
-                                paths.path.lstrip('/').encode('utf-8'))
+            path = paths.path.lstrip('/').encode('utf-8')
+            fullpath = os.path.join(rootpath, path)
             yield {
-                'path': path,
+                'path': fullpath,
                 'action': paths.action  # A(dd), M(odified), D(eleted)
             }
 

@@ -10,30 +10,7 @@ from swh.model import git, hashutil
 from swh.model.git import GitType
 
 from swh.loader.core.loader import SWHLoader
-from swh.loader.svn import svn, converters
-
-
-def objects_per_type(objects_per_path):
-    """Given an object dictionary returned by
-    `swh.model.git.walk_and_compute_sha1_from_directory`, return a map
-    grouped by type.
-
-    Returns:
-        Dictionary with keys:
-        - GitType.BLOB: list of blobs
-        - GitType.TREE: list of directories
-
-    """
-    objects = {
-        GitType.BLOB: [],
-        GitType.TREE: [],
-    }
-    for tree_path in objects_per_path:
-        objs = objects_per_path[tree_path]
-        for obj in objs:
-            objects[obj['type']].append(obj)
-
-    return objects
+from . import svn, converters
 
 
 class SvnLoader(SWHLoader):
@@ -67,7 +44,7 @@ class SvnLoader(SWHLoader):
                                                                 revision_start)
         rev, _, commit, objects_per_path = list(hash_data_per_revs)[0]
 
-        dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
+        dir_id = objects_per_path[b'']['checksums']['sha1_git']
         swh_revision = converters.build_swh_revision(svnrepo.uuid,
                                                      commit,
                                                      rev,
@@ -95,7 +72,7 @@ class SvnLoader(SWHLoader):
             revision_end)
         for rev, nextrev, commit, objects_per_path in gen_revs:
             # compute the fs tree's checksums
-            dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
+            dir_id = objects_per_path[b'']['checksums']['sha1_git']
             swh_revision = converters.build_swh_revision(
                 svnrepo.uuid,
                 commit,
@@ -112,11 +89,10 @@ class SvnLoader(SWHLoader):
             if nextrev:
                 revision_parents[nextrev] = [swh_revision['id']]
 
-            objects = objects_per_type(objects_per_path)
-
-            self.maybe_load_contents(objects[GitType.BLOB])
-            self.maybe_load_directories(objects[GitType.TREE],
-                                        objects_per_path)
+            self.maybe_load_contents(
+                git.objects_per_type(GitType.BLOB, objects_per_path))
+            self.maybe_load_directories(
+                git.objects_per_type(GitType.TREE, objects_per_path))
 
             yield swh_revision
 
@@ -191,7 +167,7 @@ class SvnLoader(SWHLoader):
 
                 if swh_rev:  # Yes, we do. Try and update it.
                     extra_headers = dict(swh_rev['metadata']['extra_headers'])
-                    revision_start = extra_headers['svn_revision']
+                    revision_start = int(extra_headers['svn_revision'])
                     revision_parents = {
                         revision_start: swh_rev['parents']
                     }
@@ -207,10 +183,6 @@ class SvnLoader(SWHLoader):
                             svn_url, revision_start)
                         self.log.warn(msg)
                         return {'status': False, 'stderr': msg}
-                else:
-                    svnrepo.fork(revision_start)
-            else:
-                svnrepo.fork(revision_start)
 
             revision_end = svnrepo.head_revision()
 

@@ -215,7 +215,7 @@ class SWHDirEditor:
             elif os.path.islink(fpath):
                 os.remove(fpath)
             else:
-                os.removedirs(fpath)
+                shutil.rmtree(fpath)
 
     def __children(self, entry):
         """Compute the children of the current entry.
@@ -325,7 +325,7 @@ class SWHEditor:
     def open_root(self, base_revnum):
         return SWHDirEditor(self.state,
                             rootpath=self.rootpath,
-                            path=b'/')
+                            path=b'')
 
 
 def compute_or_update_hash_from_replay_at(conn, rev, rootpath, state):
@@ -350,7 +350,7 @@ def compute_or_update_hash_from_replay_at(conn, rev, rootpath, state):
     # When accepting empty folder, this should be removed
     if not state:  # dangling tree at root
         # hack: empty tree at level 1: `git hash-object -t tree /dev/null`
-        state[b'/'] = {
+        state[b''] = {
             'checksums': {
                 'sha1_git': hex_to_hash(
                     '4b825dc642cb6eb9a060e54bf8d69288fbee4904'),
@@ -401,7 +401,7 @@ def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
                                                           rootpath,
                                                           state)
             print('r%s %s' % (r, hashutil.hash_to_hex(
-                state[b'/']['checksums']['sha1_git'])))
+                state[b'']['checksums']['sha1_git'])))
 
         if debug:
             print('%s' % rootpath.decode('utf-8'))

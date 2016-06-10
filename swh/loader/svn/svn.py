@@ -99,13 +99,10 @@ class SvnRepo():
         author = revprops.get(properties.PROP_REVISION_AUTHOR,
                               DEFAULT_AUTHOR_NAME)
 
-        msg = revprops.get(properties.PROP_REVISION_LOG)
-        if msg and self.with_extra_commit_line:
-            message = ('%s\n' % msg)
-        elif msg:
-            message = msg
-        else:
-            message = DEFAULT_AUTHOR_MESSAGE
+        message = revprops.get(properties.PROP_REVISION_LOG,
+                               DEFAULT_AUTHOR_MESSAGE)
+        if self.with_extra_commit_line:
+            message = ('%s\n' % message)
 
         return {
             'rev': rev,

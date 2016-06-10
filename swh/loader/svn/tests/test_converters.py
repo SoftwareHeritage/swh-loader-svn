@@ -5,7 +5,6 @@
 
 import unittest
 
-from dateutil import parser
 from nose.tools import istest
 
 from swh.loader.svn import converters
@@ -58,7 +57,7 @@ class TestConverters(unittest.TestCase):
 
     @istest
     def build_swh_revision_default(self):
-        author_date = '2010-10-10'
+        author_date = '2004-06-24T20:19:39.755589Z'
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid=b'uuid',
             dir_id='dir-id',
@@ -68,7 +67,7 @@ class TestConverters(unittest.TestCase):
             rev=10,
             parents=['123'])
 
-        date = parser.parse(author_date)
+        date = {'timestamp': 1088108379, 'offset': 0}
 
         self.assertEquals(actual_swh_revision, {
             'date': date,
@@ -98,7 +97,7 @@ class TestConverters(unittest.TestCase):
 
     @istest
     def build_swh_revision_no_extra_headers(self):
-        author_date = '2010-10-10'
+        author_date = '2004-06-24T20:19:39.755589Z'
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid=b'uuid',
             dir_id='dir-id',
@@ -108,7 +107,8 @@ class TestConverters(unittest.TestCase):
             rev=10,
             parents=['123'],
             with_revision_headers=False)
-        date = parser.parse(author_date)
+
+        date = {'timestamp': 1088108379, 'offset': 0}
 
         self.assertEquals(actual_swh_revision, {
             'date': date,
@@ -133,7 +133,7 @@ class TestConverters(unittest.TestCase):
 
     @istest
     def build_swh_revision_empty_data(self):
-        author_date = '2010-10-10'
+        author_date = '2004-06-24T20:19:39.755589Z'
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid=b'uuid',
             dir_id='dir-id',
@@ -142,7 +142,8 @@ class TestConverters(unittest.TestCase):
                     'author_date': author_date},
             rev=8,
             parents=[])
-        date = parser.parse(author_date)
+
+        date = {'timestamp': 1088108379, 'offset': 0}
 
         self.assertEquals(actual_swh_revision, {
             'date': date,

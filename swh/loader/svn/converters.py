@@ -3,8 +3,9 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from dateutil import parser
 from email import utils
+
+from .utils import strdate_to_timestamp
 
 
 def svn_author_to_person(author, repo_uuid):
@@ -54,7 +55,8 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id, parents,
 
     msg = commit['message']
 
-    date = parser.parse(commit['author_date'])
+    ts = strdate_to_timestamp(commit['author_date'])
+    date = {'timestamp': ts, 'offset': 0}
 
     if with_revision_headers:
         metadata = {

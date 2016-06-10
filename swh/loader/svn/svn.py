@@ -30,14 +30,19 @@ class SvnRepoException(ValueError):
         self.svnrepo = svnrepo
 
 
-class SvnRepo():
+class BaseSvnRepo():
     """Swh representation of a svn repository.
+
+    To use this class, instantiate a new class and implement the following
+    method:
+    - def transform_commit_message(msg):
+        Transform the message msg (string) to bytes (+ do some extra
+        work on it if you want, add an extra line for example)
 
     """
     def __init__(self, remote_url, origin_id, storage,
                  destination_path=None,
-                 with_empty_folder=False,
-                 with_extra_commit_line=False):
+                 with_empty_folder=False):
         self.remote_url = remote_url.rstrip('/')
         self.storage = storage
         self.origin_id = origin_id
@@ -67,7 +72,6 @@ class SvnRepo():
         self.local_url = os.path.join(self.local_dirname, local_name).encode(
             'utf-8')
         self.uuid = self.conn.get_uuid().encode('utf-8')
-        self.with_extra_commit_line = with_extra_commit_line
 
         # In charge of computing hash while replaying svn logs
         self.swhreplay = ra.SWHReplay(
@@ -95,6 +99,19 @@ class SvnRepo():
         """
         return 1
 
+    def transform_commit_message(msg):
+        """Do something with message (e.g add extra line, etc...)
+
+        Args:
+            msg (str): the commit message to transform_commit_message
+
+        Returns:
+            The transformed message.
+        """
+        raise NotImplementedError('This should be implemented in an '
+                                  'inherited class to tranform the '
+                                  ' commit message.')
+
     def __to_entry(self, log_entry):
         changed_paths, rev, revprops, has_children = log_entry
 
@@ -104,10 +121,9 @@ class SvnRepo():
         author = revprops.get(properties.PROP_REVISION_AUTHOR,
                               DEFAULT_AUTHOR_NAME)
 
-        message = revprops.get(properties.PROP_REVISION_LOG,
-                               DEFAULT_AUTHOR_MESSAGE)
-        if self.with_extra_commit_line:
-            message = ('%s\n' % message)
+        message = self.transform_commit_message(
+            revprops.get(properties.PROP_REVISION_LOG,
+                         DEFAULT_AUTHOR_MESSAGE))
 
         return {
             'rev': rev,
@@ -201,3 +217,40 @@ class SvnRepo():
 
         """
         shutil.rmtree(self.local_dirname)
+
+
+class SvnRepo(BaseSvnRepo):
+    """This class does exactly as BaseSvnRepo.
+
+    It keeps the commit message as is.
+
+    """
+
+    def transform_commit_message(self, msg):
+        """Pass the message as is.
+
+        Args:
+            msg (str): the commit message to transform_commit_message
+
+        Returns:
+            The message as is.
+
+        """
+        return msg
+
+
+class SvnRepoWithExtraCommitLine(BaseSvnRepo):
+    """This class does exactly as BaseSvnRepo except for the commit
+    message which is extended with a new line.
+
+    """
+    def transform_commit_message(self, msg):
+        """Add an extra line to the commit message and encode in bytes.
+
+        Args:
+            msg (str): the commit message to transform_commit_message
+
+        Returns:
+            The transformed message.
+        """
+        return '%s\n' % msg

@@ -39,12 +39,20 @@ class SvnLoader(SWHLoader):
         self.with_extra_commit_line = self.config['with_extra_commit_line']
         self.with_svn_update = self.config['with_svn_update'] and self.with_revision_headers  # noqa
         self.origin = origin
-        self.svnrepo = svn.SvnRepo(
-            svn_url, origin['id'], self.storage,
-            destination_path=destination_path,
-            with_empty_folder=self.with_empty_folder,
-            with_extra_commit_line=self.with_extra_commit_line
-        )
+        if self.with_extra_commit_line:
+            self.svnrepo = svn.SvnRepoWithExtraCommitLine(
+                svn_url,
+                origin['id'],
+                self.storage,
+                destination_path=destination_path,
+                with_empty_folder=self.with_empty_folder)
+        else:
+            self.svnrepo = svn.SvnRepo(
+                svn_url, origin['id'],
+                self.storage,
+                destination_path=destination_path,
+                with_empty_folder=self.with_empty_folder
+            )
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.

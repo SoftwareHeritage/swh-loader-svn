@@ -31,13 +31,20 @@ class SvnLoader(SWHLoader):
         'with_extra_commit_line': ('bool', False),
     }
 
-    def __init__(self, origin_id=None):
-        super().__init__(origin_id,
+    def __init__(self, svn_url, destination_path, origin):
+        super().__init__(origin['id'],
                          logging_class='swh.loader.svn.SvnLoader')
         self.with_revision_headers = self.config['with_revision_headers']
         self.with_empty_folder = self.config['with_empty_folder']
         self.with_extra_commit_line = self.config['with_extra_commit_line']
         self.with_svn_update = self.config['with_svn_update'] and self.with_revision_headers  # noqa
+        self.origin = origin
+        self.svnrepo = svn.SvnRepo(
+            svn_url, origin['id'], self.storage,
+            destination_path=destination_path,
+            with_empty_folder=self.with_empty_folder,
+            with_extra_commit_line=self.with_extra_commit_line
+        )
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.
@@ -135,7 +142,7 @@ class SvnLoader(SWHLoader):
         self.log.debug('occ: %s' % occ)
         self.maybe_load_occurrences([occ])
 
-    def process(self, svn_url, origin, destination_path):
+    def process(self):
         """Load a svn repository in swh.
 
         Checkout the svn repository locally in destination_path.
@@ -153,13 +160,8 @@ class SvnLoader(SWHLoader):
             - stderr: optional when status is True, mandatory otherwise
 
         """
-        svnrepo = svn.SvnRepo(
-            svn_url, origin['id'], self.storage,
-            destination_path=destination_path,
-            with_empty_folder=self.with_empty_folder,
-            with_extra_commit_line=self.with_extra_commit_line
-        )
-
+        svnrepo = self.svnrepo
+        origin = self.origin
         try:
             # default configuration
             revision_start = 1
@@ -178,14 +180,15 @@ class SvnLoader(SWHLoader):
                     }
 
                     svnrepo.fork(revision_start)
-                    self.log.debug('svn co %s@%s' % (svn_url, revision_start))
+                    self.log.debug('svn co %s@%s' % (self.remote_url,
+                                                     revision_start))
 
                     if swh_rev and not self.check_history_not_altered(
                             svnrepo,
                             revision_start,
                             swh_rev):
                         msg = 'History of svn %s@%s history modified. Skipping...' % (  # noqa
-                            svn_url, revision_start)
+                            self.remote_url, revision_start)
                         self.log.warn(msg)
                         return {'status': False, 'stderr': msg}
 
@@ -195,8 +198,8 @@ class SvnLoader(SWHLoader):
                 revision_start, revision_end))
 
             if revision_start == revision_end and revision_start is not 1:
-                self.log.info('%s@%s already injected.' % (svn_url,
-                                                           revision_end))
+                self.log.info('%s@%s already injected.' % (
+                    self.remote_url, revision_end))
                 return {'status': True}
 
             self.log.info('Processing %s.' % svnrepo)

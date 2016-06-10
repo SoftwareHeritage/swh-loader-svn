@@ -171,6 +171,16 @@ class BaseDirSWHEditor:
     cf. SWHDirEditorNoEmptyFolder for an implementation that deletes
     empty folder
 
+    Instantiate a new class inheriting frmo this class and define the
+    following function:
+
+    - def update_checksum(self):
+        Compute the checksums at current state
+    - def open_directory(self, *args):
+        Update an existing folder.
+    - def add_directory(self, *args):
+        Add a new one.
+
     """
     __slots__ = ['state', 'rootpath', 'path']
 
@@ -367,8 +377,6 @@ class BaseSWHEditor:
     """SWH Base class editor in charge of receiving events.
 
     """
-    __slots__ = ['rootpath', 'state']
-
     def __init__(self, rootpath, state):
         self.rootpath = rootpath
         self.state = state
@@ -383,8 +391,9 @@ class BaseSWHEditor:
         pass
 
     def open_root(self, base_revnum):
-        raise NotImplementedError('Instanciate an swh dir editor to choose '
-                                  'the hash computation policy')
+        raise NotImplementedError('Instantiate an swh dir editor of your '
+                                  ' choice depending of the hash computation '
+                                  ' policy you want')
 
 
 class SWHEditorNoEmptyFolder(BaseSWHEditor):
@@ -414,18 +423,22 @@ class SWHEditor(BaseSWHEditor):
 
 
 class SWHReplay:
+    """Class in charge of computing hashes.
+
+    """
     def __init__(self, conn, rootpath, no_empty_folder=False):
         self.conn = conn
         self.rootpath = rootpath
+        state = {}
         if no_empty_folder:
-            self.editor = SWHEditorNoEmptyFolder(state={}, rootpath=rootpath)
+            self.editor = SWHEditorNoEmptyFolder(rootpath=rootpath,
+                                                 state=state)
         else:
-            self.editor = SWHEditor(state={}, rootpath=rootpath)
+            self.editor = SWHEditor(rootpath=rootpath, state=state)
 
     def compute_hashes(self, rev):
-        """Given a connection to the svn server, a revision, a rootpath and a
-        hash state, compute the hash updated from a replay for that
-        revision.
+        """Compute hashes at revisions rev.
+        Expects the state to be at previous revision's state.
 
         Args:
             rev: The revision to play the replay.
@@ -433,7 +446,7 @@ class SWHReplay:
 
         Returns:
             The updated state
-            Beware that the rootpath has been changed on disk as well.
+            Beware that this mutates the filesystem at rootpath accordingly.
 
         """
         self.conn.replay(rev, rev+1, self.editor)
@@ -471,6 +484,9 @@ class SWHReplay:
               help="Do not account empty folder during hash computation.")
 def main(local_url, svn_url, revision_start, revision_end, debug, cleanup,
          empty_folder):
+    """Script to present how to use SWHReplay class.
+
+    """
     conn = RemoteAccess(svn_url.encode('utf-8'),
                         auth=Auth([get_username_provider()]))
 

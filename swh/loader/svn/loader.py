@@ -35,23 +35,23 @@ class SvnLoader(SWHLoader):
         super().__init__(origin['id'],
                          logging_class='swh.loader.svn.SvnLoader')
         self.with_revision_headers = self.config['with_revision_headers']
-        self.with_empty_folder = self.config['with_empty_folder']
-        self.with_extra_commit_line = self.config['with_extra_commit_line']
         self.with_svn_update = self.config['with_svn_update'] and self.with_revision_headers  # noqa
         self.origin = origin
-        if self.with_extra_commit_line:
+
+        with_empty_folder = self.config['with_empty_folder']
+        if self.config['with_extra_commit_line']:
             self.svnrepo = svn.SvnRepoWithExtraCommitLine(
                 svn_url,
                 origin['id'],
                 self.storage,
                 destination_path=destination_path,
-                with_empty_folder=self.with_empty_folder)
+                with_empty_folder=with_empty_folder)
         else:
             self.svnrepo = svn.SvnRepo(
                 svn_url, origin['id'],
                 self.storage,
                 destination_path=destination_path,
-                with_empty_folder=self.with_empty_folder
+                with_empty_folder=with_empty_folder
             )
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
@@ -99,7 +99,7 @@ class SvnLoader(SWHLoader):
                 rev,
                 dir_id,
                 revision_parents[rev],
-                with_revision_headers=self.with_revision_headers)  # BEWARE: if False, svn repo update won't work...  # noqa
+                with_revision_headers=self.with_revision_headers)
             swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
             self.log.debug('rev: %s, swhrev: %s, dir: %s' % (
                 rev,

@@ -21,13 +21,35 @@ def convert_hashes_with_relative_path(hashes, rootpath):
     """A function to ease the transformation of absolute path to relative ones.
 
     This is an implementation detail:
-    - swh.loader.svn.ra compute relative paths
-    - swh.model.git compute with full paths
-
-    FIXME: Need to walk the paths and transform the path relative to
-    the root (that's how swh.loader.svn.ra computes the path)
+    - swh.loader.svn.ra compute hashes and store keys with relative paths
+    - swh.model.git compute hashes and store keys with full paths
 
     """
-    hashes[b''] = hashes[rootpath]
-    hashes.pop(rootpath, None)
-    return hashes
+    if rootpath.endswith(b'/'):
+        rootpath = rootpath[:-1]
+
+    root_value = hashes.pop(rootpath)
+
+    if not rootpath.endswith(b'/'):
+        rootpath = rootpath + b'/'
+
+    def _replace_slash(s, rootpath=rootpath):
+        return s.replace(rootpath, b'')
+
+    def _update_children(children, rootpath=rootpath):
+        return set((_replace_slash(c) for c in children))
+
+    h = {
+        b'': {
+            'checksums': root_value['checksums'],
+            'children': _update_children(root_value['children'])
+        }
+    }
+    for path, v in hashes.items():
+        p = _replace_slash(path)
+        if 'children' in v:
+            v['children'] = _update_children(v['children'])
+
+        h[p] = v
+
+    return h

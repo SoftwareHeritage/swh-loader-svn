@@ -21,3 +21,76 @@ class TestUtils(unittest.TestCase):
     def strdate_to_timestamp_empty_does_not_break(self):
         # It should return 0, epoch
         self.assertEquals(0, utils.strdate_to_timestamp(''))
+
+
+class TestHashesConvert(unittest.TestCase):
+    def setUp(self):
+        self.hashes = {
+            b'/tmp/tmp.c39vkrp1.swh.loader/pkg-fox': {
+                'checksums': {
+                    'name': b'pkg-fox',
+                    'sha1_git': b'\xad\xdf2x\x1fBX\xdb\xe8Adt\xc9\xf5~\xcb6\x98^\xbf',  # noqa
+                    'path': b'/tmp/tmp.c39vkrp1.swh.loader/pkg-fox'
+                },
+                'children': {
+                    b'/tmp/tmp.c39vkrp1.swh.loader/pkg-fox/fox-1.2',
+                    b'/tmp/tmp.c39vkrp1.swh.loader/pkg-fox/fox-1.4'
+                }
+            },
+            b'/tmp/tmp.c39vkrp1.swh.loader/pkg-fox/fox-1.4': {
+                'checksums': 'something',
+                'children': set()
+            },
+            b'/tmp/tmp.c39vkrp1.swh.loader/pkg-fox/fox-1.2': {
+                'checksums': 'something'
+            },
+            b'/tmp/tmp.c39vkrp1.swh.loader/pkg-fox/fox-1.3': {
+                'checksums': 'or something',
+                'children': {
+                    b'/tmp/tmp.c39vkrp1.swh.loader/pkg-fox/some/path'
+                }
+            }
+        }
+
+        self.expected_output = {
+            b'': {
+                'checksums': {
+                    'name': b'pkg-fox',
+                    'sha1_git': b'\xad\xdf2x\x1fBX\xdb\xe8Adt\xc9\xf5~\xcb6\x98^\xbf',  # noqa
+                    'path': b'/tmp/tmp.c39vkrp1.swh.loader/pkg-fox'
+                },
+                'children': {
+                    b'fox-1.2', b'fox-1.4'
+                }
+            },
+            b'fox-1.4': {
+                'checksums': 'something',
+                'children': set()
+            },
+            b'fox-1.2': {
+                'checksums': 'something',
+            },
+            b'fox-1.3': {
+                'checksums': 'or something',
+                'children': {
+                    b'some/path'
+                }
+            }
+        }
+
+    @istest
+    def convert_hashes_with_relative_path(self):
+
+        actual_output = utils.convert_hashes_with_relative_path(
+            self.hashes,
+            b'/tmp/tmp.c39vkrp1.swh.loader/pkg-fox')
+
+        self.assertEquals(actual_output, self.expected_output)
+
+    @istest
+    def convert_hashes_with_relative_path_with_slash(self):
+        actual_output = utils.convert_hashes_with_relative_path(
+            self.hashes,
+            b'/tmp/tmp.c39vkrp1.swh.loader/pkg-fox/')
+
+        self.assertEquals(actual_output, self.expected_output)

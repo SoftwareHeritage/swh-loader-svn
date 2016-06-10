@@ -8,7 +8,7 @@ import tempfile
 import shutil
 
 from subvertpy.ra import RemoteAccess, Auth, get_username_provider
-from subvertpy import client
+from subvertpy import client, properties
 
 from . import ra
 
@@ -87,10 +87,13 @@ class SvnRepo():
     def __to_entry(self, log_entry):
         changed_paths, rev, revprops, has_children = log_entry
 
-        author_date = revprops.get('svn:date', DEFAULT_AUTHOR_DATE)
-        author = revprops.get('svn:author', DEFAULT_AUTHOR_NAME)
+        author_date = revprops.get(properties.PROP_REVISION_DATE,
+                                   DEFAULT_AUTHOR_DATE)
 
-        msg = revprops.get('svn:log')
+        author = revprops.get(properties.PROP_REVISION_AUTHOR,
+                              DEFAULT_AUTHOR_NAME)
+
+        msg = revprops.get(properties.PROP_REVISION_LOG)
         if msg and self.with_extra_commit_line:
             message = ('%s\n' % msg)
         elif msg:

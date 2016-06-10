@@ -188,7 +188,7 @@ class SvnLoader(SWHLoader):
                     }
 
                     svnrepo.fork(revision_start)
-                    self.log.debug('svn co %s@%s' % (self.remote_url,
+                    self.log.debug('svn co %s@%s' % (svnrepo.remote_url,
                                                      revision_start))
 
                     if swh_rev and not self.check_history_not_altered(
@@ -196,7 +196,7 @@ class SvnLoader(SWHLoader):
                             revision_start,
                             swh_rev):
                         msg = 'History of svn %s@%s history modified. Skipping...' % (  # noqa
-                            self.remote_url, revision_start)
+                            svnrepo.remote_url, revision_start)
                         self.log.warn(msg)
                         return {'status': False, 'stderr': msg}
 
@@ -207,7 +207,7 @@ class SvnLoader(SWHLoader):
 
             if revision_start == revision_end and revision_start is not 1:
                 self.log.info('%s@%s already injected.' % (
-                    self.remote_url, revision_end))
+                    svnrepo.remote_url, revision_end))
                 return {'status': True}
 
             self.log.info('Processing %s.' % svnrepo)

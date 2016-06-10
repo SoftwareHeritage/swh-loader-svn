@@ -162,8 +162,14 @@ def default_dictionary():
     return dict(checksums=None, children=set())
 
 
-class SWHDirEditor:
-    """Directory Editor in charge of updating directory hashes computation.
+class BaseDirSWHEditor:
+    """Base class implementation of dir editor.
+
+    cf. SWHDirEditor for an implementation that hashes every directory
+    encountered.
+
+    cf. SWHDirEditorNoEmptyFolder for an implementation that deletes
+    empty folder
 
     """
     __slots__ = ['state', 'rootpath', 'path']
@@ -175,7 +181,7 @@ class SWHDirEditor:
         # build directory on init
         os.makedirs(os.path.join(rootpath, path), exist_ok=True)
 
-    def __add_child(self, path):
+    def add_child(self, path):
         """Add a children path to the actual state for the current directory
         seen as the parent.
 
@@ -187,7 +193,7 @@ class SWHDirEditor:
         d['children'].add(path)
         self.state[self.path] = d
 
-    def __remove_child(self, path):
+    def remove_child(self, path):
         """Remove a path from the current state.
 
         The path can be resolved as link, file or directory.
@@ -204,14 +210,11 @@ class SWHDirEditor:
         if entry_removed:
             if 'children' in entry_removed:  # dir
                 for child_path in entry_removed['children']:
-                    self.__remove_child(child_path)
+                    self.remove_child(child_path)
 
             parent = os.path.dirname(path)
             if parent and parent in self.state:
                 self.state[parent]['children'].discard(path)
-
-        # Due to empty folder policy, we need to remove not
-        # found entry (they already have been popped)
 
         if os.path.lexists(fpath):  # we want to catch broken symlink too
             if os.path.isfile(fpath):
@@ -221,7 +224,7 @@ class SWHDirEditor:
             else:
                 shutil.rmtree(fpath)
 
-    def __children(self, entry):
+    def children(self, entry):
         """Compute the children of the current entry.
 
         Args:
@@ -241,46 +244,21 @@ class SWHDirEditor:
                 continue
             yield c
 
-    def __update_checksum(self):
-        """Update the root path self.path's checksums according to the
-        children's hashes.
-
-        This function is expected to be called when the folder has
-        been completely 'walked'.
-
-        """
-        d = self.state.get(self.path, default_dictionary())
-        # Retrieve the list of the current folder's children hashes
-        ls_hashes = list(self.__children(d))
-        if ls_hashes:
-            d['checksums'] = git._compute_tree_metadata(self.path, ls_hashes)
-            self.state[self.path] = d
-        else:   # To compute with empty directories, remove the else
-                # and use ls_hashes even if empty
-            self.__remove_child(self.path)
+    def update_checksum(self):
+        raise NotImplementedError('This should be implemented.')
 
     def open_directory(self, *args):
-        """Updating existing directory.
+        raise NotImplementedError('This should be implemented.')
 
-        """
-        path = args[0].encode('utf-8')
-        self.__add_child(path)
-        return SWHDirEditor(self.state, self.rootpath, path=path)
-
-    def add_directory(self, path, copyfrom_path=None, copyfrom_rev=-1):
-        """Adding a new directory.
-
-        """
-        path = path.encode('utf-8')
-        self.__add_child(path)
-        return SWHDirEditor(self.state, rootpath=self.rootpath, path=path)
+    def add_directory(self, *args):
+        raise NotImplementedError('This should be implemented.')
 
     def open_file(self, *args):
         """Updating existing file.
 
         """
         path = args[0].encode('utf-8')
-        self.__add_child(path)
+        self.add_child(path)
         return SWHFileEditor(self.state, rootpath=self.rootpath, path=path)
 
     def add_file(self, path, copyfrom_path=None, copyfrom_rev=-1):
@@ -288,7 +266,7 @@ class SWHDirEditor:
 
         """
         path = path.encode('utf-8')
-        self.__add_child(path)
+        self.add_child(path)
         return SWHFileEditor(self.state, rootpath=self.rootpath, path=path)
 
     def change_prop(self, key, value):
@@ -298,17 +276,95 @@ class SWHDirEditor:
         """Remove a path.
 
         """
-        self.__remove_child(path.encode('utf-8'))
+        self.remove_child(path.encode('utf-8'))
 
     def close(self):
         """Function called when we finish walking a repository.
 
         """
-        self.__update_checksum()
+        self.update_checksum()
 
 
-class SWHEditor:
-    """Base class in charge of receiving events.
+class SWHDirEditor(BaseDirSWHEditor):
+    """Directory Editor in charge of updating directory hashes computation.
+
+    This implementation includes empty folder in the hash computation.
+
+    """
+    def update_checksum(self):
+        """Update the root path self.path's checksums according to the
+        children's hashes.
+
+        This function is expected to be called when the folder has
+        been completely 'walked'.
+
+        """
+        d = self.state.get(self.path, default_dictionary())
+        # Retrieve the list of the current folder's children hashes
+        ls_hashes = list(self.children(d))
+        d['checksums'] = git._compute_tree_metadata(self.path, ls_hashes)
+        self.state[self.path] = d
+
+    def open_directory(self, *args):
+        """Updating existing directory.
+
+        """
+        path = args[0].encode('utf-8')
+        self.add_child(path)
+        return SWHDirEditor(self.state, self.rootpath, path=path)
+
+    def add_directory(self, path, copyfrom_path=None, copyfrom_rev=-1):
+        """Adding a new directory.
+
+        """
+        path = path.encode('utf-8')
+        self.add_child(path)
+        return SWHDirEditor(self.state, rootpath=self.rootpath, path=path)
+
+
+class SWHDirEditorNoEmptyFolder(BaseDirSWHEditor):
+    """Directory Editor in charge of updating directory hashes computation.
+
+    """
+    def update_checksum(self):
+        """Update the root path self.path's checksums according to the
+        children's hashes.
+
+        This function is expected to be called when the folder has
+        been completely 'walked'.
+
+        """
+        d = self.state.get(self.path, default_dictionary())
+        # Retrieve the list of the current folder's children hashes
+        ls_hashes = list(self.children(d))
+        if ls_hashes:
+            d['checksums'] = git._compute_tree_metadata(self.path, ls_hashes)
+            self.state[self.path] = d
+        else:   # To compute with empty directories, remove the else
+                # and use ls_hashes even if empty
+            self.remove_child(self.path)
+
+    def open_directory(self, *args):
+        """Updating existing directory.
+
+        """
+        path = args[0].encode('utf-8')
+        self.add_child(path)
+        return SWHDirEditorNoEmptyFolder(self.state, self.rootpath, path=path)
+
+    def add_directory(self, path, copyfrom_path=None, copyfrom_rev=-1):
+        """Adding a new directory.
+
+        """
+        path = path.encode('utf-8')
+        self.add_child(path)
+        return SWHDirEditorNoEmptyFolder(self.state,
+                                         rootpath=self.rootpath,
+                                         path=path)
+
+
+class BaseSWHEditor:
+    """SWH Base class editor in charge of receiving events.
 
     """
     __slots__ = ['rootpath', 'state']
@@ -327,43 +383,75 @@ class SWHEditor:
         pass
 
     def open_root(self, base_revnum):
-        return SWHDirEditor(self.state,
-                            rootpath=self.rootpath,
-                            path=b'')
+        raise NotImplementedError('Instanciate an swh dir editor to choose '
+                                  'the hash computation policy')
 
 
-def compute_or_update_hash_from_replay_at(conn, rev, rootpath, state):
-    """Given a connection to the svn server, a revision, a rootpath and a
-    hash state, compute the hash updated from a replay for that
-    revision.
+class SWHEditorNoEmptyFolder(BaseSWHEditor):
+    """SWH Editor in charge of replaying svn events and computing hashes
+    along.
 
-    Args:
-        conn: The connection object to the remove svn repository
-        rev: The revision to play the replay.
-        rootpath: the root from which computation takes place
-        state: the current state to update
-
-    Returns:
-        The updated state
-        Beware that the rootpath has been changed on disk as well.
+    This implementation removes empty folder and do not account for
+    them when computing hashes.
 
     """
-    editor = SWHEditor(state=state, rootpath=rootpath)
-    conn.replay(rev, rev+1, editor)
-    state = editor.state
-    # When accepting empty folder, this should be removed
-    if not state:  # dangling tree at root
-        # hack: empty tree at level 1: `git hash-object -t tree /dev/null`
-        state[b''] = {
-            'checksums': {
-                'sha1_git': hex_to_hash(
-                    '4b825dc642cb6eb9a060e54bf8d69288fbee4904'),
-                'path': rootpath
-            },
-            'children': set()
-        }
+    def open_root(self, base_revnum):
+        return SWHDirEditorNoEmptyFolder(self.state,
+                                         rootpath=self.rootpath,
+                                         path=b'')
 
-    return state
+
+class SWHEditor(BaseSWHEditor):
+    """SWH Editor in charge of replaying svn events and computing hashes
+    along.
+
+    This implementation accounts for empty folder during hash
+    computations.
+
+    """
+    def open_root(self, base_revnum):
+        return SWHDirEditor(self.state, rootpath=self.rootpath, path=b'')
+
+
+class SWHReplay:
+    def __init__(self, conn, rootpath, no_empty_folder=False):
+        self.conn = conn
+        self.rootpath = rootpath
+        if no_empty_folder:
+            self.editor = SWHEditorNoEmptyFolder(state={}, rootpath=rootpath)
+        else:
+            self.editor = SWHEditor(state={}, rootpath=rootpath)
+
+    def compute_hashes(self, rev):
+        """Given a connection to the svn server, a revision, a rootpath and a
+        hash state, compute the hash updated from a replay for that
+        revision.
+
+        Args:
+            rev: The revision to play the replay.
+            It is expected to be the next revision.
+
+        Returns:
+            The updated state
+            Beware that the rootpath has been changed on disk as well.
+
+        """
+        self.conn.replay(rev, rev+1, self.editor)
+        state = self.editor.state
+        # When accepting empty folder, this should be removed
+        if not state:  # dangling tree at root
+            # hack: empty tree at level 1: `git hash-object -t tree /dev/null`
+            state[b''] = {
+                'checksums': {
+                    'sha1_git': hex_to_hash(
+                        '4b825dc642cb6eb9a060e54bf8d69288fbee4904'),
+                    'path': self.rootpath
+                },
+                'children': set()
+            }
+            self.editor.state = state
+
+        return state
 
 
 @click.command()
@@ -379,7 +467,10 @@ def compute_or_update_hash_from_replay_at(conn, rev, rootpath, state):
               help="Indicates if the server should run in debug mode.")
 @click.option('--cleanup/--nocleanup', default=True,
               help="Indicates whether to cleanup disk when done or not.")
-def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
+@click.option('--empty-folder/--noempty-folder', default=True,
+              help="Do not account empty folder during hash computation.")
+def main(local_url, svn_url, revision_start, revision_end, debug, cleanup,
+         empty_folder):
     conn = RemoteAccess(svn_url.encode('utf-8'),
                         auth=Auth([get_username_provider()]))
 
@@ -398,13 +489,10 @@ def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
     revision_end = min(revision_end, revision_end_max)
 
     try:
-        state = {}
-        for r in range(revision_start, revision_end+1):
-            state = compute_or_update_hash_from_replay_at(conn,
-                                                          r,
-                                                          rootpath,
-                                                          state)
-            print('r%s %s' % (r, hashutil.hash_to_hex(
+        replay = SWHReplay(conn, rootpath, not empty_folder)
+        for rev in range(revision_start, revision_end+1):
+            state = replay.compute_hashes(rev)
+            print('r%s %s' % (rev, hashutil.hash_to_hex(
                 state[b'']['checksums']['sha1_git'])))
 
         if debug:

@@ -67,8 +67,13 @@ class SvnRepo():
         self.local_url = os.path.join(self.local_dirname, local_name).encode(
             'utf-8')
         self.uuid = self.conn.get_uuid().encode('utf-8')
-        self.with_empty_folder = with_empty_folder
         self.with_extra_commit_line = with_extra_commit_line
+
+        # In charge of computing hash while replaying svn logs
+        self.swhreplay = ra.SWHReplay(
+            conn=self.conn,
+            rootpath=self.local_url,
+            no_empty_folder=(not with_empty_folder))
 
     def __str__(self):
         return str({'remote_url': self.remote_url,
@@ -179,16 +184,10 @@ class SvnRepo():
             - objects_per_path: dictionary of path, swh hash data with type
 
         """
-        # remove_empty_folder = not self.with_empty_folder
-
         hashes = {}
         for commit in self.logs(start_revision, end_revision):
             rev = commit['rev']
-            hashes = ra.compute_or_update_hash_from_replay_at(
-                self.conn,
-                rev,
-                rootpath=self.local_url,
-                state=hashes)
+            hashes = self.swhreplay.compute_hashes(rev)
 
             if rev == end_revision:
                 nextrev = None

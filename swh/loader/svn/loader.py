@@ -60,8 +60,9 @@ class SvnLoader(SWHLoader):
         """
         revision_id = swh_rev['id']
         parents = swh_rev['parents']
-        hash_data_per_revs = svnrepo.swh_hash_data_per_revision(revision_start,
-                                                                revision_start)
+        hash_data_per_revs = svnrepo.swh_hash_data_at_revision(revision_start)
+
+        rev = revision_start
         rev, _, commit, objects_per_path = list(hash_data_per_revs)[0]
 
         dir_id = objects_per_path[b'']['checksums']['sha1_git']
@@ -187,7 +188,6 @@ class SvnLoader(SWHLoader):
                         revision_start: swh_rev['parents']
                     }
 
-                    svnrepo.fork(revision_start)
                     self.log.debug('svn co %s@%s' % (svnrepo.remote_url,
                                                      revision_start))
 

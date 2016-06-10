@@ -422,20 +422,10 @@ class SWHEditor(BaseSWHEditor):
         return SWHDirEditor(self.state, rootpath=self.rootpath, path=b'')
 
 
-class SWHReplay:
-    """Class in charge of computing hashes.
+class BaseSWHReplay:
+    """intended to be inherited.
 
     """
-    def __init__(self, conn, rootpath, no_empty_folder=False):
-        self.conn = conn
-        self.rootpath = rootpath
-        state = {}
-        if no_empty_folder:
-            self.editor = SWHEditorNoEmptyFolder(rootpath=rootpath,
-                                                 state=state)
-        else:
-            self.editor = SWHEditor(rootpath=rootpath, state=state)
-
     def compute_hashes(self, rev):
         """Compute hashes at revisions rev.
         Expects the state to be at previous revision's state.
@@ -465,6 +455,22 @@ class SWHReplay:
             self.editor.state = state
 
         return state
+
+
+class SWHReplayNoEmptyFolder(BaseSWHReplay):
+    def __init__(self, conn, rootpath, state=None):
+        self.conn = conn
+        self.rootpath = rootpath
+        self.editor = SWHEditorNoEmptyFolder(rootpath=rootpath,
+                                             state=state if state else {})
+
+
+class SWHReplay(BaseSWHReplay):
+    def __init__(self, conn, rootpath, state=None):
+        self.conn = conn
+        self.rootpath = rootpath
+        self.editor = SWHEditor(rootpath=rootpath,
+                                state=state if state else {})
 
 
 @click.command()
@@ -505,7 +511,11 @@ def main(local_url, svn_url, revision_start, revision_end, debug, cleanup,
     revision_end = min(revision_end, revision_end_max)
 
     try:
-        replay = SWHReplay(conn, rootpath, not empty_folder)
+        if empty_folder:
+            replay = SWHReplay(conn, rootpath)
+        else:
+            replay = SWHReplayNoEmptyFolder(conn, rootpath)
+
         for rev in range(revision_start, revision_end+1):
             state = replay.compute_hashes(rev)
             print('r%s %s' % (rev, hashutil.hash_to_hex(

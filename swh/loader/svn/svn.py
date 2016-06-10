@@ -16,7 +16,9 @@ import shutil
 from subvertpy.ra import RemoteAccess, Auth, get_username_provider
 from subvertpy import client, properties
 
-from . import ra
+from swh.model import git
+
+from . import ra, utils
 
 # When log message contains empty data
 DEFAULT_AUTHOR_NAME = ''
@@ -74,10 +76,19 @@ class BaseSvnRepo():
         self.uuid = self.conn.get_uuid().encode('utf-8')
 
         # In charge of computing hash while replaying svn logs
-        self.swhreplay = ra.SWHReplay(
+        self.with_empty_folder = with_empty_folder
+        self.swhreplay = self._init_swhreplay()
+
+    def _init_swhreplay(self, state=None):
+        if self.with_empty_folder:
+            return ra.SWHReplay(
+                conn=self.conn,
+                rootpath=self.local_url,
+                state=state)
+        return ra.SWHReplayNoEmptyFolder(
             conn=self.conn,
             rootpath=self.local_url,
-            no_empty_folder=(not with_empty_folder))
+            state=state)
 
     def __str__(self):
         return str({'remote_url': self.remote_url,
@@ -132,7 +143,7 @@ class BaseSvnRepo():
             'message': message.encode('utf-8'),
         }
 
-    def logs(self, revision_start, revision_end, block_size=100):
+    def logs(self, revision_start, revision_end):
         """Stream svn logs between revision_start and revision_end by chunks of
         block_size logs.
 
@@ -142,7 +153,6 @@ class BaseSvnRepo():
         Args:
             revision_start: the svn revision starting bound
             revision_end: the svn revision ending bound
-            block_size: block size of revisions to fetch
 
         Yields:
             tuple of revisions and logs.
@@ -211,6 +221,31 @@ class BaseSvnRepo():
                 nextrev = rev + 1
 
             yield rev, nextrev, commit, hashes
+
+    def swh_hash_data_at_revision(self, revision):
+        """Compute the hash data at revision.
+
+        Expected to be used for update only.
+
+        """
+        # Update the disk at revision
+        self.fork(revision)
+        # Compute the current hashes on disk
+        hashes = git.walk_and_compute_sha1_from_directory_2(
+            self.local_url,
+            remove_empty_folder=not self.with_empty_folder)
+
+        hashes = utils.convert_hashes_with_relative_path(
+            hashes,
+            rootpath=self.local_url)
+
+        # Update the replay collaborator with the right state
+        self.swhreplay = self._init_swhreplay(state=hashes)
+
+        # Retrieve the commit information for revision
+        commit = list(self.logs(revision, revision))[0]
+
+        yield revision, revision + 1, commit, hashes
 
     def clean_fs(self):
         """Clean up the local working copy.

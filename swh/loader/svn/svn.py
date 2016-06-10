@@ -3,6 +3,12 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+"""SVN client in charge of iterating over svn logs and yield commit
+representations including the hash tree/content computations per
+svn commit.
+
+"""
+
 import os
 import tempfile
 import shutil

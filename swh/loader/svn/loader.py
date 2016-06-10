@@ -3,6 +3,11 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+"""Loader in charge of injecting either new or existing svn mirrors to
+swh-storage.
+
+"""
+
 import datetime
 
 from swh.core import utils

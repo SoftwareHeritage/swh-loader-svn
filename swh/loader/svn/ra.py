@@ -3,6 +3,10 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+"""Remote Access client to svn server.
+
+"""
+
 import click
 import os
 import shutil

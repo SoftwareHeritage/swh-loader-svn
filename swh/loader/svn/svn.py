@@ -170,7 +170,7 @@ class BaseSvnRepo():
                                                 discover_changed_paths=False):
             yield self.__to_entry(log_entry)
 
-    def fork(self, revision):
+    def export(self, revision):
         """Export the repository to a given version.
 
         """
@@ -229,7 +229,7 @@ class BaseSvnRepo():
 
         """
         # Update the disk at revision
-        self.fork(revision)
+        self.export(revision)
         # Compute the current hashes on disk
         hashes = git.walk_and_compute_sha1_from_directory_2(
             self.local_url,

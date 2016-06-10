@@ -87,27 +87,15 @@ class SvnRepo():
     def __to_entry(self, log_entry):
         changed_paths, rev, revprops, has_children = log_entry
 
-        try:
-            author_date = revprops['svn:date'] or DEFAULT_AUTHOR_DATE
-        except AttributeError:
-            author_date = DEFAULT_AUTHOR_DATE
+        author_date = revprops.get('svn:date', DEFAULT_AUTHOR_DATE)
+        author = revprops.get('svn:author', DEFAULT_AUTHOR_NAME)
 
-        try:
-            author = revprops['svn:author'] or DEFAULT_AUTHOR_NAME
-        except AttributeError:
-            author = DEFAULT_AUTHOR_NAME
-
-        try:
-
-            msg = revprops['svn:log']
-            if msg and self.with_extra_commit_line:
-                message = ('%s\n' % msg)
-            elif msg:
-                message = msg
-            else:
-                message = DEFAULT_AUTHOR_MESSAGE
-
-        except AttributeError:
+        msg = revprops.get('svn:log')
+        if msg and self.with_extra_commit_line:
+            message = ('%s\n' % msg)
+        elif msg:
+            message = msg
+        else:
             message = DEFAULT_AUTHOR_MESSAGE
 
         return {

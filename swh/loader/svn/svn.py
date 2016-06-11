@@ -3,21 +3,27 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+"""SVN client in charge of iterating over svn logs and yield commit
+representations including the hash tree/content computations per
+svn commit.
+
+"""
+
 import os
-import pysvn
 import tempfile
 import shutil
 
-from pysvn import Revision, opt_revision_kind
-from retrying import retry
+from subvertpy.ra import RemoteAccess, Auth, get_username_provider
+from subvertpy import client, properties
 
 from swh.model import git
 
+from . import ra, utils
 
 # When log message contains empty data
-DEFAULT_AUTHOR_NAME = b''
+DEFAULT_AUTHOR_NAME = ''
 DEFAULT_AUTHOR_DATE = b''
-DEFAULT_AUTHOR_MESSAGE = b''
+DEFAULT_AUTHOR_MESSAGE = ''
 
 
 class SvnRepoException(ValueError):
@@ -26,43 +32,19 @@ class SvnRepoException(ValueError):
         self.svnrepo = svnrepo
 
 
-def retry_with_cleanup(exception):
-    """Clean the repository from locks before retrying.
-
-    """
-    exception.svnrepo.cleanup()
-    return True
-
-
-def ignore_dot_svn_folder(dirpath):
-    """Ignore basic .svn folder and .svn folder's content.
-
-    Function to be passed at swh.model.git's functions
-    walk_and_compute_sha1_from_directory and update_checksums_from to
-    validate folder.
-
-    Args:
-        dirpath: Absolute directory path to check
-
-    Returns:
-        True if the dirpath does not contains .svn references.
-        False otherwise.
-
-    """
-    dirname = os.path.basename(dirpath)
-    if b'.svn' == dirname:
-        return False
-    return b'/.svn/' not in dirpath
-
-
-class SvnRepo():
+class BaseSvnRepo():
     """Swh representation of a svn repository.
+
+    To use this class, instantiate a new class and implement the following
+    method:
+    - def transform_commit_message(msg):
+        Transform the message msg (string) to bytes (+ do some extra
+        work on it if you want, add an extra line for example)
 
     """
     def __init__(self, remote_url, origin_id, storage,
                  destination_path=None,
-                 with_empty_folder=False,
-                 with_extra_commit_line=False):
+                 with_empty_folder=False):
         self.remote_url = remote_url.rstrip('/')
         self.storage = storage
         self.origin_id = origin_id
@@ -79,11 +61,34 @@ class SvnRepo():
 
         local_name = os.path.basename(self.remote_url)
 
-        self.client = pysvn.Client()
-        self.local_url = os.path.join(self.local_dirname, local_name)
-        self.uuid = None  # Cannot know it yet since we need a working copy
+        auth = Auth([get_username_provider()])
+        # one connection for log iteration
+        self.conn_log = RemoteAccess(self.remote_url,
+                                     auth=auth)
+        # another for replay
+        self.conn = RemoteAccess(self.remote_url,
+                                 auth=auth)
+        # one client for update operation
+        self.client = client.Client(auth=auth)
+
+        self.local_url = os.path.join(self.local_dirname, local_name).encode(
+            'utf-8')
+        self.uuid = self.conn.get_uuid().encode('utf-8')
+
+        # In charge of computing hash while replaying svn logs
         self.with_empty_folder = with_empty_folder
-        self.with_extra_commit_line = with_extra_commit_line
+        self.swhreplay = self._init_swhreplay()
+
+    def _init_swhreplay(self, state=None):
+        if self.with_empty_folder:
+            return ra.SWHReplay(
+                conn=self.conn,
+                rootpath=self.local_url,
+                state=state)
+        return ra.SWHReplayNoEmptyFolder(
+            conn=self.conn,
+            rootpath=self.local_url,
+            state=state)
 
     def __str__(self):
         return str({'remote_url': self.remote_url,
@@ -91,52 +96,11 @@ class SvnRepo():
                     'uuid': self.uuid,
                     'swh-origin': self.origin_id})
 
-    def cleanup(self):
-        """Clean up any locks in the working copy at path.
-
-        """
-        self.client.cleanup(self.local_url)
-
-    @retry(retry_on_exception=retry_with_cleanup,
-           stop_max_attempt_number=3)
-    def checkout(self, revision):
-        """Checkout repository repo at revision.
-
-        Args:
-            revision: the revision number to checkout the repo to.
-
-        """
-        try:
-            self.client.checkout(
-                self.remote_url,
-                self.local_url,
-                revision=Revision(opt_revision_kind.number, revision))
-        except Exception as e:
-            raise SvnRepoException(self, e)
-
-    def fork(self, svn_revision=None):
-        """Checkout remote repository to a local working copy (at revision 1
-        if the svn revision is not specified).
-
-        This will also update the repository's uuid.
-
-        """
-        self.checkout(1 if not svn_revision else svn_revision)
-        uuid = self.client.info(self.local_url).uuid
-        if isinstance(uuid, str):
-            self.uuid = uuid.encode('utf-8')
-        else:
-            self.uuid = uuid
-
     def head_revision(self):
         """Retrieve current revision of the repository's working copy.
 
         """
-        head_rev = Revision(opt_revision_kind.head)
-        info = self.client.info2(self.local_url,
-                                 revision=head_rev,
-                                 recurse=False)
-        return info[0][1]['rev'].number
+        return self.conn.get_latest_revnum()
 
     def initial_revision(self):
         """Retrieve the initial revision from which the remote url appeared.
@@ -144,67 +108,42 @@ class SvnRepo():
         url.
 
         """
-        return self.client.log(self.remote_url)[-1].data.get(
-            'revision').number
+        return 1
 
-    def _to_change_paths(self, log_entry):
-        """Convert changed paths to dict if any.
+    def transform_commit_message(msg):
+        """Do something with message (e.g add extra line, etc...)
 
+        Args:
+            msg (str): the commit message to transform_commit_message
+
+        Returns:
+            The transformed message.
         """
-        try:
-            changed_paths = log_entry.changed_paths
-        except AttributeError:
-            changed_paths = []
+        raise NotImplementedError('This should be implemented in an '
+                                  'inherited class to tranform the '
+                                  ' commit message.')
 
-        for paths in changed_paths:
-            path = os.path.join(self.local_url, paths.path.lstrip('/'))
-            yield {
-                'path': path.encode('utf-8'),
-                'action': paths.action  # A(dd), M(odified), D(eleted)
-            }
+    def __to_entry(self, log_entry):
+        changed_paths, rev, revprops, has_children = log_entry
 
-    def _to_entry(self, log_entry):
-        try:
-            author_date = log_entry.date or DEFAULT_AUTHOR_DATE
-        except AttributeError:
-            author_date = DEFAULT_AUTHOR_DATE
+        author_date = revprops.get(properties.PROP_REVISION_DATE,
+                                   DEFAULT_AUTHOR_DATE)
 
-        try:
-            author = log_entry.author.encode('utf-8') or DEFAULT_AUTHOR_NAME
-        except AttributeError:
-            author = DEFAULT_AUTHOR_NAME
+        author = revprops.get(properties.PROP_REVISION_AUTHOR,
+                              DEFAULT_AUTHOR_NAME)
 
-        try:
-
-            msg = log_entry.message
-            if msg and self.with_extra_commit_line:
-                message = ('%s\n' % msg).encode('utf-8')
-            elif msg:
-                message = msg.encode('utf-8')
-            else:
-                message = DEFAULT_AUTHOR_MESSAGE
-
-        except AttributeError:
-            message = DEFAULT_AUTHOR_MESSAGE
+        message = self.transform_commit_message(
+            revprops.get(properties.PROP_REVISION_LOG,
+                         DEFAULT_AUTHOR_MESSAGE))
 
         return {
-            'rev': log_entry.revision.number,
+            'rev': rev,
             'author_date': author_date,
-            'author_name': author,
-            'message': message,
-            'changed_paths': self._to_change_paths(log_entry),
+            'author_name': author.encode('utf-8'),
+            'message': message.encode('utf-8'),
         }
 
-    @retry(stop_max_attempt_number=3)
-    def _logs(self, revision_start, revision_end):
-        rev_start = Revision(opt_revision_kind.number, revision_start)
-        rev_end = Revision(opt_revision_kind.number, revision_end)
-        return self.client.log(url_or_path=self.local_url,
-                               revision_start=rev_start,
-                               revision_end=rev_end,
-                               discover_changed_paths=True)
-
-    def logs(self, revision_start, revision_end, block_size=100):
+    def logs(self, revision_start, revision_end):
         """Stream svn logs between revision_start and revision_end by chunks of
         block_size logs.
 
@@ -214,7 +153,6 @@ class SvnRepo():
         Args:
             revision_start: the svn revision starting bound
             revision_end: the svn revision ending bound
-            block_size: block size of revisions to fetch
 
         Yields:
             tuple of revisions and logs.
@@ -226,19 +164,19 @@ class SvnRepo():
                      - message: commit message
 
         """
-        r1 = revision_start
-        r2 = r1 + block_size - 1
+        for log_entry in self.conn_log.iter_log(paths=None,
+                                                start=revision_start,
+                                                end=revision_end,
+                                                discover_changed_paths=False):
+            yield self.__to_entry(log_entry)
 
-        done = False
-        if r2 >= revision_end:
-            r2 = revision_end
-            done = True
+    def export(self, revision):
+        """Export the repository to a given version.
 
-        for log_entry in self._logs(r1, r2):
-            yield self._to_entry(log_entry)
-
-        if not done:
-            yield from self.logs(r2 + 1, revision_end, block_size)
+        """
+        self.client.export(self.remote_url,
+                           to=self.local_url.decode('utf-8'),
+                           rev=revision)
 
     def swh_previous_revision(self):
         """Look for possible existing revision in swh.
@@ -272,35 +210,82 @@ class SvnRepo():
             - objects_per_path: dictionary of path, swh hash data with type
 
         """
-        remove_empty_folder = not self.with_empty_folder
-
-        local_url = self.local_url.encode('utf-8')
+        hashes = {}
         for commit in self.logs(start_revision, end_revision):
             rev = commit['rev']
-            if rev == start_revision:  # first time, we walk the complete tree
-                objects_per_path = git.walk_and_compute_sha1_from_directory(
-                    local_url,
-                    dir_ok_fn=ignore_dot_svn_folder,
-                    remove_empty_folder=remove_empty_folder)
-            else:
-                # checkout to the next revision rev
-                self.checkout(revision=rev)
-                # and we update  only what needs to be
-                objects_per_path = git.update_checksums_from(
-                    commit['changed_paths'],
-                    objects_per_path,
-                    dir_ok_fn=ignore_dot_svn_folder,
-                    remove_empty_folder=remove_empty_folder)
+            hashes = self.swhreplay.compute_hashes(rev)
 
             if rev == end_revision:
                 nextrev = None
             else:
                 nextrev = rev + 1
 
-            yield rev, nextrev, commit, objects_per_path
+            yield rev, nextrev, commit, hashes
+
+    def swh_hash_data_at_revision(self, revision):
+        """Compute the hash data at revision.
+
+        Expected to be used for update only.
+
+        """
+        # Update the disk at revision
+        self.export(revision)
+        # Compute the current hashes on disk
+        hashes = git.compute_hashes_from_directory(
+            self.local_url,
+            remove_empty_folder=not self.with_empty_folder)
+
+        hashes = utils.convert_hashes_with_relative_path(
+            hashes,
+            rootpath=self.local_url)
+
+        # Update the replay collaborator with the right state
+        self.swhreplay = self._init_swhreplay(state=hashes)
+
+        # Retrieve the commit information for revision
+        commit = list(self.logs(revision, revision))[0]
+
+        yield revision, revision + 1, commit, hashes
 
     def clean_fs(self):
         """Clean up the local working copy.
 
         """
         shutil.rmtree(self.local_dirname)
+
+
+class SvnRepo(BaseSvnRepo):
+    """This class does exactly as BaseSvnRepo.
+
+    It keeps the commit message as is.
+
+    """
+
+    def transform_commit_message(self, msg):
+        """Pass the message as is.
+
+        Args:
+            msg (str): the commit message to transform_commit_message
+
+        Returns:
+            The message as is.
+
+        """
+        return msg
+
+
+class SvnRepoWithExtraCommitLine(BaseSvnRepo):
+    """This class does exactly as BaseSvnRepo except for the commit
+    message which is extended with a new line.
+
+    """
+    def transform_commit_message(self, msg):
+        """Add an extra line to the commit message and encode in bytes.
+
+        Args:
+            msg (str): the commit message to transform_commit_message
+
+        Returns:
+            The transformed message.
+        """
+        return '%s\n' % msg

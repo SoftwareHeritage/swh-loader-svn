@@ -5,6 +5,8 @@
 
 from email import utils
 
+from .utils import strdate_to_timestamp
+
 
 def svn_author_to_person(author, repo_uuid):
     """Convert an svn author to a person suitable for insertion.
@@ -53,10 +55,8 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id, parents,
 
     msg = commit['message']
 
-    date = {
-        'timestamp': int(commit['author_date']),
-        'offset': 0,
-    }
+    ts = strdate_to_timestamp(commit['author_date'])
+    date = {'timestamp': ts, 'offset': 0}
 
     if with_revision_headers:
         metadata = {

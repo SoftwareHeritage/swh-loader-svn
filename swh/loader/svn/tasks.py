@@ -8,9 +8,11 @@ from swh.loader.svn.loader import SvnLoader
 
 
 class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
-    """Import a svn repository to Software Heritage
+    """Import one svn repository to Software Heritage.
 
     """
+    CONFIG_BASE_FILENAME = 'loader/svn.ini'
+
     task_queue = 'swh_loader_svn'
 
     def run(self, svn_url, local_path):
@@ -20,13 +22,11 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
             cf. swh.loader.svn.SvnLoader.process docstring
 
         """
-        storage = SvnLoader().storage
-
         origin = {'type': 'svn', 'url': svn_url}
-        origin['id'] = storage.origin_add_one(origin)
+        origin['id'] = self.storage.origin_add_one(origin)
 
-        fetch_history_id = self.open_fetch_history(storage, origin['id'])
+        fetch_history_id = self.open_fetch_history(origin['id'])
 
-        result = SvnLoader(origin['id']).process(svn_url, origin, local_path)
+        result = SvnLoader(svn_url, local_path, origin).process()
 
-        self.close_fetch_history(storage, fetch_history_id, result)
+        self.close_fetch_history(fetch_history_id, result)

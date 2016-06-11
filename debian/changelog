@@ -1,8 +1,10 @@
-swh-loader-svn (0.0.7-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.8-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.8
+  * Use remote-access approach to hash and compute hashes from svn
+  * repository (migrate major dependency from pysvn to subvertpy)
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Thu, 26 May 2016 16:10:32 +0200
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Sat, 11 Jun 2016 19:55:54 +0200
 
 swh-loader-svn (0.0.7-1~swh1) unstable-swh; urgency=medium
 

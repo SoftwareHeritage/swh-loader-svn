@@ -448,7 +448,9 @@ class BaseSWHReplay:
                 'checksums': {
                     'sha1_git': hex_to_hash(
                         '4b825dc642cb6eb9a060e54bf8d69288fbee4904'),
-                    'path': self.rootpath
+                    'path': self.rootpath,
+                    'type': git.GitType.TREE,
+                    'perms': git.GitPerm.TREE
                 },
                 'children': set()
             }

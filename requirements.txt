@@ -8,3 +8,4 @@ swh.scheduler >= 0.0.6
 swh.loader.core >= 0.0.10
 click
 retrying
+dateutil

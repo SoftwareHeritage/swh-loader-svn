@@ -3,6 +3,11 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+"""Loader in charge of injecting either new or existing svn mirrors to
+swh-storage.
+
+"""
+
 import datetime
 
 from swh.core import utils
@@ -10,30 +15,7 @@ from swh.model import git, hashutil
 from swh.model.git import GitType
 
 from swh.loader.core.loader import SWHLoader
-from swh.loader.svn import svn, converters
-
-
-def objects_per_type(objects_per_path):
-    """Given an object dictionary returned by
-    `swh.model.git.walk_and_compute_sha1_from_directory`, return a map
-    grouped by type.
-
-    Returns:
-        Dictionary with keys:
-        - GitType.BLOB: list of blobs
-        - GitType.TREE: list of directories
-
-    """
-    objects = {
-        GitType.BLOB: [],
-        GitType.TREE: [],
-    }
-    for tree_path in objects_per_path:
-        objs = objects_per_path[tree_path]
-        for obj in objs:
-            objects[obj['type']].append(obj)
-
-    return objects
+from . import svn, converters
 
 
 class SvnLoader(SWHLoader):
@@ -49,13 +31,28 @@ class SvnLoader(SWHLoader):
         'with_extra_commit_line': ('bool', False),
     }
 
-    def __init__(self, origin_id=None):
-        super().__init__(origin_id,
+    def __init__(self, svn_url, destination_path, origin):
+        super().__init__(origin['id'],
                          logging_class='swh.loader.svn.SvnLoader')
         self.with_revision_headers = self.config['with_revision_headers']
-        self.with_empty_folder = self.config['with_empty_folder']
-        self.with_extra_commit_line = self.config['with_extra_commit_line']
         self.with_svn_update = self.config['with_svn_update'] and self.with_revision_headers  # noqa
+        self.origin = origin
+
+        with_empty_folder = self.config['with_empty_folder']
+        if self.config['with_extra_commit_line']:
+            self.svnrepo = svn.SvnRepoWithExtraCommitLine(
+                svn_url,
+                origin['id'],
+                self.storage,
+                destination_path=destination_path,
+                with_empty_folder=with_empty_folder)
+        else:
+            self.svnrepo = svn.SvnRepo(
+                svn_url, origin['id'],
+                self.storage,
+                destination_path=destination_path,
+                with_empty_folder=with_empty_folder
+            )
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.
@@ -63,11 +60,12 @@ class SvnLoader(SWHLoader):
         """
         revision_id = swh_rev['id']
         parents = swh_rev['parents']
-        hash_data_per_revs = svnrepo.swh_hash_data_per_revision(revision_start,
-                                                                revision_start)
+        hash_data_per_revs = svnrepo.swh_hash_data_at_revision(revision_start)
+
+        rev = revision_start
         rev, _, commit, objects_per_path = list(hash_data_per_revs)[0]
 
-        dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
+        dir_id = objects_per_path[b'']['checksums']['sha1_git']
         swh_revision = converters.build_swh_revision(svnrepo.uuid,
                                                      commit,
                                                      rev,
@@ -95,14 +93,14 @@ class SvnLoader(SWHLoader):
             revision_end)
         for rev, nextrev, commit, objects_per_path in gen_revs:
             # compute the fs tree's checksums
-            dir_id = objects_per_path[git.ROOT_TREE_KEY][0]['sha1_git']
+            dir_id = objects_per_path[b'']['checksums']['sha1_git']
             swh_revision = converters.build_swh_revision(
                 svnrepo.uuid,
                 commit,
                 rev,
                 dir_id,
                 revision_parents[rev],
-                with_revision_headers=self.with_revision_headers)  # BEWARE: if False, svn repo update won't work...  # noqa
+                with_revision_headers=self.with_revision_headers)
             swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
             self.log.debug('rev: %s, swhrev: %s, dir: %s' % (
                 rev,
@@ -112,11 +110,10 @@ class SvnLoader(SWHLoader):
             if nextrev:
                 revision_parents[nextrev] = [swh_revision['id']]
 
-            objects = objects_per_type(objects_per_path)
-
-            self.maybe_load_contents(objects[GitType.BLOB])
-            self.maybe_load_directories(objects[GitType.TREE],
-                                        objects_per_path)
+            self.maybe_load_contents(
+                git.objects_per_type(GitType.BLOB, objects_per_path))
+            self.maybe_load_directories(
+                git.objects_per_type(GitType.TREE, objects_per_path))
 
             yield swh_revision
 
@@ -154,7 +151,7 @@ class SvnLoader(SWHLoader):
         self.log.debug('occ: %s' % occ)
         self.maybe_load_occurrences([occ])
 
-    def process(self, svn_url, origin, destination_path):
+    def process(self):
         """Load a svn repository in swh.
 
         Checkout the svn repository locally in destination_path.
@@ -172,13 +169,8 @@ class SvnLoader(SWHLoader):
             - stderr: optional when status is True, mandatory otherwise
 
         """
-        svnrepo = svn.SvnRepo(
-            svn_url, origin['id'], self.storage,
-            destination_path=destination_path,
-            with_empty_folder=self.with_empty_folder,
-            with_extra_commit_line=self.with_extra_commit_line
-        )
-
+        svnrepo = self.svnrepo
+        origin = self.origin
         try:
             # default configuration
             revision_start = 1
@@ -191,26 +183,22 @@ class SvnLoader(SWHLoader):
 
                 if swh_rev:  # Yes, we do. Try and update it.
                     extra_headers = dict(swh_rev['metadata']['extra_headers'])
-                    revision_start = extra_headers['svn_revision']
+                    revision_start = int(extra_headers['svn_revision'])
                     revision_parents = {
                         revision_start: swh_rev['parents']
                     }
 
-                    svnrepo.fork(revision_start)
-                    self.log.debug('svn co %s@%s' % (svn_url, revision_start))
+                    self.log.debug('svn co %s@%s' % (svnrepo.remote_url,
+                                                     revision_start))
 
                     if swh_rev and not self.check_history_not_altered(
                             svnrepo,
                             revision_start,
                             swh_rev):
                         msg = 'History of svn %s@%s history modified. Skipping...' % (  # noqa
-                            svn_url, revision_start)
+                            svnrepo.remote_url, revision_start)
                         self.log.warn(msg)
                         return {'status': False, 'stderr': msg}
-                else:
-                    svnrepo.fork(revision_start)
-            else:
-                svnrepo.fork(revision_start)
 
             revision_end = svnrepo.head_revision()
 
@@ -218,8 +206,8 @@ class SvnLoader(SWHLoader):
                 revision_start, revision_end))
 
             if revision_start == revision_end and revision_start is not 1:
-                self.log.info('%s@%s already injected.' % (svn_url,
-                                                           revision_end))
+                self.log.info('%s@%s already injected.' % (
+                    svnrepo.remote_url, revision_end))
                 return {'status': True}
 
             self.log.info('Processing %s.' % svnrepo)

@@ -1,8 +1,9 @@
 click
-pysvn
+dateutil
 retrying
+subvertpy>=0.9.3
 swh.core>=0.0.19
-swh.loader.core>=0.0.4
-swh.model>=0.0.8
+swh.loader.core>=0.0.10
+swh.model>=0.0.11
 swh.scheduler>=0.0.6
 vcversioner

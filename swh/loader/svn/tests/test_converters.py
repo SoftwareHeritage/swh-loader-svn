@@ -1,4 +1,4 @@
-# Copyright (C) 2015  The Software Heritage developers
+# Copyright (C) 2015-2016  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -57,19 +57,21 @@ class TestConverters(unittest.TestCase):
 
     @istest
     def build_swh_revision_default(self):
+        author_date = '2004-06-24T20:19:39.755589Z'
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid=b'uuid',
             dir_id='dir-id',
             commit={'author_name': b'theo',
                     'message': b'commit message',
-                    'author_date': 1095446497.574042},
+                    'author_date': author_date},
             rev=10,
             parents=['123'])
 
+        date = {'timestamp': 1088108379, 'offset': 0}
+
         self.assertEquals(actual_swh_revision, {
-            'date': {'timestamp': 1095446497, 'offset': 0},
-            'committer_date': {'timestamp': 1095446497,
-                               'offset': 0},
+            'date': date,
+            'committer_date': date,
             'type': 'svn',
             'directory': 'dir-id',
             'message': b'commit message',
@@ -95,20 +97,22 @@ class TestConverters(unittest.TestCase):
 
     @istest
     def build_swh_revision_no_extra_headers(self):
+        author_date = '2004-06-24T20:19:39.755589Z'
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid=b'uuid',
             dir_id='dir-id',
             commit={'author_name': b'theo',
                     'message': b'commit message',
-                    'author_date': 1095446497.574042},
+                    'author_date': author_date},
             rev=10,
             parents=['123'],
             with_revision_headers=False)
 
+        date = {'timestamp': 1088108379, 'offset': 0}
+
         self.assertEquals(actual_swh_revision, {
-            'date': {'timestamp': 1095446497, 'offset': 0},
-            'committer_date': {'timestamp': 1095446497,
-                               'offset': 0},
+            'date': date,
+            'committer_date': date,
             'type': 'svn',
             'directory': 'dir-id',
             'message': b'commit message',
@@ -129,19 +133,21 @@ class TestConverters(unittest.TestCase):
 
     @istest
     def build_swh_revision_empty_data(self):
+        author_date = '2004-06-24T20:19:39.755589Z'
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid=b'uuid',
             dir_id='dir-id',
             commit={'author_name': b'',
                     'message': b'',
-                    'author_date': 1095446497.574042},
+                    'author_date': author_date},
             rev=8,
             parents=[])
 
+        date = {'timestamp': 1088108379, 'offset': 0}
+
         self.assertEquals(actual_swh_revision, {
-            'date': {'timestamp': 1095446497, 'offset': 0},
-            'committer_date': {'timestamp': 1095446497,
-                               'offset': 0},
+            'date': date,
+            'committer_date': date,
             'type': 'svn',
             'directory': 'dir-id',
             'message': b'',

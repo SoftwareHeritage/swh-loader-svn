@@ -234,26 +234,6 @@ class BaseDirSWHEditor:
             else:
                 shutil.rmtree(fpath)
 
-    def children(self, entry):
-        """Compute the children of the current entry.
-
-        Args:
-            entry: the current entry metadata of self.path.
-
-        Yields:
-            The children's hashes if it has one
-            If it does not, it's an empty directory
-
-        """
-        for path in entry['children']:
-            h = self.state.get(path)
-            if not h:
-                continue
-            c = h.get('checksums')
-            if not c:
-                continue
-            yield c
-
     def update_checksum(self):
         raise NotImplementedError('This should be implemented.')
 
@@ -311,7 +291,7 @@ class SWHDirEditor(BaseDirSWHEditor):
         """
         d = self.state.get(self.path, default_dictionary())
         # Retrieve the list of the current folder's children hashes
-        ls_hashes = list(self.children(d))
+        ls_hashes = list(git.children_hash(d['children'], objects=self.state))
         d['checksums'] = git._compute_tree_metadata(self.path, ls_hashes)
         self.state[self.path] = d
 
@@ -346,12 +326,13 @@ class SWHDirEditorNoEmptyFolder(BaseDirSWHEditor):
         """
         d = self.state.get(self.path, default_dictionary())
         # Retrieve the list of the current folder's children hashes
-        ls_hashes = list(self.children(d))
+        ls_hashes = list(git.children_hashes(d['children'],
+                                             objects=self.state))
         if ls_hashes:
             d['checksums'] = git._compute_tree_metadata(self.path, ls_hashes)
             self.state[self.path] = d
         else:   # To compute with empty directories, remove the else
-                # and use ls_hashes even if empty
+            # and use ls_hashes even if empty
             self.remove_child(self.path)
 
     def open_directory(self, *args):

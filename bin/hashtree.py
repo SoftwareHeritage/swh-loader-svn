@@ -59,7 +59,7 @@ def hashtree(path, ignore_empty_folder, ignore=None):
         else:
             dir_ok_fn = git.default_validation_dir
 
-    objects = git.walk_and_compute_sha1_from_directory_2(
+    objects = git.compute_sha1_from_directory(
         path,
         dir_ok_fn=dir_ok_fn)
 

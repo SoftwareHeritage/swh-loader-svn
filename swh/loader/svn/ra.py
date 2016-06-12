@@ -291,7 +291,8 @@ class SWHDirEditor(BaseDirSWHEditor):
         """
         d = self.state.get(self.path, default_dictionary())
         # Retrieve the list of the current folder's children hashes
-        ls_hashes = list(git.children_hash(d['children'], objects=self.state))
+        ls_hashes = list(git.children_hashes(d['children'],
+                                             objects=self.state))
         d['checksums'] = git._compute_tree_metadata(self.path, ls_hashes)
         self.state[self.path] = d
 

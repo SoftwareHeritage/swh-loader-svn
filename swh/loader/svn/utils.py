@@ -36,7 +36,7 @@ def convert_hashes_with_relative_path(hashes, rootpath):
     def _replace_slash(s, rootpath=rootpath):
         return s.replace(rootpath, b'')
 
-    def _update_children(children, rootpath=rootpath):
+    def _update_children(children):
         return set((_replace_slash(c) for c in children))
 
     h = {

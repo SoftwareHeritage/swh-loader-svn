@@ -149,20 +149,24 @@ closely in time (not as close as possible though, cf. ## Note below).
 ## Pseudo
 
 ```
-Do we know the repository?
-  Yes, extract the last known revision
-    set start-rev to last-known-revision
+Do we know the repository (with swh-svn-update option on)?
+  Yes, extract the last swh known revision from swh-storage
+    set start-rev to last-swh-known-revision
     Export on disk the svn at start-rev
-    Compute revision hash
+    Compute revision hashes (from top level tree's hashes + commit log for that revision)
     Does the revision hash match the one in swh-storage? (<=> Is the history altered?)
       No
         log an error message and stop
       Yes
-        keep the current in-memory hashes
+        keep the current in-memory hashes (for the following updates steps if any)
   No
     set start-rev to 1
 
-Iterate over the stream of logs of that repository to start-rev to the latest revision of that repository
+Set head-revision to latest svn repository's head revision
+When start-rev is the same as head revision, we are done.
+Otherwise continue
+
+Iterate over the stream of svn-logs from start-rev to head-rev
   The current revision is rev
   replay the diffs from previous rev (rev - 1) to rev and compute hashes along
   compute the revision hash

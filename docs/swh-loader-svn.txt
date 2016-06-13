@@ -1,0 +1,150 @@
+swh-loader-svn
+==============
+
+# v1
+
+## Description
+
+This is the first basic implementation.
+Based on checkouting on disk and walking the tree at revision.
+
+It is slow.
+
+Using git-svn to check if the hash computations are a match, and they
+are not.
+
+The hashes computation are corrects though.
+It's just not the same assertions as git-svn so the hashes mismatch.
+
+## Pseudo
+
+```
+Checkout/Update/Export on disk the first known revision or 1 if unknown repository
+When revision is not 1
+  Check the history is altered (revision hashes won't match)
+  If it is altered, log an error message and stop
+  Otherwise continue
+
+Iterate over logs from revision 1 to revision head_revision
+  The revision is now rev
+  checkout/update/export the revision at rev
+  walk the tree directory for that revision and compute hashes
+  compute the revision hash
+  send the blobs for storage in swh
+  send the directories for storage in swh
+  send the revision for storage in swh
+done
+
+Send the occurrence pointing to the last revision seen
+```
+
+## Notes
+
+SVN checkout/update instructions are faster than export since they
+leverage svn diffs.  But:
+- they do keyword expansion (so bad for diffs with external tools so
+  bad for swh)
+- we need to ignore .svn folder since it's present (this needed some
+  adaptation in code to ignore folder based on pattern so slow as
+  well)
+
+SVN export instruction is slower than the 2 previous ones since they
+don't use diffs.  But:
+- there is one option to ignore keyword expansion (good)
+- no folder are to be omitted during hash computation from disk (good)
+
+All in all, there is a tradeoff here to choose from.
+
+Still, everything was tested (with much code adapted in the lower
+level api) and both are slow.
+
+# v2
+
+## Description
+
+The v2 is more about:
+- adding options to match the git-svn's hash computations (no empty
+  folder option, add extra commit line im commit message option, no
+  update option, not sending content to swh-storage)
+- trying to improve the performance
+
+So options are added:
+- remove empty folder when encoutered (to ignore during hash
+  computations)
+- add an extra commit line to the svn commit message
+- (de)activate the loader svn's update routine
+- (de)activate the sending of
+  contents/directories/revisions/occurrences/releases to swh-storage
+
+And, optimizations are done as well:
+- in swh-model, instead of walking the disk all over again at each
+  revision, compute from the svn log's changed paths between the
+  previous revision and the current one, the lowest common path that
+  need to be walked again to compute the updated hashes. Then update
+  from that path to the top level the in-memory hashes
+
+- in the loader-core, cache are added
+- in the loader-core, lifting the existing swh-storage api to filter
+  only the missing entities on the client side (there are already
+  filters on the server side)
+
+Now the computations, with the right options, are a match with git-svn.
+Still, the performance against git-svn are bad.
+
+Taking a closer look at git-svn, they used a remote-access approach,
+that is discussing directly with the svn server and computing at the
+same time the hashes.
+That is the base for the v3.
+
+## Pseudo
+
+The logic does not change, only the inner implementation.
+
+# v3
+
+## Description
+
+This one is about performance only.
+
+Leveraging another low-level library (subvertpy) to permit the use of
+the same git-svn approach, the remote-access.
+
+## Pseudo
+
+```
+Do we know the repository?
+  Yes, extract the last known revision
+    set start-rev to last-known-revision
+    Export on disk the svn at start-rev
+    Compute revision hash
+    Does the revision hash match the one in swh-storage? (<=> Is the history altered?)
+      No
+        log an error message and stop
+      Yes
+        keep the current in-memory hashes
+  No
+    set start-rev to 1
+
+Iterate over the stream of logs of that repository to start-rev to the latest revision of that repository
+  The current revision is rev
+  replay the diffs from previous rev (rev - 1) to rev and compute hashes along
+  compute the revision hash
+  send the blobs for storage in swh
+  send the directories for storage in swh
+  send the revision for storage in swh
+done
+
+Send the occurrence pointing to the last revision seen
+```
+
+## Note
+
+There could be margin for improvment in the actual implementation
+here.
+
+We apply the diff on files first and then open the file to compute its
+hashes afterwards.
+
+If we'd apply the diff and compute the hashes directly, we'd gain one
+round-trip. Depending on the ratio files/directory, this could be
+significant.

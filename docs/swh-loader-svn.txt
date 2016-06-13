@@ -189,3 +189,7 @@ hashes afterwards.
 If we'd apply the diff and compute the hashes directly, we'd gain one
 round-trip. Depending on the ratio files/directory, this could be
 significant.
+
+This approach has also the following benefits:
+- no keyword expansion
+- no need to ignore .svn folder (since it does not exist)

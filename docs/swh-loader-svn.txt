@@ -1,20 +1,45 @@
 swh-loader-svn
 ==============
 
+The goal is to load a svn repository's lifetime logs to swh-storage.
+
+This must be able to deal with:
+- unknown svn repository (resulting in a new origin)
+- known svn repository (starting up from the last known svn revision
+  and update from that moment on)
+
+For a full detailed comparison between version's speed, please refer
+to https://forge.softwareheritage.org/diffusion/DLDSVN/browse/master/docs/comparison-git-svn-swh-svn.org.
+
+
 # v1
 
 ## Description
 
-This is the first basic implementation.
-Based on checkouting on disk and walking the tree at revision.
+This is a first basic implementation, a proof-of-concept of sort.
+Based on checkout-ing on disk the svn repository at each revision and
+walking the tree at svn revision to compute the swh hashes and store
+them in swh-storage.
 
-It is slow.
+Conclusion: It is possible but it is slow.
 
-Using git-svn to check if the hash computations are a match, and they
-are not.
+We use git-svn to check if the hash computations were a match, and
+they were not. The swh hashes computation are corrects though.
 
-The hashes computation are corrects though.
 It's just not the same assertions as git-svn so the hashes mismatch.
+
+git-svn:
+- does not checkout empty folders
+- adds metadata at the end of the svn commit message (by default, this
+  can be avoided but then no update, in the swh sense, is possible
+  afterwards)
+- integrates the svn repository's uuid in the git revision for the
+  commit author (author@<repo-uuid>)
+
+swh-loader-svn:
+- checkouts empty folder (which are then used in swh hashes)
+- adds metadata the git way (leveraging git's extra-header slot), so
+  that we can deal with svn repository updates
 
 ## Pseudo
 
@@ -53,7 +78,7 @@ don't use diffs.  But:
 - there is one option to ignore keyword expansion (good)
 - no folder are to be omitted during hash computation from disk (good)
 
-All in all, there is a tradeoff here to choose from.
+All in all, there is a trade-off here to choose from.
 
 Still, everything was tested (with much code adapted in the lower
 level api) and both are slow.
@@ -63,30 +88,38 @@ level api) and both are slow.
 ## Description
 
 The v2 is more about:
-- adding options to match the git-svn's hash computations (no empty
-  folder option, add extra commit line im commit message option, no
-  update option, not sending content to swh-storage)
+- adding options to match the git-svn's hash computations
 - trying to improve the performance
 
-So options are added:
-- remove empty folder when encoutered (to ignore during hash
+So, options are added:
+- remove empty folder when encountered (to ignore during hash
   computations)
 - add an extra commit line to the svn commit message
 - (de)activate the loader svn's update routine
 - (de)activate the sending of
   contents/directories/revisions/occurrences/releases to swh-storage
+- (de)activate the extra-header metadata in revision hash (thus
+  deactivating the svn update options altogether)
 
-And, optimizations are done as well:
-- in swh-model, instead of walking the disk all over again at each
-  revision, compute from the svn log's changed paths between the
-  previous revision and the current one, the lowest common path that
-  need to be walked again to compute the updated hashes. Then update
-  from that path to the top level the in-memory hashes
+As this is thought as genuine implementation, we adapted the revision
+message to also use the repository's uuid in the author's email.
 
-- in the loader-core, cache are added
+Also, optimization are done as well:
+- instead of walking the disk from the top leve at each revision (slow
+  for huge repository like svn.apache.org), compute from the svn log's
+  changed paths between the previous revision and the current one, the
+  lowest common path. Then, walk only that path to compute the updated
+  hashes. Then update from that path to the top level the in-memory
+  hashes (less i/o, less RAM are used).
+
 - in the loader-core, lifting the existing swh-storage api to filter
   only the missing entities on the client side (there are already
-  filters on the server side)
+  filters on the server side but filtering client-side uses less RAM.
+  Especially for blobs, since we extract the data from disk and store
+  it in RAM, this is now done only for unknown blobs and still before
+  updating the disk with a new revision content)
+
+- in the loader-core, cache are added as well
 
 Now the computations, with the right options, are a match with git-svn.
 Still, the performance against git-svn are bad.
@@ -94,11 +127,12 @@ Still, the performance against git-svn are bad.
 Taking a closer look at git-svn, they used a remote-access approach,
 that is discussing directly with the svn server and computing at the
 same time the hashes.
-That is the base for the v3.
+That is the base for the v3 implementation.
 
 ## Pseudo
 
-The logic does not change, only the inner implementation.
+Relatively to the v1, the logic does not change, only the inner
+implementation.
 
 # v3
 
@@ -108,6 +142,9 @@ This one is about performance only.
 
 Leveraging another low-level library (subvertpy) to permit the use of
 the same git-svn approach, the remote-access.
+
+The idea is to replay the logs and diffs on disk and compute hashes
+closely in time (not as close as possible though, cf. ## Note below).
 
 ## Pseudo
 

@@ -210,10 +210,24 @@ class BaseSvnRepo():
             - objects_per_path: dictionary of path, swh hash data with type
 
         """
+        from swh.core import hashutil
         hashes = {}
         for commit in self.logs(start_revision, end_revision):
             rev = commit['rev']
             hashes = self.swhreplay.compute_hashes(rev)
+
+            dir_id1 = hashes[b'']['checksums']['sha1_git']
+            dir_id2 = utils.hashtree(
+                self.local_url,
+                ignore_empty_folder=not self.with_empty_folder).get('sha1_git')
+
+            if dir_id1 != dir_id2:
+                raise ValueError(
+                    '%s != %s, rev %s, path %s' % (
+                        hashutil.hash_to_hex(dir_id1),
+                        hashutil.hash_to_hex(dir_id2),
+                        rev,
+                        self.local_url))
 
             if rev == end_revision:
                 nextrev = None

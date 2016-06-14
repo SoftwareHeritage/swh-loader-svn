@@ -14,7 +14,7 @@ class TestConverters(unittest.TestCase):
     @istest
     def svn_author_to_person(self):
         actual_person = converters.svn_author_to_person(
-            b'tony <ynot@dagobah>',
+            'tony <ynot@dagobah>',
             repo_uuid=None)
         self.assertEquals(actual_person, {
             'fullname': b'tony <ynot@dagobah>',
@@ -25,7 +25,7 @@ class TestConverters(unittest.TestCase):
     @istest
     def svn_author_to_person_no_email(self):
         # should not happen - input is bytes but nothing prevents it
-        actual_person = converters.svn_author_to_person(b'tony',
+        actual_person = converters.svn_author_to_person('tony',
                                                         repo_uuid=b'some-uuid')
         self.assertEquals(actual_person, {
             'fullname': b'tony <tony@some-uuid>',
@@ -34,14 +34,23 @@ class TestConverters(unittest.TestCase):
         })
 
     @istest
-    def svn_author_to_person_empty_person(self):
-        # should not happen - nothing prevents it though
+    def svn_author_to_person_noone_isNone(self):
+        actual_person = converters.svn_author_to_person(None,
+                                                        repo_uuid=b'some-uuid')
+        self.assertEqual(actual_person, {
+            'fullname': b'',
+            'name': None,
+            'email': None
+        })
+
+    @istest
+    def svn_author_to_person_empty_person_isNone(self):
         actual_person = converters.svn_author_to_person(b'',
                                                         repo_uuid=b'some-uuid')
-        self.assertEquals(actual_person, {
-            'name': b'',
-            'fullname': b' <@some-uuid>',
-            'email': b'@some-uuid'
+        self.assertEqual(actual_person, {
+            'fullname': b'',
+            'name': None,
+            'email': None
         })
 
     @istest
@@ -50,8 +59,8 @@ class TestConverters(unittest.TestCase):
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid=b'uuid',
             dir_id='dir-id',
-            commit={'author_name': b'theo',
-                    'message': b'commit message',
+            commit={'author_name': 'theo',
+                    'message': 'commit message',
                     'author_date': author_date},
             rev=10,
             parents=['123'])
@@ -90,8 +99,8 @@ class TestConverters(unittest.TestCase):
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid=b'uuid',
             dir_id='dir-id',
-            commit={'author_name': b'theo',
-                    'message': b'commit message',
+            commit={'author_name': 'theo',
+                    'message': 'commit message',
                     'author_date': author_date},
             rev=10,
             parents=['123'],
@@ -126,15 +135,15 @@ class TestConverters(unittest.TestCase):
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid=b'uuid',
             dir_id='dir-id',
-            commit={'author_name': b'',
-                    'message': b'',
+            commit={'author_name': '',
+                    'message': '',
                     'author_date': author_date},
             rev=8,
             parents=[])
 
         date = {'timestamp': 1088108379, 'offset': 0}
 
-        author = {'name': b'', 'email': b'@uuid', 'fullname': b' <@uuid>'}
+        author = None
         self.assertEquals(actual_swh_revision, {
             'date': date,
             'committer_date': date,

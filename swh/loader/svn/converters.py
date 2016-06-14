@@ -21,6 +21,14 @@ def svn_author_to_person(author, repo_uuid):
         email: None (no email in svn)
 
     """
+    if not author:
+        return {
+            'fullname': b'',
+            'name': None,
+            'email': None,
+        }
+
+    author = author.encode('utf-8')
     if b'<' in author and b'>' in author:
         name, email = utils.parseaddr(author.decode('utf-8'))
         return {
@@ -47,7 +55,7 @@ def build_swh_revision(repo_uuid, commit, rev, dir_id, parents,
     """
     author = svn_author_to_person(commit['author_name'], repo_uuid)
 
-    msg = commit['message']
+    msg = commit['message'].encode('utf-8')
 
     ts = strdate_to_timestamp(commit['author_date'])
     date = {'timestamp': ts, 'offset': 0}

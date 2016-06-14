@@ -21,7 +21,6 @@ from swh.model import git
 from . import ra, utils
 
 # When log message contains empty data
-DEFAULT_AUTHOR_NAME = ''
 DEFAULT_AUTHOR_DATE = ''
 DEFAULT_AUTHOR_MESSAGE = ''
 
@@ -129,8 +128,7 @@ class BaseSvnRepo():
         author_date = revprops.get(properties.PROP_REVISION_DATE,
                                    DEFAULT_AUTHOR_DATE)
 
-        author = revprops.get(properties.PROP_REVISION_AUTHOR,
-                              DEFAULT_AUTHOR_NAME)
+        author = revprops.get(properties.PROP_REVISION_AUTHOR)
 
         message = self.transform_commit_message(
             revprops.get(properties.PROP_REVISION_LOG,
@@ -139,8 +137,8 @@ class BaseSvnRepo():
         return {
             'rev': rev,
             'author_date': author_date,
-            'author_name': author.encode('utf-8'),
-            'message': message.encode('utf-8'),
+            'author_name': author,
+            'message': message,
         }
 
     def logs(self, revision_start, revision_end):

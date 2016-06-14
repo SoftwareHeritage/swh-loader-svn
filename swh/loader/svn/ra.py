@@ -59,6 +59,27 @@ def compute_svn_link_metadata(linkpath, filetype, data):
     return link_metadata
 
 
+def apply_txdelta_handler(sbuf, target_stream):
+    """Return a function that can be called repeatedly with txdelta windows.
+    When done, closes the target_stream.
+
+    Adapted from subvertpy.delta.apply_txdelta_handler.
+
+    Args
+        sbuf: Source buffer
+        target_stream: Target stream to write to.
+
+    Returns
+         Function to be called to apply txdelta windows
+    """
+    def apply_window(window):
+        if window is None:
+            target_stream.close()
+            return  # Last call
+        target_stream.write(delta.apply_txdelta_window(sbuf, window))
+    return apply_window
+
+
 class SWHFileEditor:
     """File Editor in charge of updating file on disk and memory hashes.
 
@@ -122,11 +143,13 @@ class SWHFileEditor:
                 sbuf = self.__make_svnlink()
                 self.link = True
             else:
-                sbuf = open(self.fullpath, 'rb').read()
+                with open(self.fullpath, 'rb') as f:
+                    sbuf = f.read()
         else:
             sbuf = b''
-        f = open(self.fullpath, 'wb')
-        return delta.apply_txdelta_handler(sbuf, target_stream=f)
+
+        t = open(self.fullpath, 'wb')
+        return apply_txdelta_handler(sbuf, target_stream=t)
 
     def close(self):
         """When done with the file, this is called.

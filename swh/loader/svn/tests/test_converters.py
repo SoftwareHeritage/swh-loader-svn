@@ -34,25 +34,14 @@ class TestConverters(unittest.TestCase):
         })
 
     @istest
-    def svn_author_to_person_None(self):
-        # should not happen - nothing prevents it though
-        actual_person = converters.svn_author_to_person(None,
-                                                        repo_uuid=None)
-        self.assertEquals(actual_person, {
-            'fullname': None,
-            'name': None,
-            'email': None,
-        })
-
-    @istest
     def svn_author_to_person_empty_person(self):
         # should not happen - nothing prevents it though
         actual_person = converters.svn_author_to_person(b'',
-                                                        repo_uuid=None)
+                                                        repo_uuid=b'some-uuid')
         self.assertEquals(actual_person, {
-            'fullname': None,
-            'name': None,
-            'email': None,
+            'name': b'',
+            'fullname': b' <@some-uuid>',
+            'email': b'@some-uuid'
         })
 
     @istest
@@ -145,14 +134,15 @@ class TestConverters(unittest.TestCase):
 
         date = {'timestamp': 1088108379, 'offset': 0}
 
+        author = {'name': b'', 'email': b'@uuid', 'fullname': b' <@uuid>'}
         self.assertEquals(actual_swh_revision, {
             'date': date,
             'committer_date': date,
             'type': 'svn',
             'directory': 'dir-id',
             'message': b'',
-            'author': {'name': None, 'email': None, 'fullname': None},
-            'committer': {'name': None, 'email': None, 'fullname': None},
+            'author': author,
+            'committer': author,
             'synthetic': True,
             'metadata': {
                 'extra_headers': [

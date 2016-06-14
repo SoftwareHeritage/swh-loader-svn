@@ -21,12 +21,6 @@ def svn_author_to_person(author, repo_uuid):
         email: None (no email in svn)
 
     """
-    if not author:
-        return {
-            'fullname': None,
-            'name': None,
-            'email': None
-        }
     if b'<' in author and b'>' in author:
         name, email = utils.parseaddr(author.decode('utf-8'))
         return {

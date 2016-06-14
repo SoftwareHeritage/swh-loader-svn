@@ -22,7 +22,7 @@ from . import ra, utils
 
 # When log message contains empty data
 DEFAULT_AUTHOR_NAME = ''
-DEFAULT_AUTHOR_DATE = b''
+DEFAULT_AUTHOR_DATE = ''
 DEFAULT_AUTHOR_MESSAGE = ''
 
 

@@ -55,13 +55,21 @@ class TestConverters(unittest.TestCase):
 
     @istest
     def build_swh_revision_default(self):
-        author_date = '2004-06-24T20:19:39.755589Z'
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid=b'uuid',
             dir_id='dir-id',
-            commit={'author_name': 'theo',
-                    'message': 'commit message',
-                    'author_date': author_date},
+            commit={
+                'author_name': {
+                    'name': b'theo',
+                    'email': b'theo@uuid',
+                    'fullname': b'theo <theo@uuid>'
+                },
+                'message': b'commit message',
+                'author_date': {
+                    'timestamp': 1088108379,
+                    'offset': 0
+                }
+            },
             rev=10,
             parents=['123'])
 
@@ -95,13 +103,21 @@ class TestConverters(unittest.TestCase):
 
     @istest
     def build_swh_revision_no_extra_headers(self):
-        author_date = '2004-06-24T20:19:39.755589Z'
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid=b'uuid',
             dir_id='dir-id',
-            commit={'author_name': 'theo',
-                    'message': 'commit message',
-                    'author_date': author_date},
+            commit={
+                'author_name': {
+                    'name': b'theo',
+                    'email': b'theo@uuid',
+                    'fullname': b'theo <theo@uuid>'
+                },
+                'message': b'commit message',
+                'author_date': {
+                    'timestamp': 1088108379,
+                    'offset': 0
+                }
+            },
             rev=10,
             parents=['123'],
             with_revision_headers=False)
@@ -131,19 +147,34 @@ class TestConverters(unittest.TestCase):
 
     @istest
     def build_swh_revision_empty_data(self):
-        author_date = '2004-06-24T20:19:39.755589Z'
         actual_swh_revision = converters.build_swh_revision(
             repo_uuid=b'uuid',
             dir_id='dir-id',
-            commit={'author_name': '',
-                    'message': '',
-                    'author_date': author_date},
+            commit={
+                'author_name': {
+                    'fullname': b'',
+                    'name': None,
+                    'email': None
+                },
+                'message': b'',
+                'author_date': {
+                    'timestamp': 1088108379,
+                    'offset': 0
+                }
+            },
             rev=8,
             parents=[])
 
-        date = {'timestamp': 1088108379, 'offset': 0}
+        date = {
+            'timestamp': 1088108379,
+            'offset': 0
+        }
 
-        author = None
+        author = {
+            'fullname': b'',
+            'name': None,
+            'email': None
+        }
         self.assertEquals(actual_swh_revision, {
             'date': date,
             'committer_date': date,

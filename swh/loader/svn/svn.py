@@ -18,10 +18,9 @@ from subvertpy import client, properties
 
 from swh.model import git
 
-from . import ra, utils
+from . import ra, utils, converters
 
 # When log message contains empty data
-DEFAULT_AUTHOR_DATE = ''
 DEFAULT_AUTHOR_MESSAGE = ''
 
 
@@ -31,14 +30,16 @@ class SvnRepoException(ValueError):
         self.svnrepo = svnrepo
 
 
-class BaseSvnRepo():
+class SvnRepo():
     """Swh representation of a svn repository.
 
-    To use this class, instantiate a new class and implement the following
-    method:
-    - def transform_commit_message(msg):
-        Transform the message msg (string) to bytes (+ do some extra
-        work on it if you want, add an extra line for example)
+    To override some of the behavior regarding the log properties, you
+    can instantiate a subclass of this class and override:
+    - def convert_commit_author(self, author)
+    - def convert_commit_message(self, msg)
+    - def convert_commit_date(self, date)
+
+    cf. SvnRepoWithExtraCommitLine for an example.
 
     """
     def __init__(self, remote_url, origin_id, storage,
@@ -109,28 +110,56 @@ class BaseSvnRepo():
         """
         return 1
 
-    def transform_commit_message(msg):
+    def convert_commit_message(self, msg):
         """Do something with message (e.g add extra line, etc...)
 
+        cf. SvnRepo for a simple implementation.
+
         Args:
-            msg (str): the commit message to transform_commit_message
+            msg (str): the commit message to convert.
 
         Returns:
-            The transformed message.
+            The transformed message as bytes.
+
         """
-        raise NotImplementedError('This should be implemented in an '
-                                  'inherited class to tranform the '
-                                  ' commit message.')
+        return msg.encode('utf-8')
+
+    def convert_commit_date(self, date):
+        """Convert the message date (e.g, convert into timestamp or whatever
+        makes sense to you.).
+
+           Args:
+               date (str): the commit date to convert.
+
+            Returns:
+               The transformed date.
+
+        """
+        return utils.strdate_to_timestamp(date)
+
+    def convert_commit_author(self, author):
+        """Convert the commit author (e.g, convert into dict or whatever
+        makes sense to you.).
+
+        Args:
+            author (str): the commit author to convert.
+
+        Returns:
+            The transformed author as dict.
+
+        """
+        return converters.svn_author_to_person(author, self.uuid)
 
     def __to_entry(self, log_entry):
         changed_paths, rev, revprops, has_children = log_entry
 
-        author_date = revprops.get(properties.PROP_REVISION_DATE,
-                                   DEFAULT_AUTHOR_DATE)
+        author_date = self.convert_commit_date(
+            revprops.get(properties.PROP_REVISION_DATE))
 
-        author = revprops.get(properties.PROP_REVISION_AUTHOR)
+        author = self.convert_commit_author(
+            revprops.get(properties.PROP_REVISION_AUTHOR))
 
-        message = self.transform_commit_message(
+        message = self.convert_commit_message(
             revprops.get(properties.PROP_REVISION_LOG,
                          DEFAULT_AUTHOR_MESSAGE))
 
@@ -252,38 +281,18 @@ class BaseSvnRepo():
         shutil.rmtree(self.local_dirname)
 
 
-class SvnRepo(BaseSvnRepo):
-    """This class does exactly as BaseSvnRepo.
-
-    It keeps the commit message as is.
-
-    """
-
-    def transform_commit_message(self, msg):
-        """Pass the message as is.
-
-        Args:
-            msg (str): the commit message to transform_commit_message
-
-        Returns:
-            The message as is.
-
-        """
-        return msg
-
-
-class SvnRepoWithExtraCommitLine(BaseSvnRepo):
+class SvnRepoWithExtraCommitLine(SvnRepo):
     """This class does exactly as BaseSvnRepo except for the commit
     message which is extended with a new line.
 
     """
-    def transform_commit_message(self, msg):
+    def convert_commit_message(self, msg):
         """Add an extra line to the commit message and encode in bytes.
 
         Args:
-            msg (str): the commit message to transform_commit_message
+            msg (str): the commit message to convert_commit_message
 
         Returns:
             The transformed message.
         """
-        return '%s\n' % msg
+        return ('%s\n' % msg).encode('utf-8')

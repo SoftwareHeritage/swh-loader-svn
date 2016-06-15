@@ -15,12 +15,16 @@ class TestUtils(unittest.TestCase):
     def strdate_to_timestamp(self):
         actual_ts = utils.strdate_to_timestamp('2011-05-31T06:04:39.800722Z')
 
-        self.assertEquals(actual_ts, 1306821879)
+        self.assertEquals(actual_ts,
+                          {'timestamp': 1306821879.800722, 'offset': 0})
 
     @istest
     def strdate_to_timestamp_empty_does_not_break(self):
         # It should return 0, epoch
-        self.assertEquals(0, utils.strdate_to_timestamp(''))
+        self.assertEquals({'timestamp': 0, 'offset': 0},
+                          utils.strdate_to_timestamp(''))
+        self.assertEquals({'timestamp': 0, 'offset': 0},
+                          utils.strdate_to_timestamp(None))
 
 
 class TestHashesConvert(unittest.TestCase):

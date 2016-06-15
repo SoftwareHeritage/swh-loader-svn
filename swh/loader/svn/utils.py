@@ -14,11 +14,12 @@ def strdate_to_timestamp(strdate):
     """Convert a string date to an int timestamp.
 
     """
-    if not strdate:  # epoch
-        return 0
-    dt = parser.parse(strdate)
-    ts_float = dt.timestamp()
-    return int(ts_float)
+    if strdate:
+        dt = parser.parse(strdate)
+        ts_float = dt.timestamp()
+    else:  # epoch
+        ts_float = 0
+    return {'timestamp': ts_float, 'offset': 0}
 
 
 def convert_hashes_with_relative_path(hashes, rootpath):

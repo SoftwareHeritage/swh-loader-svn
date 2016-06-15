@@ -13,13 +13,20 @@ from swh.model import git
 def strdate_to_timestamp(strdate):
     """Convert a string date to an int timestamp.
 
+    Args:
+        strdate: A string representing a date with format like
+        'YYYY-mm-DDTHH:MM:SS.800722Z'
+
+    Returns:
+        A timestamp in float
+
     """
     if strdate:
         dt = parser.parse(strdate)
         ts_float = dt.timestamp()
     else:  # epoch
         ts_float = 0
-    return {'timestamp': ts_float, 'offset': 0}
+    return ts_float
 
 
 def convert_hashes_with_relative_path(hashes, rootpath):

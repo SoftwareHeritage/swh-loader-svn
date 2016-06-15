@@ -5,6 +5,25 @@
 
 from email import utils
 
+from .utils import strdate_to_timestamp
+
+
+def svn_date_to_swh_date(strdate):
+    """Convert a string date to an swh one.
+
+    Args:
+        strdate: A string formatted for .utils.strdate_to_timestamp
+        to do its jobs
+
+    Returns:
+        An swh date format
+
+    """
+    return {
+        'timestamp': strdate_to_timestamp(strdate),
+        'offset': 0
+    }
+
 
 def svn_author_to_person(author, repo_uuid):
     """Convert an svn author to a person suitable for insertion.

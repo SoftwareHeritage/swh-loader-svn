@@ -135,7 +135,7 @@ class SvnRepo():
                The transformed date.
 
         """
-        return utils.strdate_to_timestamp(date)
+        return converters.svn_date_to_swh_date(date)
 
     def convert_commit_author(self, author):
         """Convert the commit author (e.g, convert into dict or whatever

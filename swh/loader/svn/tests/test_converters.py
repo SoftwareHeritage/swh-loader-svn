@@ -205,3 +205,21 @@ class TestConverters(unittest.TestCase):
             'target_type': 'revision',
             'origin': 'origin-id',
             'date': 'some-date'})
+
+    @istest
+    def svn_date_to_swh_date(self):
+        """Date in string should be converted in swh date."""
+        actual_ts = converters.svn_date_to_swh_date(
+            '2011-05-31T06:04:39.800722Z')
+
+        self.assertEquals(actual_ts,
+                          {'timestamp': 1306821879.800722, 'offset': 0})
+
+    @istest
+    def svn_date_to_swh_date_epoch(self):
+        """Empty date should be EPOCH (timestamp and offset at 0)."""
+        # It should return 0, epoch
+        self.assertEquals({'timestamp': 0, 'offset': 0},
+                          converters.svn_date_to_swh_date(''))
+        self.assertEquals({'timestamp': 0, 'offset': 0},
+                          converters.svn_date_to_swh_date(None))

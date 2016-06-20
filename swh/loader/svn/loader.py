@@ -77,8 +77,8 @@ class SvnLoader(SWHLoader):
 
     def process_svn_revisions(self, svnrepo, revision_start, revision_end,
                               revision_parents):
-        """Process revisions from revision_start to revision_end and send to swh for
-        storage.
+        """Process revisions from revision_start to revision_end and send to
+        swh for storage.
 
         At each svn revision, checkout the repository, compute the
         tree hash and blobs and send for swh storage to store.

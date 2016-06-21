@@ -22,6 +22,7 @@ from . import ra, utils, converters
 
 # When log message contains empty data
 DEFAULT_AUTHOR_MESSAGE = ''
+DEFAULT_AUTHOR = ''  # git-svn uses '(no author)'
 
 
 class SvnRepoException(ValueError):
@@ -157,7 +158,7 @@ class SvnRepo():
             revprops.get(properties.PROP_REVISION_DATE))
 
         author = self.convert_commit_author(
-            revprops.get(properties.PROP_REVISION_AUTHOR))
+            revprops.get(properties.PROP_REVISION_AUTHOR, DEFAULT_AUTHOR))
 
         message = self.convert_commit_message(
             revprops.get(properties.PROP_REVISION_LOG,

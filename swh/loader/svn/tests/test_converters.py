@@ -34,23 +34,13 @@ class TestConverters(unittest.TestCase):
         })
 
     @istest
-    def svn_author_to_person_noone_isNone(self):
-        actual_person = converters.svn_author_to_person(None,
+    def svn_author_to_person_empty_person(self):
+        actual_person = converters.svn_author_to_person('',
                                                         repo_uuid=b'some-uuid')
         self.assertEqual(actual_person, {
-            'fullname': b'',
-            'name': None,
-            'email': None
-        })
-
-    @istest
-    def svn_author_to_person_empty_person_isNone(self):
-        actual_person = converters.svn_author_to_person(b'',
-                                                        repo_uuid=b'some-uuid')
-        self.assertEqual(actual_person, {
-            'fullname': b'',
-            'name': None,
-            'email': None
+            'fullname': b' <@some-uuid>',
+            'name': b'',
+            'email': b'@some-uuid'
         })
 
     @istest

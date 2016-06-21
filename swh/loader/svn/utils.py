@@ -6,7 +6,6 @@
 import os
 
 from dateutil import parser
-
 from swh.model import git
 
 
@@ -23,7 +22,7 @@ def strdate_to_timestamp(strdate):
     """
     if strdate:
         dt = parser.parse(strdate)
-        ts_float = dt.timestamp()
+        ts_float = int(dt.timestamp())
     else:  # epoch
         ts_float = 0
     return ts_float

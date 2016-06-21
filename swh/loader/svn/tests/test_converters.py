@@ -203,7 +203,7 @@ class TestConverters(unittest.TestCase):
             '2011-05-31T06:04:39.800722Z')
 
         self.assertEquals(actual_ts,
-                          {'timestamp': 1306821879.800722, 'offset': 0})
+                          {'timestamp': 1306821879, 'offset': 0})
 
     @istest
     def svn_date_to_swh_date_epoch(self):

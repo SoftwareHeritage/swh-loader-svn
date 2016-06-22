@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Use sample:
-# hashtree.py --path . --ignore '.svn' --ignore '.git-svn' \
+# swh-hashtree --path . --ignore '.svn' --ignore '.git-svn' \
 #    --ignore-empty-folders
 # 38f8d2c3a951f6b94007896d0981077e48bbd702
 

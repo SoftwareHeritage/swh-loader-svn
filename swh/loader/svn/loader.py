@@ -202,6 +202,13 @@ class GitSvnSvnLoader(BaseSvnLoader):
     def __init__(self, svn_url, destination_path, origin):
         super().__init__(svn_url, destination_path, origin,
                          with_svn_update=False)
+        # We don't want to persist result in git-svn policy
+        self.config['send_contents'] = False
+        self.config['send_directories'] = False
+        self.config['send_revisions'] = False
+        self.config['send_releases'] = False
+        self.config['send_occurrences'] = False
+
         self.svnrepo = svn.GitSvnSvnRepo(
             svn_url,
             origin['id'],

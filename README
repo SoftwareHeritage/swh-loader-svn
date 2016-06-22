@@ -44,7 +44,7 @@ with_policy = swh
 
 This policy does not:
 - alter anything in regards of svn data
-- adds an extra-headers to permit to check and update from last known point
+- adds an extra-headers with repo uuid and svn revision. This permits to deal with update.
 
 ## git-svn like
 
@@ -56,12 +56,19 @@ policy), adapt to the previous options with the following:
 with_policy = gitsvn
 ```
 
-This policy does alter things:
+Notes:
 
-- it adds the repo-uuid on author's name (author@<repo-uuid>) -> thus
-  in effects, altering the git hash computation of revisions
+This policy does alter things:
+- it adds the repo-uuid on author's name (author@<repo-uuid>)
 - truncates date time commits so some precision is lost on date
-- removes empty folder if any are checkouted on disk
+- removes empty folder if any are checkouted on disk 
+
+Those modifications, in effects, alter the git hash computation of
+revisions.
+
+This policy is destined for test. Thus:
+- no persistence takes place (even if send_* options are True)
+- no update is possible
 
 
 # Starting one instance

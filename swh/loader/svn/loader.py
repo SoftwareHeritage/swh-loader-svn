@@ -22,8 +22,20 @@ class BaseSvnLoader(SWHLoader):
     """Base Svn loader to load one svn repository.
 
     There exists 2 different policies:
-    - git-svn one (not for production): cf. GitSvnLoader
+    - git-svn one (not for production): cf. GitSvnSvnLoader
     - SWH one: cf. SWHSvnLoader
+
+    The main entry point of this is (no need to override it)
+    - def load(self):
+
+    Inherit this class and then override the following functions:
+    - def build_swh_revision(self, rev, commit, dir_id, parents)
+        This is in charge of converting an svn revision to a compliant
+        swh revision
+
+    - def process_repository(self)
+        This is in charge of processing the actual svn repository and
+        store the result to swh storage.
 
     """
     CONFIG_BASE_FILENAME = 'loader/svn.ini'
@@ -51,25 +63,20 @@ class BaseSvnLoader(SWHLoader):
         """
         raise NotImplementedError('This should be overriden by subclass')
 
-    def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
-        """Given a svn repository, check if the history was not tampered with.
+    def process_repository(self):
+        """The main idea of this function is to:
+        - iterate over the svn commit logs
+        - extract the svn commit log metadata
+        - compute the hashes from the current directory down to the
+          file
+        - compute the equivalent swh revision
+        - send all those objects for storage
+        - create an swh occurrence pointing to the last swh revision
+          seen
+        - send that occurrence for storage in swh-storage.
 
         """
-        revision_id = swh_rev['id']
-        parents = swh_rev['parents']
-        hash_data_per_revs = svnrepo.swh_hash_data_at_revision(revision_start)
-
-        rev = revision_start
-        rev, _, commit, objects_per_path = list(hash_data_per_revs)[0]
-
-        dir_id = objects_per_path[b'']['checksums']['sha1_git']
-        swh_revision = self.build_swh_revision(rev,
-                                               commit,
-                                               dir_id,
-                                               parents)
-        swh_revision_id = git.compute_revision_sha1_git(swh_revision)
-
-        return swh_revision_id == revision_id
+        raise NotImplementedError('This should be implemented in subclass.')
 
     def process_svn_revisions(self, svnrepo, revision_start, revision_end,
                               revision_parents):
@@ -142,7 +149,7 @@ class BaseSvnLoader(SWHLoader):
         self.log.debug('occ: %s' % occ)
         self.maybe_load_occurrences([occ])
 
-    def process(self):
+    def load(self):
         """Load a svn repository in swh.
 
         Checkout the svn repository locally in destination_path.
@@ -160,61 +167,12 @@ class BaseSvnLoader(SWHLoader):
             - stderr: optional when status is True, mandatory otherwise
 
         """
-        svnrepo = self.svnrepo
-        origin = self.origin
         try:
-            # default configuration
-            revision_start = 1
-            revision_parents = {
-                revision_start: []
-            }
-
-            if self.with_svn_update:  # Do we want to deal with update?
-                swh_rev = svnrepo.swh_previous_revision()
-
-                if swh_rev:  # Yes, we do. Try and update it.
-                    extra_headers = dict(swh_rev['metadata']['extra_headers'])
-                    revision_start = int(extra_headers['svn_revision'])
-                    revision_parents = {
-                        revision_start: swh_rev['parents']
-                    }
-
-                    self.log.debug('svn co %s@%s' % (svnrepo.remote_url,
-                                                     revision_start))
-
-                    if swh_rev and not self.check_history_not_altered(
-                            svnrepo,
-                            revision_start,
-                            swh_rev):
-                        msg = 'History of svn %s@%s history modified. Skipping...' % (  # noqa
-                            svnrepo.remote_url, revision_start)
-                        self.log.warn(msg)
-                        return {'status': False, 'stderr': msg}
-
-            revision_end = svnrepo.head_revision()
-
-            self.log.info('[revision_start-revision_end]: [%s-%s]' % (
-                revision_start, revision_end))
-
-            if revision_start == revision_end and revision_start is not 1:
-                self.log.info('%s@%s already injected.' % (
-                    svnrepo.remote_url, revision_end))
-                return {'status': True}
-
-            self.log.info('Processing %s.' % svnrepo)
-
-            # process and store revision to swh (sent by by blocks of
-            # 'revision_packet_size')
-            latest_rev = self.process_swh_revisions(svnrepo,
-                                                    revision_start,
-                                                    revision_end,
-                                                    revision_parents)
-            self.process_swh_occurrence(latest_rev, origin)
-
+            self.process_repository()
         finally:
             # flush eventual remaining data
             self.flush()
-            svnrepo.clean_fs()
+            self.svnrepo.clean_fs()
 
         return {'status': True}
 
@@ -269,6 +227,40 @@ class GitSvnSvnLoader(BaseSvnLoader):
                                                     dir_id,
                                                     parents)
 
+    def process_repository(self):
+        """Load the repository's commits and send them for storage to swh.
+
+        This does not deal with update.
+
+        """
+        origin = self.origin
+        svnrepo = self.svnrepo
+        # default configuration
+        revision_start = 1
+        revision_parents = {
+            revision_start: []
+        }
+
+        revision_end = svnrepo.head_revision()
+
+        self.log.info('[revision_start-revision_end]: [%s-%s]' % (
+            revision_start, revision_end))
+
+        if revision_start == revision_end and revision_start is not 1:
+            self.log.info('%s@%s already injected.' % (
+                svnrepo.remote_url, revision_end))
+            return {'status': True}
+
+        self.log.info('Processing %s.' % svnrepo)
+
+        # process and store revision to swh (sent by by blocks of
+        # 'revision_packet_size')
+        latest_rev = self.process_swh_revisions(svnrepo,
+                                                revision_start,
+                                                revision_end,
+                                                revision_parents)
+        self.process_swh_occurrence(latest_rev, origin)
+
 
 class SWHSvnLoader(BaseSvnLoader):
     """Swh svn loader is the main implementation destined for production.
@@ -289,6 +281,26 @@ class SWHSvnLoader(BaseSvnLoader):
             origin['id'],
             self.storage,
             destination_path=destination_path)
+
+    def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
+        """Given a svn repository, check if the history was not tampered with.
+
+        """
+        revision_id = swh_rev['id']
+        parents = swh_rev['parents']
+        hash_data_per_revs = svnrepo.swh_hash_data_at_revision(revision_start)
+
+        rev = revision_start
+        rev, _, commit, objects_per_path = list(hash_data_per_revs)[0]
+
+        dir_id = objects_per_path[b'']['checksums']['sha1_git']
+        swh_revision = self.build_swh_revision(rev,
+                                               commit,
+                                               dir_id,
+                                               parents)
+        swh_revision_id = git.compute_revision_sha1_git(swh_revision)
+
+        return swh_revision_id == revision_id
 
     def build_swh_revision(self, rev, commit, dir_id, parents):
         """Build the swh revision dictionary.
@@ -313,3 +325,55 @@ class SWHSvnLoader(BaseSvnLoader):
                                              self.svnrepo.uuid,
                                              dir_id,
                                              parents)
+
+    def process_repository(self):
+        svnrepo = self.svnrepo
+        origin = self.origin
+
+        # default configuration
+        revision_start = 1
+        revision_parents = {
+            revision_start: []
+        }
+
+        # Deal with update
+        swh_rev = svnrepo.swh_previous_revision()
+
+        if swh_rev:  # Yes, we do. Try and update it.
+            extra_headers = dict(swh_rev['metadata']['extra_headers'])
+            revision_start = int(extra_headers['svn_revision'])
+            revision_parents = {
+                revision_start: swh_rev['parents']
+            }
+
+            self.log.debug('svn co %s@%s' % (svnrepo.remote_url,
+                                             revision_start))
+
+            if swh_rev and not self.check_history_not_altered(
+                    svnrepo,
+                    revision_start,
+                    swh_rev):
+                msg = 'History of svn %s@%s history modified. Skipping...' % (  # noqa
+                    svnrepo.remote_url, revision_start)
+                self.log.warn(msg)
+                return {'status': False, 'stderr': msg}
+
+        revision_end = svnrepo.head_revision()
+
+        self.log.info('[revision_start-revision_end]: [%s-%s]' % (
+            revision_start, revision_end))
+
+        if revision_start == revision_end and revision_start is not 1:
+            self.log.info('%s@%s already injected.' % (
+                svnrepo.remote_url, revision_end))
+            return {'status': True}
+
+        self.log.info('Processing %s.' % svnrepo)
+
+        # process and store revision to swh (sent by by blocks of
+        # 'revision_packet_size')
+        latest_rev = self.process_swh_revisions(svnrepo,
+                                                revision_start,
+                                                revision_end,
+                                                revision_parents)
+        self.process_swh_occurrence(latest_rev, origin)

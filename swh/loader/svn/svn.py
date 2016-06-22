@@ -243,9 +243,7 @@ class BaseSvnRepo():
         # Update the disk at revision
         self.export(revision)
         # Compute the current hashes on disk
-        hashes = git.compute_hashes_from_directory(
-            self.local_url,
-            remove_empty_folder=not self.with_empty_folder)
+        hashes = git.compute_hashes_from_directory(self.local_url)
 
         hashes = utils.convert_hashes_with_relative_path(
             hashes,

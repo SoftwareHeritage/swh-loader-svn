@@ -39,24 +39,30 @@ release_packet_size = 1
 occurrence_packet_size = 1
 
 # Flags
-with_svn_update = True
 with_policy = swh
 ```
+
+This policy does not:
+- alter anything in regards of svn data
+- adds an extra-headers to permit to check and update from last known point
 
 ## git-svn like
 
 For a git-svn like (ignore empty folder, no extra metadata, adapt
-user's name with repository's uuid, add extra commit line), adapt to
-the previous options with the following:
+user's name with repository's uuid, add extra commit line, no update
+policy), adapt to the previous options with the following:
 
 ```txt
-with_svn_update = False
 with_policy = gitsvn
 ```
 
-Note: The 'gitsvn' policy automatically deactivate the svn update
-behavior (we need the extra metadata added with the swh policy for
-this to work so...)
+This policy does alter things:
+
+- it adds the repo-uuid on author's name (author@<repo-uuid>) -> thus
+  in effects, altering the git hash computation of revisions
+- truncates date time commits so some precision is lost on date
+- removes empty folder if any are checkouted on disk
+
 
 # Starting one instance
 

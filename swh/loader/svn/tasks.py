@@ -18,7 +18,6 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
         'storage_args': ('list[str]', ['http://localhost:5000/']),
         'with_policy': ('string', 'swh'),  # Default, other possible
                                            # value is 'gitsvn'
-        'with_svn_update': ('bool', True),
     }
 
     task_queue = 'swh_loader_svn'
@@ -30,7 +29,6 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
             cf. swh.loader.svn.SvnLoader.process docstring
 
         """
-        print(self.config)
         origin = {'type': 'svn', 'url': svn_url}
         origin['id'] = self.storage.origin_add_one(origin)
 
@@ -46,6 +44,6 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
                              '\'with_policy\' entry. '
                              'Please adapt your svn.ini file accordingly')
 
-        result = loader.process()
+        result = loader.load()
 
         self.close_fetch_history(fetch_history_id, result)

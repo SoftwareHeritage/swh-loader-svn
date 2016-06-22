@@ -22,7 +22,6 @@ from . import ra, utils, converters
 
 # When log message contains empty data
 DEFAULT_AUTHOR_MESSAGE = ''
-DEFAULT_AUTHOR = ''  # git-svn uses '(no author)'
 
 
 class SvnRepoException(ValueError):
@@ -31,21 +30,21 @@ class SvnRepoException(ValueError):
         self.svnrepo = svnrepo
 
 
-class SvnRepo():
-    """Swh representation of a svn repository.
+class BaseSvnRepo():
+    """Base svn repository representation for swh.
 
-    To override some of the behavior regarding the log properties, you
-    can instantiate a subclass of this class and override:
+    To override some of the behavior regarding the message log
+    properties, you can instantiate a subclass of this class and
+    override:
     - def convert_commit_author(self, author)
     - def convert_commit_message(self, msg)
     - def convert_commit_date(self, date)
 
-    cf. SvnRepoWithExtraCommitLine for an example.
+    cf. GitSvnSvnRepo, SwhSvnRepo for instanciation example.
 
     """
     def __init__(self, remote_url, origin_id, storage,
-                 destination_path=None,
-                 with_empty_folder=False):
+                 destination_path=None):
         self.remote_url = remote_url.rstrip('/')
         self.storage = storage
         self.origin_id = origin_id
@@ -75,21 +74,6 @@ class SvnRepo():
         self.local_url = os.path.join(self.local_dirname, local_name).encode(
             'utf-8')
         self.uuid = self.conn.get_uuid().encode('utf-8')
-
-        # In charge of computing hash while replaying svn logs
-        self.with_empty_folder = with_empty_folder
-        self.swhreplay = self._init_swhreplay()
-
-    def _init_swhreplay(self, state=None):
-        if self.with_empty_folder:
-            return ra.SWHReplay(
-                conn=self.conn,
-                rootpath=self.local_url,
-                state=state)
-        return ra.SWHReplayNoEmptyFolder(
-            conn=self.conn,
-            rootpath=self.local_url,
-            state=state)
 
     def __str__(self):
         return str({'remote_url': self.remote_url,
@@ -123,7 +107,7 @@ class SvnRepo():
             The transformed message as bytes.
 
         """
-        return msg.encode('utf-8')
+        raise NotImplementedError('Should be overridden by subclass.')
 
     def convert_commit_date(self, date):
         """Convert the message date (e.g, convert into timestamp or whatever
@@ -136,7 +120,7 @@ class SvnRepo():
                The transformed date.
 
         """
-        return converters.svn_date_to_swh_date(date)
+        raise NotImplementedError('Should be overridden by subclass.')
 
     def convert_commit_author(self, author):
         """Convert the commit author (e.g, convert into dict or whatever
@@ -149,7 +133,7 @@ class SvnRepo():
             The transformed author as dict.
 
         """
-        return converters.svn_author_to_person(author, self.uuid)
+        raise NotImplementedError('Should be overridden by subclass.')
 
     def __to_entry(self, log_entry):
         changed_paths, rev, revprops, has_children = log_entry
@@ -158,7 +142,7 @@ class SvnRepo():
             revprops.get(properties.PROP_REVISION_DATE))
 
         author = self.convert_commit_author(
-            revprops.get(properties.PROP_REVISION_AUTHOR, DEFAULT_AUTHOR))
+            revprops.get(properties.PROP_REVISION_AUTHOR))
 
         message = self.convert_commit_message(
             revprops.get(properties.PROP_REVISION_LOG,
@@ -268,7 +252,10 @@ class SvnRepo():
             rootpath=self.local_url)
 
         # Update the replay collaborator with the right state
-        self.swhreplay = self._init_swhreplay(state=hashes)
+        self.swhreplay = ra.SWHReplay(
+                conn=self.conn,
+                rootpath=self.local_url,
+                state=hashes)
 
         # Retrieve the commit information for revision
         commit = list(self.logs(revision, revision))[0]
@@ -282,18 +269,129 @@ class SvnRepo():
         shutil.rmtree(self.local_dirname)
 
 
-class SvnRepoWithExtraCommitLine(SvnRepo):
-    """This class does exactly as BaseSvnRepo except for the commit
-    message which is extended with a new line.
+class GitSvnSvnRepo(BaseSvnRepo):
+    """Svn repository mapping a-la git-svn.
+
+    This class does exactly as BaseSvnRepo except for:
+    - the commit message which is extended with a new line and then encoded
+    - the commit author is converted using the repository's uuid for his/her
+    email
+    - the commit date is transformed into timestamp and truncated
+
+    - Extra commit line in commit message.
+    - user@<uuid> in raw commit message
+    - truncated timestamp in raw commit message
 
     """
+    def __init__(self, remote_url, origin_id, storage,
+                 destination_path=None):
+        super().__init__(remote_url, origin_id, storage, destination_path)
+        self.swhreplay = ra.SWHReplayNoEmptyFolder(
+            conn=self.conn,
+            rootpath=self.local_url)
+        self.with_empty_folder = False
+
     def convert_commit_message(self, msg):
-        """Add an extra line to the commit message and encode in bytes.
+        """Add an extra line to the commit message and encode it in utf-8.
 
         Args:
-            msg (str): the commit message to convert_commit_message
+            msg (str): the commit message to convert.
 
         Returns:
-            The transformed message.
+            The transformed message as bytes.
+
         """
         return ('%s\n' % msg).encode('utf-8')
+
+    def convert_commit_date(self, date):
+        """Convert the commit message date into truncated timestamp in swh
+        format.
+
+        Args:
+            date (str): the commit date to convert.
+
+        Returns:
+            The transformed date.
+
+        """
+        return converters.svn_date_to_gitsvn_date(date)
+
+    def convert_commit_author(self, author):
+        """Convert the commit author into an swh person.
+
+        The user becomes a dictionary of the form:
+        {
+          name: author,
+          email: author@repo-uuid,
+          fullname: author <author@repo-uuid>
+        }
+
+        If the user is already some kind of fullname, this is what is
+        used as fullname.
+
+        Args:
+            author (str): the commit author to convert.
+
+        Returns:
+            The transformed author as dict.
+
+        """
+        return converters.svn_author_to_gitsvn_person(author, self.uuid)
+
+
+class SWHSvnRepo(BaseSvnRepo):
+    """This class does exactly as BaseSvnRepo except for:
+    - the commit message which is simply encoded
+    - the commit author is left as is.
+    - the commit timestamp is left as is.
+
+    """
+    def __init__(self, remote_url, origin_id, storage,
+                 destination_path=None):
+        super().__init__(remote_url, origin_id, storage, destination_path)
+        self.swhreplay = ra.SWHReplay(
+            conn=self.conn,
+            rootpath=self.local_url)
+
+    def convert_commit_message(self, msg):
+        """Simply encode the commit message.
+
+        Args:
+            msg (str): the commit message to convert.
+
+        Returns:
+            The transformed message as bytes.
+
+        """
+        return msg.encode('utf-8')
+
+    def convert_commit_date(self, date):
+        """Convert the message commit date into a timestamp in swh format.
+        The precision is kept.
+
+        Args:
+            date (str): the commit date to convert.
+
+        Returns:
+            The transformed date.
+
+        """
+        return converters.svn_date_to_swh_date(date)
+
+    def convert_commit_author(self, author):
+        """Convert the commit author into an swh person.
+        The user becomes a dictionary of the form:
+        {
+          name: author,
+          email: '',
+          fullname: author
+        }
+
+        Args:
+            author (str): the commit author to convert.
+
+        Returns:
+            The transformed author as dict.
+
+        """
+        return converters.svn_author_to_swh_person(author)

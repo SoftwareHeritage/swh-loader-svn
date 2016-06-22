@@ -22,7 +22,7 @@ def strdate_to_timestamp(strdate):
     """
     if strdate:
         dt = parser.parse(strdate)
-        ts_float = int(dt.timestamp())
+        ts_float = dt.timestamp()
     else:  # epoch
         ts_float = 0
     return ts_float

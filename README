@@ -40,22 +40,23 @@ occurrence_packet_size = 1
 
 # Flags
 with_svn_update = True
-with_revision_headers = True
-with_empty_folder = True
-with_extra_commit_line = False
+with_policy = swh
 ```
 
 ## git-svn like
 
-For a git-svn like (ignore empty folder, no metadata), adapt to the
-previous options with the following:
+For a git-svn like (ignore empty folder, no extra metadata, adapt
+user's name with repository's uuid, add extra commit line), adapt to
+the previous options with the following:
 
 ```txt
 with_svn_update = False
-with_revision_headers = False
-with_empty_folder = False
-with_extra_commit_line = True
+with_policy = gitsvn
 ```
+
+Note: The 'gitsvn' policy automatically deactivate the svn update
+behavior (we need the extra metadata added with the swh policy for
+this to work so...)
 
 # Starting one instance
 
@@ -79,6 +80,8 @@ task_modules = swh.loader.svn.tasks,swh.loader.tar.tasks
 task_queues = swh_loader_svn, swh_loader_tar
 task_soft_time_limit = 0
 ```
+
+swh.loader.svn.tasks and swh_loader_svn are the important entries here.
 
 ## start worker instance
 

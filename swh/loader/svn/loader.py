@@ -18,41 +18,38 @@ from swh.loader.core.loader import SWHLoader
 from . import svn, converters
 
 
-class SvnLoader(SWHLoader):
-    """Svn loader to load one svn repository.
+class BaseSvnLoader(SWHLoader):
+    """Base Svn loader to load one svn repository.
+
+    There exists 2 different policies:
+    - git-svn one (not for production): cf. GitSvnLoader
+    - SWH one: cf. SWHSvnLoader
 
     """
     CONFIG_BASE_FILENAME = 'loader/svn.ini'
 
-    ADDITIONAL_CONFIG = {
-        'with_svn_update': ('bool', True),
-        'with_revision_headers': ('bool', True),
-        'with_empty_folder': ('bool', False),
-        'with_extra_commit_line': ('bool', False),
-    }
-
-    def __init__(self, svn_url, destination_path, origin):
+    def __init__(self, svn_url, destination_path, origin,
+                 with_svn_update=True):
         super().__init__(origin['id'],
                          logging_class='swh.loader.svn.SvnLoader')
-        self.with_revision_headers = self.config['with_revision_headers']
-        self.with_svn_update = self.config['with_svn_update'] and self.with_revision_headers  # noqa
+        self.with_svn_update = with_svn_update  # noqa
         self.origin = origin
 
-        with_empty_folder = self.config['with_empty_folder']
-        if self.config['with_extra_commit_line']:
-            self.svnrepo = svn.SvnRepoWithExtraCommitLine(
-                svn_url,
-                origin['id'],
-                self.storage,
-                destination_path=destination_path,
-                with_empty_folder=with_empty_folder)
-        else:
-            self.svnrepo = svn.SvnRepo(
-                svn_url, origin['id'],
-                self.storage,
-                destination_path=destination_path,
-                with_empty_folder=with_empty_folder
-            )
+    def build_swh_revision(self, rev, commit, dir_id, parents):
+        """Convert an svn revision to an swh one according to the loader's
+        policy (git-svn or swh).
+
+        Args:
+            rev: the svn revision number
+            commit: dictionary with keys 'author_name', 'author_date', 'rev',
+            'message'
+            dir_id: the hash tree computation
+            parents: the revision's parents
+
+        Returns:
+            The swh revision
+        """
+        raise NotImplementedError('This should be overriden by subclass')
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.
@@ -66,11 +63,10 @@ class SvnLoader(SWHLoader):
         rev, _, commit, objects_per_path = list(hash_data_per_revs)[0]
 
         dir_id = objects_per_path[b'']['checksums']['sha1_git']
-        swh_revision = converters.build_swh_revision(svnrepo.uuid,
-                                                     commit,
-                                                     rev,
-                                                     dir_id,
-                                                     parents)
+        swh_revision = self.build_swh_revision(rev,
+                                               commit,
+                                               dir_id,
+                                               parents)
         swh_revision_id = git.compute_revision_sha1_git(swh_revision)
 
         return swh_revision_id == revision_id
@@ -94,13 +90,8 @@ class SvnLoader(SWHLoader):
         for rev, nextrev, commit, objects_per_path in gen_revs:
             # compute the fs tree's checksums
             dir_id = objects_per_path[b'']['checksums']['sha1_git']
-            swh_revision = converters.build_swh_revision(
-                svnrepo.uuid,
-                commit,
-                rev,
-                dir_id,
-                revision_parents[rev],
-                with_revision_headers=self.with_revision_headers)
+            swh_revision = self.build_swh_revision(
+                rev, commit, dir_id, revision_parents[rev])
             swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
             self.log.debug('rev: %s, swhrev: %s, dir: %s' % (
                 rev,
@@ -226,3 +217,99 @@ class SvnLoader(SWHLoader):
             svnrepo.clean_fs()
 
         return {'status': True}
+
+
+class GitSvnSvnLoader(BaseSvnLoader):
+    """Git-svn like loader (compute hashes a-la git-svn)
+
+    Notes:
+        This implementation is:
+        - NOT for production
+        - NOT able to deal with update.
+
+    Default policy:
+        Its default policy is to enrich (or even alter) information at
+        each svn revision. It will:
+
+        - truncate the timestamp of the svn commit date
+        - alter the user to be an email using the repository's uuid as
+          mailserver (user -> user@<repo-uuid>)
+        - fills in the gap for empty author with '(no author)' name
+        - remove empty folder (thus not counting them during hash computation)
+
+        The equivalent git command is: `git svn clone <repo-url> -q
+        --no-metadata`
+
+    """
+    def __init__(self, svn_url, destination_path, origin):
+        super().__init__(svn_url, destination_path, origin,
+                         with_svn_update=False)
+        self.svnrepo = svn.GitSvnSvnRepo(
+            svn_url,
+            origin['id'],
+            self.storage,
+            destination_path=destination_path)
+
+    def build_swh_revision(self, rev, commit, dir_id, parents):
+        """Build the swh revision a-la git-svn.
+
+        Args:
+            rev: the svn revision
+            commit: the commit metadata
+            dir_id: the upper tree's hash identifier
+            parents: the parents' identifiers
+
+        Returns:
+            The swh revision corresponding to the svn revision
+            without any extra headers.
+
+        """
+        return converters.build_gitsvn_swh_revision(rev,
+                                                    commit,
+                                                    dir_id,
+                                                    parents)
+
+
+class SWHSvnLoader(BaseSvnLoader):
+    """Swh svn loader is the main implementation destined for production.
+    This implementation is able to deal with update on known svn repository.
+
+    Default policy:
+        It's to not add any information and be as close as possible
+        from the svn data the server sent its way.
+
+        The only thing that are added are the swh's revision
+        'extra_header' to be able to deal with update.
+
+    """
+    def __init__(self, svn_url, destination_path, origin):
+        super().__init__(svn_url, destination_path, origin)
+        self.svnrepo = svn.SWHSvnRepo(
+            svn_url,
+            origin['id'],
+            self.storage,
+            destination_path=destination_path)
+
+    def build_swh_revision(self, rev, commit, dir_id, parents):
+        """Build the swh revision dictionary.
+
+        This adds:
+        - the 'synthetic' flag to true
+        - the 'extra_headers' containing the repository's uuid and the
+          svn revision number.
+
+        Args:
+            rev: the svn revision
+            commit: the commit metadata
+            dir_id: the upper tree's hash identifier
+            parents: the parents' identifiers
+
+        Returns:
+            The swh revision corresponding to the svn revision.
+
+        """
+        return converters.build_swh_revision(rev,
+                                             commit,
+                                             self.svnrepo.uuid,
+                                             dir_id,
+                                             parents)

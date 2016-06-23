@@ -1,0 +1,112 @@
+#+title: Prepare test_converters.py it tests
+#+author: ardumont
+
+* Requisite:
+
+#+BEGIN_SRC sh
+sudo apt install subversion git-svn
+#+END_SRC
+
+* Create mirror repository
+
+Then:
+#+BEGIN_SRC sh
+./init-svn-repository.sh /home/storage/svn/repos/pkg-gourmet svn://svn.debian.org/svn/pkg-gourmet/
+#+END_SRC
+Note:
+Saved as ../../../../bin/init-svn-repository.sh
+
+And now we have a mirror svn repository at file:///home/storage/svn/repos/pkg-gourmet
+
+* git-svn policy
+
+`git svn clone` the repository and parse the git log entries for the needed data.
+
+#+BEGIN_SRC sh
+git svn clone file:///home/storage/svn/repos/pkg-gourmet -q --no-metadata
+cd pkg-gourmet
+# commit
+git log --format=raw --reverse | grep '^commit ' | awk '{print $2}'
+# tree
+git log --format=raw --reverse | grep '^tree ' | awk '{print $2}'
+#+END_SRC
+
+Those are the data to check when done parsing the repository:
+
+|------------------------------------------+------------------------------------------|
+| revision                                 | tree                                     |
+|------------------------------------------+------------------------------------------|
+| 22c0fa5195a53f2e733ec75a9b6e9d1624a8b771 | 4b825dc642cb6eb9a060e54bf8d69288fbee4904 |
+| 17a631d474f49bbebfdf3d885dcde470d7faafd7 | 4b825dc642cb6eb9a060e54bf8d69288fbee4904 |
+| c8a9172b2a615d461154f61158180de53edc6070 | 4b825dc642cb6eb9a060e54bf8d69288fbee4904 |
+| 7c8f83394b6e8966eb46f0d3416c717612198a4b | 4b825dc642cb6eb9a060e54bf8d69288fbee4904 |
+| 852547b3b2bb76c8582cee963e8aa180d552a15c | ab047e38d1532f61ff5c3621202afc3e763e9945 |
+| bad4a83737f337d47e0ba681478214b07a707218 | 9bcfc25001b71c333b4b5a89224217de81c56e2e |
+|------------------------------------------+------------------------------------------|
+
+* swh policy
+
+For this one this was more tedious.
+#+BEGIN_SRC sh
+$ svn export --ignore-keywords file:///home/storage/svn/repos/pkg-gourmet@1
+#+END_SRC
+The export does not expand the keywords and does not include the .svn folder.
+
+Then:
+#+BEGIN_SRC sh
+$ cd pkg-gourmet
+$ swh-hashtree --path .
+669a71cce6c424a81ba42b7dc5d560d32252f0ca
+#+END_SRC
+
+Note: ../../../../bin/hashtree
+
+Then for the next revision:
+#+BEGIN_SRC sh
+cd .. ; rm -rf pkg-gourmet; svn export --ignore-keywords file:///home/storage/svn/repos/pkg-gourmet@2
+A    pkg-gourmet
+A    pkg-gourmet/gourmet
+A    pkg-gourmet/gourmet/trunk
+Exported revision 2.
+$ cd pkg-gourmet && swh-hashtree --path .
+008ac97a1118560797c50e3392fa1443acdaa349
+#+END_SRC
+etc...
+
+|------------------------------------------+------------------------------------------|
+| revision                                 | tree                                     |
+|------------------------------------------+------------------------------------------|
+| 0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71 | 669a71cce6c424a81ba42b7dc5d560d32252f0ca |
+| 95edacc8848369d6fb1608e887d6d2474fd5224f | 008ac97a1118560797c50e3392fa1443acdaa349 |
+| fef26ea45a520071711ba2b9d16a2985ee837021 | 3780effbe846a26751a95a8c95c511fb72be15b4 |
+| 3f51abf3b3d466571be0855dfa67e094f9ceff1b | ffcca9b09c5827a6b8137322d4339c8055c3ee1e |
+| a3a577948fdbda9d1061913b77a1588695eadb41 | 7dc52cc04c3b8bd7c085900d60c159f7b846f866 |
+| 4876cb10aec6f708f7466dddf547567b65f6c39c | 0deab3023ac59398ae467fc4bff5583008af1ee2 |
+|------------------------------------------+------------------------------------------|
+
+For the revision, cheating a little.
+That is adapting swh.model.identifiers.revision_identifiers to print the commit's manifest:
+
+#+BEGIN_SRC sh
+b'tree 669a71cce6c424a81ba42b7dc5d560d32252f0ca\nauthor seanius 1138341038.645397 +0000\ncommitter seanius 1138341038.645397 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 1\n\nmaking dir structure...'
+[2016-06-23 12:35:39,291: DEBUG/Worker-1] rev: 1, swhrev: 0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71, dir: 669a71cce6c424a81ba42b7dc5d560d32252f0ca
+b'tree 008ac97a1118560797c50e3392fa1443acdaa349\nparent 0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71\nauthor seanius 1138341044.821526 +0000\ncommitter seanius 1138341044.821526 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 2\n\nmaking dir structure...'
+[2016-06-23 12:35:39,302: DEBUG/Worker-1] rev: 2, swhrev: 95edacc8848369d6fb1608e887d6d2474fd5224f, dir: 008ac97a1118560797c50e3392fa1443acdaa349
+b'tree 3780effbe846a26751a95a8c95c511fb72be15b4\nparent 95edacc8848369d6fb1608e887d6d2474fd5224f\nauthor seanius 1138341057.282488 +0000\ncommitter seanius 1138341057.282488 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 3\n\nmaking dir structure...'
+[2016-06-23 12:35:39,313: DEBUG/Worker-1] rev: 3, swhrev: fef26ea45a520071711ba2b9d16a2985ee837021, dir: 3780effbe846a26751a95a8c95c511fb72be15b4
+b'tree ffcca9b09c5827a6b8137322d4339c8055c3ee1e\nparent fef26ea45a520071711ba2b9d16a2985ee837021\nauthor seanius 1138341064.191867 +0000\ncommitter seanius 1138341064.191867 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 4\n\nmaking dir structure...'
+[2016-06-23 12:35:39,322: DEBUG/Worker-1] rev: 4, swhrev: 3f51abf3b3d466571be0855dfa67e094f9ceff1b, dir: ffcca9b09c5827a6b8137322d4339c8055c3ee1e
+b'tree 7dc52cc04c3b8bd7c085900d60c159f7b846f866\nparent 3f51abf3b3d466571be0855dfa67e094f9ceff1b\nauthor seanius 1138342632.066765 +0000\ncommitter seanius 1138342632.066765 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 5\n\ninitial import'
+[2016-06-23 12:35:39,339: DEBUG/Worker-1] rev: 5, swhrev: a3a577948fdbda9d1061913b77a1588695eadb41, dir: 7dc52cc04c3b8bd7c085900d60c159f7b846f866
+b'tree 0deab3023ac59398ae467fc4bff5583008af1ee2\nparent a3a577948fdbda9d1061913b77a1588695eadb41\nauthor seanius 1138343905.448277 +0000\ncommitter seanius 1138343905.448277 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 6\n\nfix breakage in rules'
+[2016-06-23 12:35:39,348: DEBUG/Worker-1] rev: 6, swhrev: 4876cb10aec6f708f7466dddf547567b65f6c39c, dir: 0deab3023ac59398ae467fc4bff5583008af1ee2
+[2016-06-23 12:35:39,355: INFO/Worker-1] Processed 6 revisions: [0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71, ...]
+#+END_SRC
+
+Then checking the manifest's hash is ok:
+#+BEGIN_SRC sh
+$ echo -en 'tree 669a71cce6c424a81ba42b7dc5d560d32252f0ca\nauthor seanius 1138341038.645397 +0000\ncommitter seanius 1138341038.645397 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 1\n\nmaking dir structure...' | git hash-object -t commit --stdin
+0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71
+#+END_SRC
+
+And all is ok.

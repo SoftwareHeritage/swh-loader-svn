@@ -281,8 +281,9 @@ class SWHSvnLoader(BaseSvnLoader):
         'extra_header' to be able to deal with update.
 
     """
-    def __init__(self, svn_url, destination_path, origin):
-        super().__init__(svn_url, destination_path, origin)
+    def __init__(self, svn_url, destination_path, origin,
+                 with_svn_update=True):
+        super().__init__(svn_url, destination_path, origin, with_svn_update)
         self.svnrepo = svn.SWHSvnRepo(
             svn_url,
             origin['id'],
@@ -344,26 +345,27 @@ class SWHSvnLoader(BaseSvnLoader):
         }
 
         # Deal with update
-        swh_rev = svnrepo.swh_previous_revision()
+        if self.with_svn_update:
+            swh_rev = svnrepo.swh_previous_revision()
 
-        if swh_rev:  # Yes, we do. Try and update it.
-            extra_headers = dict(swh_rev['metadata']['extra_headers'])
-            revision_start = int(extra_headers['svn_revision'])
-            revision_parents = {
-                revision_start: swh_rev['parents']
-            }
+            if swh_rev:  # Yes, we do. Try and update it.
+                extra_headers = dict(swh_rev['metadata']['extra_headers'])
+                revision_start = int(extra_headers['svn_revision'])
+                revision_parents = {
+                    revision_start: swh_rev['parents']
+                }
 
-            self.log.debug('svn co %s@%s' % (svnrepo.remote_url,
-                                             revision_start))
+                self.log.debug('svn co %s@%s' % (svnrepo.remote_url,
+                                                 revision_start))
 
-            if swh_rev and not self.check_history_not_altered(
-                    svnrepo,
-                    revision_start,
-                    swh_rev):
-                msg = 'History of svn %s@%s history modified. Skipping...' % (  # noqa
-                    svnrepo.remote_url, revision_start)
-                self.log.warn(msg)
-                return {'status': False, 'stderr': msg}
+                if swh_rev and not self.check_history_not_altered(
+                        svnrepo,
+                        revision_start,
+                        swh_rev):
+                    msg = 'History of svn %s@%s history modified. Skipping...' % (  # noqa
+                        svnrepo.remote_url, revision_start)
+                    self.log.warn(msg)
+                    return {'status': False, 'stderr': msg}
 
         revision_end = svnrepo.head_revision()
 

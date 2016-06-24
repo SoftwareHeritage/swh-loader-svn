@@ -1,0 +1,131 @@
+swh-loader-svn
+==============
+
+Documents are in the ./docs folder:
+- Specification: ./docs/swh-loader-svn.txt
+- Comparison performance with git-svn: ./docs/comparison-git-svn-swh-svn.org
+
+# Configuration file
+
+## Location
+
+Either:
+- /etc/softwareheritage/loader/svn.ini
+- ~/.config/swh/loader/svn.ini
+- ~/.swh/loader/svn.ini
+
+## Default options
+
+```
+[main]
+storage_class = remote_storage
+storage_args = http://localhost:5000/
+
+send_contents = True
+send_directories = True
+send_revisions = True
+send_releases = True
+send_occurrences = True
+# nb of max contents to send for storage
+content_packet_size = 100
+# 100 Mib of content data
+content_packet_block_size_bytes = 104857600
+# limit for swh content storage for one blob (beyond that limit, the
+# content's data is not sent for storage)
+content_packet_size_bytes = 1073741824
+directory_packet_size = 2500
+revision_packet_size = 1000
+release_packet_size = 1
+occurrence_packet_size = 1
+
+# Flags
+with_policy = swh
+```
+
+This policy does not:
+- alter anything in regards of svn data
+- adds an extra-headers with repo uuid and svn revision. This permits to deal with update.
+
+## git-svn like
+
+For a git-svn like (ignore empty folder, no extra metadata, adapt
+user's name with repository's uuid, add extra commit line, no update
+policy), adapt to the previous options with the following:
+
+```txt
+with_policy = gitsvn
+```
+
+Notes:
+
+This policy does alter things:
+- it adds the repo-uuid on author's name (author@<repo-uuid>)
+- truncates date time commits so some precision is lost on date
+- removes empty folder if any are checkouted on disk 
+
+Those modifications, in effects, alter the git hash computation of
+revisions.
+
+This policy is destined for test. Thus:
+- no persistence takes place (even if send_* options are True)
+- no update is possible
+
+
+# Starting one instance
+
+## worker's configuration file
+
+The file is either at:
+- /etc/softwareheritage/worker.ini
+- ~/.config/swh/worker.ini
+- ~/.swh/worker.ini
+
+## configuration content
+
+With at least the following module (swh.loader.svn.tasks) and queue
+(swh_loader_svn):
+
+
+```
+[main]
+task_broker = amqp://guest@localhost//
+task_modules = swh.loader.svn.tasks,swh.loader.tar.tasks
+task_queues = swh_loader_svn, swh_loader_tar
+task_soft_time_limit = 0
+```
+
+swh.loader.svn.tasks and swh_loader_svn are the important entries here.
+
+## start worker instance
+
+To start a current worker instance:
+
+```sh
+python3 -m celery worker --app=swh.scheduler.celery_backend.config.app \
+                --pool=prefork \
+                --concurrency=10 \
+                -Ofair \
+                --loglevel=debug 2>&1
+```
+
+## Produce a repository to load
+
+Either one repository:
+```sh
+python3 -u -m swh.loader.svn.producer --svn-url file:///home/storage/svn/repos/pkg-fox
+```
+
+or a bunch:
+```sh
+cat ~/svn-repository-list | python3 -m swh.loader.svn.producer
+```
+
+svn-repository is a list of svn repository urls (one per line).
+Something like:
+```txt
+svn://svn.debian.org/svn/pkg-fox/
+svn://svn.debian.org/svn/glibc-bsd/
+svn://svn.debian.org/svn/pkg-voip/
+svn://svn.debian.org/svn/python-modules/
+svn://svn.debian.org/svn/pkg-gnome/
+```

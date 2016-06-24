@@ -4,7 +4,7 @@
 # See top-level LICENSE file for more information
 
 from swh.loader.core import tasks
-from swh.loader.svn.loader import SvnLoader
+from swh.loader.svn.loader import GitSvnSvnLoader, SWHSvnLoader
 
 
 class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
@@ -12,6 +12,13 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
 
     """
     CONFIG_BASE_FILENAME = 'loader/svn.ini'
+
+    ADDITIONAL_CONFIG = {
+        'storage_class': ('str', 'remote_storage'),
+        'storage_args': ('list[str]', ['http://localhost:5000/']),
+        'with_policy': ('string', 'swh'),  # Default, other possible
+                                           # value is 'gitsvn'
+    }
 
     task_queue = 'swh_loader_svn'
 
@@ -27,6 +34,16 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
 
         fetch_history_id = self.open_fetch_history(origin['id'])
 
-        result = SvnLoader(svn_url, local_path, origin).process()
+        # Determine which loader to trigger
+        if self.config['with_policy'] == 'gitsvn':
+            loader = GitSvnSvnLoader(svn_url, local_path, origin)
+        elif self.config['with_policy'] == 'swh':
+            loader = SWHSvnLoader(svn_url, local_path, origin)
+        else:
+            raise ValueError('Only gitsvn or swh policies are supported in'
+                             '\'with_policy\' entry. '
+                             'Please adapt your svn.ini file accordingly')
+
+        result = loader.load()
 
         self.close_fetch_history(fetch_history_id, result)

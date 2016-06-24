@@ -3,18 +3,29 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import os
+
 from dateutil import parser
+from swh.model import git
 
 
 def strdate_to_timestamp(strdate):
     """Convert a string date to an int timestamp.
 
+    Args:
+        strdate: A string representing a date with format like
+        'YYYY-mm-DDTHH:MM:SS.800722Z'
+
+    Returns:
+        A timestamp in float
+
     """
-    if not strdate:  # epoch
-        return 0
-    dt = parser.parse(strdate)
-    ts_float = dt.timestamp()
-    return int(ts_float)
+    if strdate:
+        dt = parser.parse(strdate)
+        ts_float = dt.timestamp()
+    else:  # epoch
+        ts_float = 0
+    return ts_float
 
 
 def convert_hashes_with_relative_path(hashes, rootpath):
@@ -36,7 +47,7 @@ def convert_hashes_with_relative_path(hashes, rootpath):
     def _replace_slash(s, rootpath=rootpath):
         return s.replace(rootpath, b'')
 
-    def _update_children(children, rootpath=rootpath):
+    def _update_children(children):
         return set((_replace_slash(c) for c in children))
 
     h = {
@@ -51,5 +62,69 @@ def convert_hashes_with_relative_path(hashes, rootpath):
             v['children'] = _update_children(v['children'])
 
         h[p] = v
+
+    return h
+
+
+def hashtree(path, ignore_empty_folder, ignore=None):
+    """Given a path and options, compute the hash's upper tree.
+
+    This is not for production use.
+    It's merely a helper function used mainly in bin/swh-hashtree
+
+    Args:
+        - path: The path to hash
+        - ignore_empty_folder: An option to ignore empty folder
+        - ignore: An option to ignore patterns in directory names.
+
+    Returns:
+        The path's checksums respecting the options passed as
+        parameters.
+
+    """
+    if os.path.exists(path):
+        if not os.path.isdir(path):
+            print('%s should be a directory!' % path)
+            return
+    else:
+        print('%s should exist!' % path)
+        return
+
+    if isinstance(path, str):
+        path = path.encode('utf-8')
+
+    if ignore:
+        patterns = []
+        for exc in ignore:
+            patterns.append(exc.encode('utf-8'))
+
+        def dir_ok_fn_basic(dirpath, patterns=patterns):
+            dname = os.path.basename(dirpath)
+            for pattern_to_ignore in patterns:
+                if pattern_to_ignore == dname:
+                    return False
+                if (pattern_to_ignore + b'/') in dirpath:
+                    return False
+            return True
+
+        if ignore_empty_folder:
+            def dir_ok_fn(dirpath, patterns=patterns):
+                if not dir_ok_fn_basic(dirpath):
+                    return False
+                return os.listdir(dirpath) != []
+        else:
+            dir_ok_fn = dir_ok_fn_basic
+    else:
+        if ignore_empty_folder:
+            def dir_ok_fn(dirpath):
+                return os.listdir(dirpath) != []
+        else:
+            dir_ok_fn = git.default_validation_dir
+
+    objects = git.compute_hashes_from_directory(
+        path,
+        dir_ok_fn=dir_ok_fn)
+
+    h = objects[path]['checksums']
 
     return h

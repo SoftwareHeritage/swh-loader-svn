@@ -242,7 +242,7 @@ Here is the svn repositories list:
 
 worker01.internal.softwareheritage.org has been the
 
-* Comparison
+* Comparison - 1
 
 |------------+--------+------------------------------------------+-------------------------+---------------------------+-------------|
 | Type       | # Revs | Url                                      | git-svn (git svn clone) | swh-svn (load repository) |       Ratio |
@@ -614,7 +614,7 @@ user    314m23.704s
 sys     327m49.552s
 #+END_SRC
 
-* Comparison, take 2
+* Comparison - 2
 
 Improving the comparison between swh-svn and git-svn.
 
@@ -654,13 +654,339 @@ with_empty_folder = False
 with_extra_commit_line = True
 #+END_SRC
 
-|------------+--------+------------------------------------------+-------------------------+--------------------------+------------|
-| Type       | # Revs | Url                                      | git-svn (git svn clone) | swh-svn (+ with storage) |      Ratio |
-|------------+--------+------------------------------------------+-------------------------+--------------------------+------------|
-| small      |    145 | svn://svn.debian.org/svn/pkg-fox/        |                 447.074 |        547.6864733919501 |  1.2250466 |
-| medium     |   6006 | svn://svn.debian.org/svn/glibc-bsd/      |                4740.928 |         4046.70439547766 | 0.85356799 |
-| large      |  10707 | svn://svn.debian.org/svn/pkg-voip/       |                8592.398 |       28698.161668108776 |  3.3399479 |
-| very large |  34523 | svn://svn.debian.org/svn/python-modules/ |               36627.907 |                          |         0. |
-| very large |  48013 | svn://svn.debian.org/svn/pkg-gnome/      |               71902.080 |                          |         0. |
-|------------+--------+------------------------------------------+-------------------------+--------------------------+------------|
+|------------+--------+------------------------------------------+-------------------------+-------------------------------+------------|
+| Type       | # Revs | Url                                      | git-svn (git svn clone) |                       swh-svn |      Ratio |
+|------------+--------+------------------------------------------+-------------------------+-------------------------------+------------|
+| small      |    145 | svn://svn.debian.org/svn/pkg-fox/        |                 447.074 |             547.6864733919501 |  1.2250466 |
+| medium     |   6006 | svn://svn.debian.org/svn/glibc-bsd/      |                4740.928 |              4046.70439547766 | 0.85356799 |
+| large      |  10707 | svn://svn.debian.org/svn/pkg-voip/       |                8592.398 |            28698.161668108776 |  3.3399479 |
+| very large |  34523 | svn://svn.debian.org/svn/python-modules/ |               36627.907 | Lost result (something awful) |         0. |
+| very large |  48013 | svn://svn.debian.org/svn/pkg-gnome/      |               71902.080 | Lost result (something awful) |         0. |
+|------------+--------+------------------------------------------+-------------------------+-------------------------------+------------|
 #+TBLFM: $6=$5/$4
+
+* Comparison - 3
+
+The second iteration was about finding out whether:
+- the loader was fast (it was not)
+- the loader did its computation right (it did)
+
+To improve the speed, we investigate further how git-svn did its job.
+It uses a Remote Access server approach. Meaning, it discusses directly with the svn server.
+
+Using the same approach as git-svn (using subvertpy instead of pysvn), we were able to adapt the code accordingly.
+So now, the loader speaks to the server and computes hashes alongside.
+
+Here is the comparison (using the same options as comparison 2 to have the same hashes as git-svn for trees and commits):
+
+** Comparison - no swh-storage
+
+No swh-storage is used here.
+Only write on disk and hash computations, then write result on logs (for swh-loader)
+
+|------------+--------+------------------------------------------+-------------------------+----------------+--------------------+-------------|
+| Type       | # Revs | Url                                      | git-svn (git svn clone) | # Revs updated |            swh-svn |       Ratio |
+|------------+--------+------------------------------------------+-------------------------+----------------+--------------------+-------------|
+| small      |    145 | svn://svn.debian.org/svn/pkg-fox/        |                 447.074 |            145 |  66.56195999495685 |  0.14888354 |
+| medium     |   6006 | svn://svn.debian.org/svn/glibc-bsd/      |                4740.928 |           6073 | 338.06703379005194 | 0.071308198 |
+| large      |  10707 | svn://svn.debian.org/svn/pkg-voip/       |                8592.398 |          10707 |  536.1971881072968 | 0.062403672 |
+| very large |  34523 | svn://svn.debian.org/svn/python-modules/ |               36627.907 |          34523 |  3310.805134777911 | 0.090390235 |
+| very large |  48013 | svn://svn.debian.org/svn/pkg-gnome/      |               71902.080 |          49061 | 3519.9480575090274 | 0.048954746 |
+|------------+--------+------------------------------------------+-------------------------+----------------+--------------------+-------------|
+#+TBLFM: $7=$6/$4
+
+*** Log extract
+
+From where the swh-svn column is extracted.
+
+#+BEGIN_SRC txt
+Jun 11 20:13:30 worker01 python3[27823]: [tasks]
+Jun 11 20:13:30 worker01 python3[27823]: . swh.loader.core.tasks.LoaderCoreTask
+Jun 11 20:13:30 worker01 python3[27823]: . swh.loader.svn.tasks.LoadSvnRepositoryTsk
+Jun 11 20:13:30 worker01 python3[27823]: [2016-06-11 20:13:30,213: INFO/MainProcess] Connected to amqp://swhconsumer:**@moma:5672//
+Jun 11 20:13:30 worker01 python3[27823]: [2016-06-11 20:13:30,259: INFO/MainProcess] mingle: searching for neighbors
+Jun 11 20:13:31 worker01 python3[27823]: [2016-06-11 20:13:31,369: INFO/MainProcess] mingle: sync with 7 nodes
+Jun 11 20:13:31 worker01 python3[27823]: [2016-06-11 20:13:31,387: INFO/MainProcess] mingle: sync complete
+Jun 11 20:13:32 worker01 python3[27823]: [2016-06-11 20:13:32,360: INFO/MainProcess] Events of group {task} enabled by remote.
+Jun 11 20:15:04 worker01 python3[27823]: [2016-06-11 20:15:04,997: INFO/MainProcess] Started consuming from swh_loader_svn
+Jun 11 20:15:06 worker01 python3[27823]: [2016-06-11 20:15:06,204: INFO/MainProcess] Cancelling queue swh_loader_svn
+Jun 11 20:15:20 worker01 python3[27823]: [2016-06-11 20:15:20,724: INFO/MainProcess] Started consuming from swh_loader_svn
+Jun 11 20:17:51 worker01 python3[27823]: [2016-06-11 20:17:51,487: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[7fab7834-0c41-4634-89f3-1af35502461a]
+Jun 11 20:17:52 worker01 python3[27823]: [2016-06-11 20:17:52,362: INFO/Worker-10] [revision_start-revision_end]: [1-145]
+Jun 11 20:17:52 worker01 python3[27823]: [2016-06-11 20:17:52,386: INFO/Worker-10] Processing {'remote_url': 'svn://svn.debian.org/svn/pkg-fox', 'uuid': b'd908f651-7add-0310-a5d1-c7ac9dfebe41', 'local_url': b'/tmp/tmp.bm6rebqz.swh.loader/p
+kg-fox', 'swh-origin': 4}.
+Jun 11 20:18:55 worker01 python3[27823]: [2016-06-11 20:18:55,307: INFO/Worker-10] Processed 145 revisions: [1dda85506a12af80c5a701a02aba5a02c703642f, ...]
+Jun 11 20:18:58 worker01 python3[27823]: [2016-06-11 20:18:58,078: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[7fab7834-0c41-4634-89f3-1af35502461a] succeeded in 66.56195999495685s: None
+Jun 11 20:18:58 worker01 python3[27823]: [2016-06-11 20:18:58,106: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[ace251b8-7255-4e63-90b5-1a56655755e8]
+Jun 11 20:18:58 worker01 python3[27823]: [2016-06-11 20:18:58,437: INFO/Worker-10] [revision_start-revision_end]: [1-6073]
+Jun 11 20:18:58 worker01 python3[27823]: [2016-06-11 20:18:58,453: INFO/Worker-10] Processing {'remote_url': 'svn://svn.debian.org/svn/glibc-bsd', 'uuid': b'ae44cbe4-c7d5-0310-ae45-95c72a56cd7d', 'local_url': b'/tmp/tmp.d_iw28du.swh.loader/glibc-bsd', 'swh-origin': 3}.
+Jun 11 20:20:07 worker01 python3[27823]: [2016-06-11 20:20:07,371: INFO/Worker-10] Processed 1000 revisions: [be6fe97464c0fedd9959073d07b2fda4cbedbe2d, ...]
+Jun 11 20:20:38 worker01 python3[27823]: [2016-06-11 20:20:38,419: INFO/Worker-10] Processed 1000 revisions: [344505eb753471c1085e2afeef646fe4e5d49df4, ...]
+Jun 11 20:21:06 worker01 python3[27823]: [2016-06-11 20:21:06,596: INFO/Worker-10] Processed 1000 revisions: [7638d6e04f082876bdd248f13f5e62def43f411d, ...]
+Jun 11 20:22:06 worker01 python3[27823]: [2016-06-11 20:22:06,324: INFO/Worker-10] Processed 1000 revisions: [cac5d6ccdd3aab6e29bc3def9df35b1fbbf9bd4f, ...]
+Jun 11 20:23:17 worker01 python3[27823]: [2016-06-11 20:23:17,551: INFO/Worker-10] Processed 1000 revisions: [b2c7a10f2127dd496048133480df041b0ab66865, ...]
+Jun 11 20:24:29 worker01 python3[27823]: [2016-06-11 20:24:29,274: INFO/Worker-10] Processed 1000 revisions: [382341a00301f36ceec9fca563aef85cb628b323, ...]
+Jun 11 20:24:35 worker01 python3[27823]: [2016-06-11 20:24:35,546: INFO/Worker-10] Processed 73 revisions: [512a9f720bd1af1581b09483846035cf292c52cd, ...]
+Jun 11 20:24:36 worker01 python3[27823]: [2016-06-11 20:24:36,205: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[ace251b8-7255-4e63-90b5-1a56655755e8] succeeded in 338.06703379005194s: None
+Jun 11 20:24:36 worker01 python3[27823]: [2016-06-11 20:24:36,240: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[275183f6-ef9e-4533-aa72-322f080b76e1]
+Jun 11 20:24:36 worker01 python3[27823]: [2016-06-11 20:24:36,584: INFO/Worker-10] [revision_start-revision_end]: [1-10707]
+Jun 11 20:24:36 worker01 python3[27823]: [2016-06-11 20:24:36,600: INFO/Worker-10] Processing {'remote_url': 'svn://svn.debian.org/svn/pkg-voip', 'uuid': b'5e74be4b-f5d6-0310-a852-e9e23c5afa6a', 'local_url': b'/tmp/tmp.0y0ny007.swh.loader/pkg-voip', 'swh-origin': 32}.
+Jun 11 20:25:34 worker01 python3[27823]: [2016-06-11 20:25:34,718: INFO/Worker-10] Processed 1000 revisions: [a1fff6a0e5e397f634d0ea5c1600bc723d019e4c, ...]
+Jun 11 20:26:11 worker01 python3[27823]: [2016-06-11 20:26:11,493: INFO/Worker-10] Processed 1000 revisions: [510f95e1239eaea1170816b080cd8d7d76ad4b5b, ...]
+Jun 11 20:26:45 worker01 python3[27823]: [2016-06-11 20:26:45,145: INFO/Worker-10] Processed 1000 revisions: [17a376896e1f2084bfd85dc5052e14280bbcb63a, ...]
+Jun 11 20:27:20 worker01 python3[27823]: [2016-06-11 20:27:20,603: INFO/Worker-10] Processed 1000 revisions: [5f9d3835c69ec09fd082553d425d9e26fc006289, ...]
+Jun 11 20:27:52 worker01 python3[27823]: [2016-06-11 20:27:52,940: INFO/Worker-10] Processed 1000 revisions: [89551acb946906862441ef05368b99c5ce4d2144, ...]
+Jun 11 20:28:27 worker01 python3[27823]: [2016-06-11 20:28:27,370: INFO/Worker-10] Processed 1000 revisions: [97eeaf9eae6c155631b15514b5b600e367c2dc4b, ...]
+Jun 11 20:29:02 worker01 python3[27823]: [2016-06-11 20:29:02,164: INFO/Worker-10] Processed 1000 revisions: [c0f1bce218db099425e15aa9f5521a5badb4c6c2, ...]
+Jun 11 20:29:35 worker01 python3[27823]: [2016-06-11 20:29:35,064: INFO/Worker-10] Processed 1000 revisions: [b3dcf7365c6afd9280565abfec4204b26c4e13dc, ...]
+Jun 11 20:30:18 worker01 python3[27823]: [2016-06-11 20:30:18,890: INFO/Worker-10] Processed 1000 revisions: [943042e9d1113406483a2a5b6f39023935c0532a, ...]
+Jun 11 20:32:20 worker01 python3[27823]: [2016-06-11 20:32:20,890: INFO/Worker-10] Processed 1000 revisions: [81405fca1c7f928fcc6a2b137546b4f94f22551e, ...]
+Jun 11 20:33:29 worker01 python3[27823]: [2016-06-11 20:33:29,927: INFO/Worker-10] Processed 707 revisions: [5419a4e4da9d9e37df35c1c9455024fe8170d2fa, ...]
+Jun 11 20:33:32 worker01 python3[27823]: [2016-06-11 20:33:32,487: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[275183f6-ef9e-4533-aa72-322f080b76e1] succeeded in 536.1971881072968s: None
+Jun 11 20:33:32 worker01 python3[27823]: [2016-06-11 20:33:32,522: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[8677e0f5-4938-4146-b164-720ec7294cb4]
+Jun 11 20:33:32 worker01 python3[27823]: [2016-06-11 20:33:32,816: INFO/Worker-10] [revision_start-revision_end]: [1-34523]
+Jun 11 20:33:32 worker01 python3[27823]: [2016-06-11 20:33:32,874: INFO/Worker-10] Processing {'remote_url': 'svn://svn.debian.org/svn/python-modules', 'uuid': b'771dd761-d7fa-0310-a302-f036d1c1ebb6', 'local_url': b'/tmp/tmp.jokuejpx.swh.loader/python-modules', 'swh-origin': 122}.
+Jun 11 20:34:43 worker01 python3[27823]: [2016-06-11 20:34:43,590: INFO/Worker-10] Processed 1000 revisions: [4ca7de178b8d929a6dfc12e113b3072730eeb4c3, ...]
+Jun 11 20:35:35 worker01 python3[27823]: [2016-06-11 20:35:35,455: INFO/Worker-10] Processed 1000 revisions: [45be8a9d34b4b57595a1e3c0cec40b378a05e43f, ...]
+Jun 11 20:36:12 worker01 python3[27823]: [2016-06-11 20:36:12,743: INFO/Worker-10] Processed 1000 revisions: [62d51095353cb4bac1b840a917e9cda7e809b6ea, ...]
+Jun 11 20:36:46 worker01 python3[27823]: [2016-06-11 20:36:46,526: INFO/Worker-10] Processed 1000 revisions: [0b88046aa11871c3d22a5190a62c200d42ab3da0, ...]
+Jun 11 20:37:19 worker01 python3[27823]: [2016-06-11 20:37:19,382: INFO/Worker-10] Processed 1000 revisions: [1791f1e4cdf4eef44aa6f1dcdb76378a37f5de38, ...]
+Jun 11 20:37:54 worker01 python3[27823]: [2016-06-11 20:37:54,069: INFO/Worker-10] Processed 1000 revisions: [60f91c20e1ac862c6d1fd4abf2890cebcd4ef2e6, ...]
+Jun 11 20:38:32 worker01 python3[27823]: [2016-06-11 20:38:32,090: INFO/Worker-10] Processed 1000 revisions: [51764d25e62e2318e92310cea8d123773d6a9054, ...]
+Jun 11 20:39:08 worker01 python3[27823]: [2016-06-11 20:39:08,667: INFO/Worker-10] Processed 1000 revisions: [8720f9952080e743c8432ef7d27cf35f61da88d6, ...]
+Jun 11 20:39:45 worker01 python3[27823]: [2016-06-11 20:39:45,419: INFO/Worker-10] Processed 1000 revisions: [837dc122f04058ede9351b4940579ba8fba4fda1, ...]
+Jun 11 20:40:33 worker01 python3[27823]: [2016-06-11 20:40:33,718: INFO/Worker-10] Processed 1000 revisions: [e33a666eb6f9a50e35f62e2c4187a0caf8055aad, ...]
+Jun 11 20:41:14 worker01 python3[27823]: [2016-06-11 20:41:14,348: INFO/Worker-10] Processed 1000 revisions: [2b16e069f75ebb8550d8b30c02e4dcaca0a98dae, ...]
+Jun 11 20:41:55 worker01 python3[27823]: [2016-06-11 20:41:55,502: INFO/Worker-10] Processed 1000 revisions: [fcbc70f1574e30e467d2aa49050f26a6e1e67b5e, ...]
+Jun 11 20:42:39 worker01 python3[27823]: [2016-06-11 20:42:39,390: INFO/Worker-10] Processed 1000 revisions: [10fc7480388c84bc7742e057b04f72c9e7696233, ...]
+Jun 11 20:43:25 worker01 python3[27823]: [2016-06-11 20:43:25,565: INFO/Worker-10] Processed 1000 revisions: [dabdb737d3f80c8c85ab6219b52429325750f7d7, ...]
+Jun 11 20:44:12 worker01 python3[27823]: [2016-06-11 20:44:12,970: INFO/Worker-10] Processed 1000 revisions: [5ec3d4290c8fa3f0cb3725c9412895633f48dc47, ...]
+Jun 11 20:45:07 worker01 python3[27823]: [2016-06-11 20:45:07,443: INFO/Worker-10] Processed 1000 revisions: [32aa0ad290ad039d8da3b1223d34d31f6ee93a69, ...]
+Jun 11 20:45:56 worker01 python3[27823]: [2016-06-11 20:45:56,115: INFO/Worker-10] Processed 1000 revisions: [6abae57242a050042f6980971911a9dcd7429f65, ...]
+Jun 11 20:47:32 worker01 python3[27823]: [2016-06-11 20:47:32,574: INFO/Worker-10] Processed 1000 revisions: [4bcf91f45c78113b626c914acdf81f73d11191f1, ...]
+Jun 11 20:49:10 worker01 python3[27823]: [2016-06-11 20:49:10,514: INFO/Worker-10] Processed 1000 revisions: [18f5add4158abdb8bf1e408e6758adf7e4a59eef, ...]
+Jun 11 20:51:08 worker01 python3[27823]: [2016-06-11 20:51:08,684: INFO/Worker-10] Processed 1000 revisions: [99ebabd86ec48c52965c89c41fe443f2ee49f6a4, ...]
+Jun 11 20:53:05 worker01 python3[27823]: [2016-06-11 20:53:05,376: INFO/Worker-10] Processed 1000 revisions: [d6f7410e1295db6dbb137d94a27a26e3e7d636c0, ...]
+Jun 11 20:55:15 worker01 python3[27823]: [2016-06-11 20:55:15,605: INFO/Worker-10] Processed 1000 revisions: [a4907fb6dadae5b431b66c33b1bf043eb52992e2, ...]
+Jun 11 20:59:49 worker01 python3[27823]: [2016-06-11 20:59:49,794: INFO/Worker-10] Processed 1000 revisions: [ebaca99c10f1ea83e983d500c760ea31acba0762, ...]
+Jun 11 21:03:01 worker01 python3[27823]: [2016-06-11 21:03:01,831: INFO/Worker-10] Processed 1000 revisions: [b7e32f4db2957388e5d2a7d89749a1ceb4dbcf57, ...]
+Jun 11 21:05:41 worker01 python3[27823]: [2016-06-11 21:05:41,617: INFO/Worker-10] Processed 1000 revisions: [8736c0ee49a93fbb328aabfa4d21cd5a936a02b1, ...]
+Jun 11 21:07:53 worker01 python3[27823]: [2016-06-11 21:07:53,901: INFO/Worker-10] Processed 1000 revisions: [22a27c3aab8d00bd5a63bee6287ae46aae6b9fcb, ...]
+Jun 11 21:10:05 worker01 python3[27823]: [2016-06-11 21:10:05,816: INFO/Worker-10] Processed 1000 revisions: [8575eeea98818729b6319b68078872b5a72bdf14, ...]
+Jun 11 21:12:31 worker01 python3[27823]: [2016-06-11 21:12:31,081: INFO/Worker-10] Processed 1000 revisions: [badeba4badf9ebcf209da0123dd87a074863efc9, ...]
+Jun 11 21:14:55 worker01 python3[27823]: [2016-06-11 21:14:55,572: INFO/Worker-10] Processed 1000 revisions: [b7e011f38d59bd95ca9752f5e9d4841f14a1f46b, ...]
+Jun 11 21:17:16 worker01 python3[27823]: [2016-06-11 21:17:16,501: INFO/Worker-10] Processed 1000 revisions: [fc8dbd462c4e698b2650effbf33903de2f9b49b2, ...]
+Jun 11 21:19:18 worker01 python3[27823]: [2016-06-11 21:19:18,904: INFO/Worker-10] Processed 1000 revisions: [7d70379982d340ebff879a3f79314568ea3873eb, ...]
+Jun 11 21:22:35 worker01 python3[27823]: [2016-06-11 21:22:35,067: INFO/Worker-10] Processed 1000 revisions: [7b81c934b441335e06977f2dcd797f16337c49f2, ...]
+Jun 11 21:24:43 worker01 python3[27823]: [2016-06-11 21:24:43,586: INFO/Worker-10] Processed 1000 revisions: [8de5385844c1a8de253ad8945dc06259d11c7fc8, ...]
+Jun 11 21:27:21 worker01 python3[27823]: [2016-06-11 21:27:21,950: INFO/Worker-10] Processed 1000 revisions: [c0b63db3767754092c8c1fe92b07e66e77b7fed3, ...]
+Jun 11 21:28:34 worker01 python3[27823]: [2016-06-11 21:28:34,131: INFO/Worker-10] Processed 523 revisions: [ba52b091af3078562f7e7fc05c04b9469988e006, ...]
+Jun 11 21:28:43 worker01 python3[27823]: [2016-06-11 21:28:43,356: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[8677e0f5-4938-4146-b164-720ec7294cb4] succeeded in 3310.805134777911s: None
+Jun 11 21:28:43 worker01 python3[27823]: [2016-06-11 21:28:43,373: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[b3f34747-3575-4160-8543-6ddf23b8822e]
+Jun 11 21:28:43 worker01 python3[27823]: [2016-06-11 21:28:43,674: INFO/Worker-10] [revision_start-revision_end]: [1-49061]
+Jun 11 21:28:43 worker01 python3[27823]: [2016-06-11 21:28:43,688: INFO/Worker-10] Processing {'remote_url': 'svn://svn.debian.org/svn/pkg-gnome', 'uuid': b'db0db5de-e4c8-0310-9441-90abf70311f7', 'local_url': b'/tmp/tmp.kgkdf865.swh.loader/pkg-gnome', 'swh-origin': 27}.
+Jun 11 21:29:23 worker01 python3[27823]: [2016-06-11 21:29:23,231: INFO/Worker-10] Processed 1000 revisions: [29a3157f1d4a82955860a6fd3397bbd94573b555, ...]
+Jun 11 21:29:55 worker01 python3[27823]: [2016-06-11 21:29:55,671: INFO/Worker-10] Processed 1000 revisions: [bbada23d3943294e2efe3d6a1c978498e013d957, ...]
+Jun 11 21:30:35 worker01 python3[27823]: [2016-06-11 21:30:35,913: INFO/Worker-10] Processed 1000 revisions: [8a257ee9a72d9ec7f3a25bc5b4ab886f06b7d9c4, ...]
+Jun 11 21:31:11 worker01 python3[27823]: [2016-06-11 21:31:11,428: INFO/Worker-10] Processed 1000 revisions: [f179272fc81ae3f16bbf6d8a12709e9a7109b347, ...]
+Jun 11 21:31:43 worker01 python3[27823]: [2016-06-11 21:31:43,689: INFO/Worker-10] Processed 1000 revisions: [d74e2545a86fb065e60f3ef6e1fa5a975ab6a793, ...]
+Jun 11 21:32:21 worker01 python3[27823]: [2016-06-11 21:32:21,407: INFO/Worker-10] Processed 1000 revisions: [2a1dab8d134ef32f914da2ccc7c14819777f1e8f, ...]
+Jun 11 21:32:53 worker01 python3[27823]: [2016-06-11 21:32:53,714: INFO/Worker-10] Processed 1000 revisions: [544884d67e2a6c138a09ddf6b8f3f3f9c835610e, ...]
+Jun 11 21:33:26 worker01 python3[27823]: [2016-06-11 21:33:26,103: INFO/Worker-10] Processed 1000 revisions: [17c8cc0eb3be0d69176af005422f4a8aea22b037, ...]
+Jun 11 21:33:57 worker01 python3[27823]: [2016-06-11 21:33:57,754: INFO/Worker-10] Processed 1000 revisions: [cd83dc86dc388920ddfef5c3b393eeb754b15595, ...]
+Jun 11 21:34:47 worker01 python3[27823]: [2016-06-11 21:34:47,984: INFO/Worker-10] Processed 1000 revisions: [ed5ad1e6879a9a56c1fb89fec0e9ba80943facd8, ...]
+Jun 11 21:35:35 worker01 python3[27823]: [2016-06-11 21:35:35,152: INFO/Worker-10] Processed 1000 revisions: [ea995f84bc6eef36f890243f0c6ea4bdf2796452, ...]
+Jun 11 21:36:17 worker01 python3[27823]: [2016-06-11 21:36:17,834: INFO/Worker-10] Processed 1000 revisions: [b83e8f3b62dda65f582c01e2d04da6003564546b, ...]
+Jun 11 21:37:00 worker01 python3[27823]: [2016-06-11 21:37:00,366: INFO/Worker-10] Processed 1000 revisions: [c730f0da619383441fe1dcf04e19a5e40976226d, ...]
+Jun 11 21:37:40 worker01 python3[27823]: [2016-06-11 21:37:40,533: INFO/Worker-10] Processed 1000 revisions: [559711199c653202b1c8f2073a7cb0c95116165e, ...]
+Jun 11 21:38:26 worker01 python3[27823]: [2016-06-11 21:38:26,410: INFO/Worker-10] Processed 1000 revisions: [e2739f72f8bfe51f3344d838d2ae4b66aa472497, ...]
+Jun 11 21:39:20 worker01 python3[27823]: [2016-06-11 21:39:20,230: INFO/Worker-10] Processed 1000 revisions: [d05438f16f9aa3cd8dfbe47d493bdcc168448daf, ...]
+Jun 11 21:40:05 worker01 python3[27823]: [2016-06-11 21:40:05,528: INFO/Worker-10] Processed 1000 revisions: [4cf7273102dca6be96e569b8115f1371d43c3767, ...]
+Jun 11 21:40:56 worker01 python3[27823]: [2016-06-11 21:40:56,506: INFO/Worker-10] Processed 1000 revisions: [2ecb859a650ad2b10e7d0869c014d6b1b3ded55a, ...]
+Jun 11 21:41:51 worker01 python3[27823]: [2016-06-11 21:41:51,550: INFO/Worker-10] Processed 1000 revisions: [4758461520c23192618d1e78eeb23fecfcb9bd29, ...]
+Jun 11 21:42:50 worker01 python3[27823]: [2016-06-11 21:42:50,848: INFO/Worker-10] Processed 1000 revisions: [21fec7d864ab60f99863fe842680bfef1f8cd0b5, ...]
+Jun 11 21:43:53 worker01 python3[27823]: [2016-06-11 21:43:53,391: INFO/Worker-10] Processed 1000 revisions: [e3c2e7cbb7beaa344549145e2e78c77c5fd9f7c8, ...]
+Jun 11 21:44:43 worker01 python3[27823]: [2016-06-11 21:44:43,843: INFO/Worker-10] Processed 1000 revisions: [f6cf4af3d7d1744c364a9f25e92a5a6bba622837, ...]
+Jun 11 21:45:42 worker01 python3[27823]: [2016-06-11 21:45:42,393: INFO/Worker-10] Processed 1000 revisions: [3ccd855ced499e839306249a44006b33fcd9efb7, ...]
+Jun 11 21:46:45 worker01 python3[27823]: [2016-06-11 21:46:45,238: INFO/Worker-10] Processed 1000 revisions: [65092bf7e0e2df4d71a31f3d89d1233eef0e6438, ...]
+Jun 11 21:47:34 worker01 python3[27823]: [2016-06-11 21:47:34,384: INFO/Worker-10] Processed 1000 revisions: [a4c15e02c5db378dd77f0bab5e6a73a437ad8afb, ...]
+Jun 11 21:48:26 worker01 python3[27823]: [2016-06-11 21:48:26,171: INFO/Worker-10] Processed 1000 revisions: [bb81b662a5257e136c665b97d858bf4d20bf088c, ...]
+Jun 11 21:49:11 worker01 python3[27823]: [2016-06-11 21:49:11,819: INFO/Worker-10] Processed 1000 revisions: [04467b7e2bd60ac0a5c55ba184432620410f8b11, ...]
+Jun 11 21:49:54 worker01 python3[27823]: [2016-06-11 21:49:54,668: INFO/Worker-10] Processed 1000 revisions: [7b108c6627a394a2db6ad8d743f319e085014118, ...]
+Jun 11 21:51:32 worker01 python3[27823]: [2016-06-11 21:51:32,293: INFO/Worker-10] Processed 1000 revisions: [479a007698148817ab921a0a2df6a07f4558ec0e, ...]
+Jun 11 21:52:54 worker01 python3[27823]: [2016-06-11 21:52:54,870: INFO/Worker-10] Processed 1000 revisions: [2f7cbf1ff849e315b9211e6a57451c22d5a9a538, ...]
+Jun 11 21:54:03 worker01 python3[27823]: [2016-06-11 21:54:03,799: INFO/Worker-10] Processed 1000 revisions: [97650da3145a749e730367e9bb8b4b5e99733d1f, ...]
+Jun 11 21:55:26 worker01 python3[27823]: [2016-06-11 21:55:26,019: INFO/Worker-10] Processed 1000 revisions: [8aca07d408d5461e073f2a464b1bb1098a4169d6, ...]
+Jun 11 21:56:56 worker01 python3[27823]: [2016-06-11 21:56:56,823: INFO/Worker-10] Processed 1000 revisions: [66a3005e7fb08d761030438b88416a2f5354aab3, ...]
+Jun 11 21:58:20 worker01 python3[27823]: [2016-06-11 21:58:20,814: INFO/Worker-10] Processed 1000 revisions: [8d25bc6cb7e1ce4e1cf0bceca17cc8cd4701e4b1, ...]
+Jun 11 21:59:49 worker01 python3[27823]: [2016-06-11 21:59:49,945: INFO/Worker-10] Processed 1000 revisions: [77c2759fc8f419b2993b39b1423a5f48c5b26aa4, ...]
+Jun 11 22:02:00 worker01 python3[27823]: [2016-06-11 22:02:00,541: INFO/Worker-10] Processed 1000 revisions: [39ec4e85be0132737da5862397d35263930d0f60, ...]
+Jun 11 22:03:50 worker01 python3[27823]: [2016-06-11 22:03:50,547: INFO/Worker-10] Processed 1000 revisions: [7f9125098da0bf0360ce8f2c4fb70f96f5f105f3, ...]
+Jun 11 22:05:18 worker01 python3[27823]: [2016-06-11 22:05:18,050: INFO/Worker-10] Processed 1000 revisions: [f882f6cc7777f60a3e2e795bcffcaeb586defe2e, ...]
+Jun 11 22:06:42 worker01 python3[27823]: [2016-06-11 22:06:42,185: INFO/Worker-10] Processed 1000 revisions: [dfb73fa7ac834fb8863c739c6a1f40320ccca198, ...]
+Jun 11 22:08:17 worker01 python3[27823]: [2016-06-11 22:08:17,319: INFO/Worker-10] Processed 1000 revisions: [7a3dcc6abe1fe812552a5ff17123cc676a6e19ea, ...]
+Jun 11 22:09:50 worker01 python3[27823]: [2016-06-11 22:09:50,957: INFO/Worker-10] Processed 1000 revisions: [2f14c0ee2931c3bfe146af6f7baa5ffa6512a9d5, ...]
+Jun 11 22:11:35 worker01 python3[27823]: [2016-06-11 22:11:35,384: INFO/Worker-10] Processed 1000 revisions: [aa82ccb58456e1be3fc8b3b4db0c2769526f115e, ...]
+Jun 11 22:02:00 worker01 python3[27823]: [2016-06-11 22:02:00,541: INFO/Worker-10] Processed 1000 revisions: [39ec4e85be0132737da5862397d35263930d0f60, ...]
+Jun 11 22:03:50 worker01 python3[27823]: [2016-06-11 22:03:50,547: INFO/Worker-10] Processed 1000 revisions: [7f9125098da0bf0360ce8f2c4fb70f96f5f105f3, ...]
+Jun 11 22:05:18 worker01 python3[27823]: [2016-06-11 22:05:18,050: INFO/Worker-10] Processed 1000 revisions: [f882f6cc7777f60a3e2e795bcffcaeb586defe2e, ...]
+Jun 11 22:06:42 worker01 python3[27823]: [2016-06-11 22:06:42,185: INFO/Worker-10] Processed 1000 revisions: [dfb73fa7ac834fb8863c739c6a1f40320ccca198, ...]
+Jun 11 22:08:17 worker01 python3[27823]: [2016-06-11 22:08:17,319: INFO/Worker-10] Processed 1000 revisions: [7a3dcc6abe1fe812552a5ff17123cc676a6e19ea, ...]
+Jun 11 22:09:50 worker01 python3[27823]: [2016-06-11 22:09:50,957: INFO/Worker-10] Processed 1000 revisions: [2f14c0ee2931c3bfe146af6f7baa5ffa6512a9d5, ...]
+Jun 11 22:11:35 worker01 python3[27823]: [2016-06-11 22:11:35,384: INFO/Worker-10] Processed 1000 revisions: [aa82ccb58456e1be3fc8b3b4db0c2769526f115e, ...]
+Jun 11 22:13:27 worker01 python3[27823]: [2016-06-11 22:13:27,439: INFO/Worker-10] Processed 1000 revisions: [c0ac4d6e5058a7ad19bc5b5f8ea6d0184262814b, ...]
+Jun 11 22:17:18 worker01 python3[27823]: [2016-06-11 22:17:18,339: INFO/Worker-10] Processed 1000 revisions: [8e972fa53b5e4ccaca85cf7f7087191a809d83bd, ...]
+Jun 11 22:20:03 worker01 python3[27823]: [2016-06-11 22:20:03,239: INFO/Worker-10] Processed 1000 revisions: [b846dcc3d3cea598263cffb87557aa7f7566e80f, ...]
+Jun 11 22:22:17 worker01 python3[27823]: [2016-06-11 22:22:17,967: INFO/Worker-10] Processed 1000 revisions: [bc969c3c6977374d6e6bc5fe4e0606ee60f29e90, ...]
+Jun 11 22:23:44 worker01 python3[27823]: [2016-06-11 22:23:44,874: INFO/Worker-10] Processed 1000 revisions: [e9625679cf1fe23a91f0f06f02ac03723d7112cb, ...]
+Jun 11 22:25:16 worker01 python3[27823]: [2016-06-11 22:25:16,759: INFO/Worker-10] Processed 1000 revisions: [f61326f5d12094860dead900d2d46d0c368f4e4b, ...]
+Jun 11 22:27:01 worker01 python3[27823]: [2016-06-11 22:27:01,152: INFO/Worker-10] Processed 1000 revisions: [754bfe4141e5a9165a7458945157791ac85e6ff9, ...]
+Jun 11 22:27:06 worker01 python3[27823]: [2016-06-11 22:27:06,833: INFO/Worker-10] Processed 61 revisions: [27e079019bc07ef84716c80c62ec53a39d806879, ...]
+Jun 11 22:27:23 worker01 python3[27823]: [2016-06-11 22:27:23,340: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[b3f34747-3575-4160-8543-6ddf23b8822e] succeeded in 3519.9480575090274s: None
+#+END_SRC
+
+
+** comparison - with swh-storage
+
+|------------+--------+------------------------------------------+-------------------------+----------------+--------------------+------------|
+| Type       | # Revs | Url                                      | git-svn (git svn clone) | # Revs updated |            swh-svn |      Ratio |
+|------------+--------+------------------------------------------+-------------------------+----------------+--------------------+------------|
+| small      |    145 | svn://svn.debian.org/svn/pkg-fox/        |                 447.074 |            145 | 117.17479287087917 | 0.26209261 |
+| medium     |   6006 | svn://svn.debian.org/svn/glibc-bsd/      |                4740.928 |           6073 |  962.4779040301219 | 0.20301466 |
+| large      |  10707 | svn://svn.debian.org/svn/pkg-voip/       |                8592.398 |          10707 | 3028.8734963517636 | 0.35250619 |
+| very large |  34523 | svn://svn.debian.org/svn/python-modules/ |               36627.907 |          34523 | 22651.265359937213 | 0.61841550 |
+| very large |  48013 | svn://svn.debian.org/svn/pkg-gnome/      |               71902.080 |          49061 | 43629.105175915174 | 0.60678502 |
+|------------+--------+------------------------------------------+-------------------------+----------------+--------------------+------------|
+#+TBLFM: $7=$6/$4
+
+** Log extract
+
+#+BEGIN_SRC sh
+Jun 11 22:31:34 worker01 python3[13656]: [2016-06-11 22:31:34,315: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[9b6b05d0-f7fe-4799-86a0-f9ec7bd67ead]
+Jun 11 22:31:34 worker01 python3[13656]: [2016-06-11 22:31:34,657: INFO/Worker-10] [revision_start-revision_end]: [1-145]
+Jun 11 22:31:34 worker01 python3[13656]: [2016-06-11 22:31:34,674: INFO/Worker-10] Processing {'remote_url': 'svn://svn.debian.org/svn/pkg-fox', 'local_url': b'/tmp/tmp.lod3o5u5.swh.loader/pkg-fox', 'uuid': b'd908f651-7add-0310-a5d1-c7ac9dfebe41', 'swh-origin': 4}.
+Jun 11 22:33:27 worker01 python3[13656]: [2016-06-11 22:33:27,415: INFO/Worker-10] Processed 145 revisions: [1dda85506a12af80c5a701a02aba5a02c703642f, ...]
+Jun 11 22:33:31 worker01 python3[13656]: [2016-06-11 22:33:31,508: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[9b6b05d0-f7fe-4799-86a0-f9ec7bd67ead] succeeded in 117.17479287087917s: None
+Jun 11 22:33:31 worker01 python3[13656]: [2016-06-11 22:33:31,552: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[f0375fb9-cf8c-40b5-9e04-db9e37fd9ecb]
+Jun 11 22:33:31 worker01 python3[13656]: [2016-06-11 22:33:31,856: INFO/Worker-10] [revision_start-revision_end]: [1-6073]
+Jun 11 22:33:31 worker01 python3[13656]: [2016-06-11 22:33:31,875: INFO/Worker-10] Processing {'remote_url': 'svn://svn.debian.org/svn/glibc-bsd', 'local_url': b'/tmp/tmp.w1bf5rdz.swh.loader/glibc-bsd', 'uuid': b'ae44cbe4-c7d5-0310-ae45-95c72a56cd7d', 'swh-origin': 3}.
+Jun 11 22:36:19 worker01 python3[13656]: [2016-06-11 22:36:19,485: INFO/Worker-10] Processed 1000 revisions: [be6fe97464c0fedd9959073d07b2fda4cbedbe2d, ...]
+Jun 11 22:38:43 worker01 python3[13656]: [2016-06-11 22:38:43,013: INFO/Worker-10] Processed 1000 revisions: [344505eb753471c1085e2afeef646fe4e5d49df4, ...]
+Jun 11 22:40:56 worker01 python3[13656]: [2016-06-11 22:40:56,494: INFO/Worker-10] Processed 1000 revisions: [7638d6e04f082876bdd248f13f5e62def43f411d, ...]
+Jun 11 22:43:23 worker01 python3[13656]: [2016-06-11 22:43:23,883: INFO/Worker-10] Processed 1000 revisions: [cac5d6ccdd3aab6e29bc3def9df35b1fbbf9bd4f, ...]
+Jun 11 22:46:03 worker01 python3[13656]: [2016-06-11 22:46:03,775: INFO/Worker-10] Processed 1000 revisions: [b2c7a10f2127dd496048133480df041b0ab66865, ...]
+Jun 11 22:48:57 worker01 python3[13656]: [2016-06-11 22:48:57,500: INFO/Worker-10] Processed 1000 revisions: [382341a00301f36ceec9fca563aef85cb628b323, ...]
+Jun 11 22:49:15 worker01 python3[13656]: [2016-06-11 22:49:15,687: INFO/Worker-10] Processed 73 revisions: [512a9f720bd1af1581b09483846035cf292c52cd, ...]
+Jun 11 22:49:34 worker01 python3[13656]: [2016-06-11 22:49:34,067: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[f0375fb9-cf8c-40b5-9e04-db9e37fd9ecb] succeeded in 962.4779040301219s: None
+Jun 11 22:49:34 worker01 python3[13656]: [2016-06-11 22:49:34,087: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[60670885-84de-4884-937d-b7aecdbedcd5]
+Jun 11 22:49:34 worker01 python3[13656]: [2016-06-11 22:49:34,371: INFO/Worker-10] [revision_start-revision_end]: [1-10707]
+Jun 11 22:49:34 worker01 python3[13656]: [2016-06-11 22:49:34,391: INFO/Worker-10] Processing {'remote_url': 'svn://svn.debian.org/svn/pkg-voip', 'local_url': b'/tmp/tmp.w9fxgpt4.swh.loader/pkg-voip', 'uuid': b'5e74be4b-f5d6-0310-a852-e9e2
+3c5afa6a', 'swh-origin': 32}.
+Jun 11 22:52:01 worker01 python3[13656]: [2016-06-11 22:52:01,903: INFO/Worker-10] Processed 1000 revisions: [a1fff6a0e5e397f634d0ea5c1600bc723d019e4c, ...]
+Jun 11 22:54:54 worker01 python3[13656]: [2016-06-11 22:54:54,798: INFO/Worker-10] Processed 1000 revisions: [510f95e1239eaea1170816b080cd8d7d76ad4b5b, ...]
+Jun 11 22:58:14 worker01 python3[13656]: [2016-06-11 22:58:14,074: INFO/Worker-10] Processed 1000 revisions: [17a376896e1f2084bfd85dc5052e14280bbcb63a, ...]
+Jun 11 23:02:08 worker01 python3[13656]: [2016-06-11 23:02:08,886: INFO/Worker-10] Processed 1000 revisions: [5f9d3835c69ec09fd082553d425d9e26fc006289, ...]
+Jun 11 23:06:31 worker01 python3[13656]: [2016-06-11 23:06:31,837: INFO/Worker-10] Processed 1000 revisions: [89551acb946906862441ef05368b99c5ce4d2144, ...]
+Jun 11 23:11:24 worker01 python3[13656]: [2016-06-11 23:11:24,307: INFO/Worker-10] Processed 1000 revisions: [97eeaf9eae6c155631b15514b5b600e367c2dc4b, ...]
+Jun 11 23:16:45 worker01 python3[13656]: [2016-06-11 23:16:45,041: INFO/Worker-10] Processed 1000 revisions: [c0f1bce218db099425e15aa9f5521a5badb4c6c2, ...]
+Jun 11 23:22:25 worker01 python3[13656]: [2016-06-11 23:22:25,507: INFO/Worker-10] Processed 1000 revisions: [b3dcf7365c6afd9280565abfec4204b26c4e13dc, ...]
+Jun 11 23:28:30 worker01 python3[13656]: [2016-06-11 23:28:30,510: INFO/Worker-10] Processed 1000 revisions: [943042e9d1113406483a2a5b6f39023935c0532a, ...]
+Jun 11 23:35:10 worker01 python3[13656]: [2016-06-11 23:35:10,918: INFO/Worker-10] Processed 1000 revisions: [81405fca1c7f928fcc6a2b137546b4f94f22551e, ...]
+Jun 11 23:39:53 worker01 python3[13656]: [2016-06-11 23:39:53,511: INFO/Worker-10] Processed 707 revisions: [5419a4e4da9d9e37df35c1c9455024fe8170d2fa, ...]
+Jun 11 23:40:02 worker01 python3[13656]: [2016-06-11 23:40:02,978: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[60670885-84de-4884-937d-b7aecdbedcd5] succeeded in 3028.8734963517636s: None
+Jun 11 23:40:02 worker01 python3[13656]: [2016-06-11 23:40:02,997: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[740dd7e1-3d96-4bc8-8fce-faef773acbb6]
+Jun 11 23:40:03 worker01 python3[13656]: [2016-06-11 23:40:03,305: INFO/Worker-10] [revision_start-revision_end]: [1-34523]
+Jun 11 23:40:03 worker01 python3[13656]: [2016-06-11 23:40:03,324: INFO/Worker-10] Processing {'remote_url': 'svn://svn.debian.org/svn/python-modules', 'local_url': b'/tmp/tmp.g_iyx8bd.swh.loader/python-modules', 'uuid': b'771dd761-d7fa-03
+10-a302-f036d1c1ebb6', 'swh-origin': 122}.
+Jun 11 23:42:33 worker01 python3[13656]: [2016-06-11 23:42:33,485: INFO/Worker-10] Processed 1000 revisions: [4ca7de178b8d929a6dfc12e113b3072730eeb4c3, ...]
+Jun 11 23:45:29 worker01 python3[13656]: [2016-06-11 23:45:29,699: INFO/Worker-10] Processed 1000 revisions: [45be8a9d34b4b57595a1e3c0cec40b378a05e43f, ...]
+Jun 11 23:48:50 worker01 python3[13656]: [2016-06-11 23:48:50,349: INFO/Worker-10] Processed 1000 revisions: [62d51095353cb4bac1b840a917e9cda7e809b6ea, ...]
+Jun 11 23:53:06 worker01 python3[13656]: [2016-06-11 23:53:06,817: INFO/Worker-10] Processed 1000 revisions: [0b88046aa11871c3d22a5190a62c200d42ab3da0, ...]
+Jun 11 23:57:02 worker01 python3[13656]: [2016-06-11 23:57:02,932: INFO/Worker-10] Processed 1000 revisions: [1791f1e4cdf4eef44aa6f1dcdb76378a37f5de38, ...]
+Jun 12 00:01:52 worker01 python3[13656]: [2016-06-12 00:01:52,850: INFO/Worker-10] Processed 1000 revisions: [60f91c20e1ac862c6d1fd4abf2890cebcd4ef2e6, ...]
+Jun 12 00:06:54 worker01 python3[13656]: [2016-06-12 00:06:54,366: INFO/Worker-10] Processed 1000 revisions: [51764d25e62e2318e92310cea8d123773d6a9054, ...]
+Jun 12 00:12:26 worker01 python3[13656]: [2016-06-12 00:12:26,119: INFO/Worker-10] Processed 1000 revisions: [8720f9952080e743c8432ef7d27cf35f61da88d6, ...]
+Jun 12 00:18:24 worker01 python3[13656]: [2016-06-12 00:18:24,556: INFO/Worker-10] Processed 1000 revisions: [837dc122f04058ede9351b4940579ba8fba4fda1, ...]
+Jun 12 00:24:53 worker01 python3[13656]: [2016-06-12 00:24:53,118: INFO/Worker-10] Processed 1000 revisions: [e33a666eb6f9a50e35f62e2c4187a0caf8055aad, ...]
+Jun 12 00:32:03 worker01 python3[13656]: [2016-06-12 00:32:03,550: INFO/Worker-10] Processed 1000 revisions: [2b16e069f75ebb8550d8b30c02e4dcaca0a98dae, ...]
+Jun 12 00:39:16 worker01 python3[13656]: [2016-06-12 00:39:16,356: INFO/Worker-10] Processed 1000 revisions: [fcbc70f1574e30e467d2aa49050f26a6e1e67b5e, ...]
+Jun 12 00:46:38 worker01 python3[13656]: [2016-06-12 00:46:38,941: INFO/Worker-10] Processed 1000 revisions: [10fc7480388c84bc7742e057b04f72c9e7696233, ...]
+Jun 12 00:54:29 worker01 python3[13656]: [2016-06-12 00:54:29,844: INFO/Worker-10] Processed 1000 revisions: [dabdb737d3f80c8c85ab6219b52429325750f7d7, ...]
+Jun 12 01:03:25 worker01 python3[13656]: [2016-06-12 01:03:25,923: INFO/Worker-10] Processed 1000 revisions: [5ec3d4290c8fa3f0cb3725c9412895633f48dc47, ...]
+Jun 12 01:12:23 worker01 python3[13656]: [2016-06-12 01:12:23,413: INFO/Worker-10] Processed 1000 revisions: [32aa0ad290ad039d8da3b1223d34d31f6ee93a69, ...]
+Jun 12 01:21:43 worker01 python3[13656]: [2016-06-12 01:21:43,691: INFO/Worker-10] Processed 1000 revisions: [6abae57242a050042f6980971911a9dcd7429f65, ...]
+Jun 12 01:31:56 worker01 python3[13656]: [2016-06-12 01:31:56,988: INFO/Worker-10] Processed 1000 revisions: [4bcf91f45c78113b626c914acdf81f73d11191f1, ...]
+Jun 12 01:42:27 worker01 python3[13656]: [2016-06-12 01:42:27,028: INFO/Worker-10] Processed 1000 revisions: [18f5add4158abdb8bf1e408e6758adf7e4a59eef, ...]
+Jun 12 01:53:32 worker01 python3[13656]: [2016-06-12 01:53:32,015: INFO/Worker-10] Processed 1000 revisions: [99ebabd86ec48c52965c89c41fe443f2ee49f6a4, ...]
+Jun 12 02:05:41 worker01 python3[13656]: [2016-06-12 02:05:41,288: INFO/Worker-10] Processed 1000 revisions: [d6f7410e1295db6dbb137d94a27a26e3e7d636c0, ...]
+Jun 12 02:19:43 worker01 python3[13656]: [2016-06-12 02:19:43,962: INFO/Worker-10] Processed 1000 revisions: [a4907fb6dadae5b431b66c33b1bf043eb52992e2, ...]
+Jun 12 02:33:59 worker01 python3[13656]: [2016-06-12 02:33:59,432: INFO/Worker-10] Processed 1000 revisions: [ebaca99c10f1ea83e983d500c760ea31acba0762, ...]
+Jun 12 02:49:18 worker01 python3[13656]: [2016-06-12 02:49:18,727: INFO/Worker-10] Processed 1000 revisions: [b7e32f4db2957388e5d2a7d89749a1ceb4dbcf57, ...]
+Jun 12 03:05:32 worker01 python3[13656]: [2016-06-12 03:05:32,251: INFO/Worker-10] Processed 1000 revisions: [8736c0ee49a93fbb328aabfa4d21cd5a936a02b1, ...]
+Jun 12 03:20:59 worker01 python3[13656]: [2016-06-12 03:20:59,802: INFO/Worker-10] Processed 1000 revisions: [22a27c3aab8d00bd5a63bee6287ae46aae6b9fcb, ...]
+Jun 12 03:37:08 worker01 python3[13656]: [2016-06-12 03:37:08,731: INFO/Worker-10] Processed 1000 revisions: [8575eeea98818729b6319b68078872b5a72bdf14, ...]
+Jun 12 03:54:14 worker01 python3[13656]: [2016-06-12 03:54:14,064: INFO/Worker-10] Processed 1000 revisions: [badeba4badf9ebcf209da0123dd87a074863efc9, ...]
+Jun 12 04:12:32 worker01 python3[13656]: [2016-06-12 04:12:32,728: INFO/Worker-10] Processed 1000 revisions: [b7e011f38d59bd95ca9752f5e9d4841f14a1f46b, ...]
+Jun 12 04:30:33 worker01 python3[13656]: [2016-06-12 04:30:33,848: INFO/Worker-10] Processed 1000 revisions: [fc8dbd462c4e698b2650effbf33903de2f9b49b2, ...]
+Jun 12 04:48:46 worker01 python3[13656]: [2016-06-12 04:48:46,147: INFO/Worker-10] Processed 1000 revisions: [7d70379982d340ebff879a3f79314568ea3873eb, ...]
+Jun 12 05:07:42 worker01 python3[13656]: [2016-06-12 05:07:42,426: INFO/Worker-10] Processed 1000 revisions: [7b81c934b441335e06977f2dcd797f16337c49f2, ...]
+Jun 12 05:26:47 worker01 python3[13656]: [2016-06-12 05:26:47,593: INFO/Worker-10] Processed 1000 revisions: [8de5385844c1a8de253ad8945dc06259d11c7fc8, ...]
+Jun 12 05:46:27 worker01 python3[13656]: [2016-06-12 05:46:27,938: INFO/Worker-10] Processed 1000 revisions: [c0b63db3767754092c8c1fe92b07e66e77b7fed3, ...]
+Jun 12 05:57:00 worker01 python3[13656]: [2016-06-12 05:57:00,711: INFO/Worker-10] Processed 523 revisions: [ba52b091af3078562f7e7fc05c04b9469988e006, ...]
+Jun 12 05:57:34 worker01 python3[13656]: [2016-06-12 05:57:34,284: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[740dd7e1-3d96-4bc8-8fce-faef773acbb6] succeeded in 22651.265359937213s: None
+Jun 12 05:57:34 worker01 python3[13656]: [2016-06-12 05:57:34,299: INFO/MainProcess] Received task: swh.loader.svn.tasks.LoadSvnRepositoryTsk[10b1e441-4ab0-4121-a27f-7d32f1312b1f]
+Jun 12 05:57:34 worker01 python3[13656]: [2016-06-12 05:57:34,593: INFO/Worker-10] [revision_start-revision_end]: [1-49061]
+Jun 12 05:57:34 worker01 python3[13656]: [2016-06-12 05:57:34,623: INFO/Worker-10] Processing {'remote_url': 'svn://svn.debian.org/svn/pkg-gnome', 'local_url': b'/tmp/tmp.h36l0khh.swh.loader/pkg-gnome', 'uuid': b'db0db5de-e4c8-0310-9441-90
+abf70311f7', 'swh-origin': 27}.
+Jun 12 06:00:02 worker01 python3[13656]: [2016-06-12 06:00:02,454: INFO/Worker-10] Processed 1000 revisions: [29a3157f1d4a82955860a6fd3397bbd94573b555, ...]
+Jun 12 06:02:48 worker01 python3[13656]: [2016-06-12 06:02:48,493: INFO/Worker-10] Processed 1000 revisions: [bbada23d3943294e2efe3d6a1c978498e013d957, ...]
+Jun 12 06:05:59 worker01 python3[13656]: [2016-06-12 06:05:59,792: INFO/Worker-10] Processed 1000 revisions: [8a257ee9a72d9ec7f3a25bc5b4ab886f06b7d9c4, ...]
+Jun 12 06:08:54 worker01 python3[13656]: [2016-06-12 06:08:54,635: INFO/Worker-10] Processed 1000 revisions: [f179272fc81ae3f16bbf6d8a12709e9a7109b347, ...]
+Jun 12 06:11:41 worker01 python3[13656]: [2016-06-12 06:11:41,154: INFO/Worker-10] Processed 1000 revisions: [d74e2545a86fb065e60f3ef6e1fa5a975ab6a793, ...]
+Jun 12 06:14:44 worker01 python3[13656]: [2016-06-12 06:14:44,830: INFO/Worker-10] Processed 1000 revisions: [2a1dab8d134ef32f914da2ccc7c14819777f1e8f, ...]
+Jun 12 06:17:56 worker01 python3[13656]: [2016-06-12 06:17:56,791: INFO/Worker-10] Processed 1000 revisions: [544884d67e2a6c138a09ddf6b8f3f3f9c835610e, ...]
+Jun 12 06:21:13 worker01 python3[13656]: [2016-06-12 06:21:13,713: INFO/Worker-10] Processed 1000 revisions: [17c8cc0eb3be0d69176af005422f4a8aea22b037, ...]
+Jun 12 06:24:12 worker01 python3[13656]: [2016-06-12 06:24:12,387: INFO/Worker-10] Processed 1000 revisions: [cd83dc86dc388920ddfef5c3b393eeb754b15595, ...]
+Jun 12 06:27:59 worker01 python3[13656]: [2016-06-12 06:27:59,335: INFO/Worker-10] Processed 1000 revisions: [ed5ad1e6879a9a56c1fb89fec0e9ba80943facd8, ...]
+Jun 12 06:31:51 worker01 python3[13656]: [2016-06-12 06:31:51,145: INFO/Worker-10] Processed 1000 revisions: [ea995f84bc6eef36f890243f0c6ea4bdf2796452, ...]
+Jun 12 06:36:05 worker01 python3[13656]: [2016-06-12 06:36:05,801: INFO/Worker-10] Processed 1000 revisions: [b83e8f3b62dda65f582c01e2d04da6003564546b, ...]
+Jun 12 06:41:16 worker01 python3[13656]: [2016-06-12 06:41:16,749: INFO/Worker-10] Processed 1000 revisions: [c730f0da619383441fe1dcf04e19a5e40976226d, ...]
+Jun 12 06:47:13 worker01 python3[13656]: [2016-06-12 06:47:13,322: INFO/Worker-10] Processed 1000 revisions: [559711199c653202b1c8f2073a7cb0c95116165e, ...]
+Jun 12 06:53:14 worker01 python3[13656]: [2016-06-12 06:53:14,793: INFO/Worker-10] Processed 1000 revisions: [e2739f72f8bfe51f3344d838d2ae4b66aa472497, ...]
+Jun 12 06:59:51 worker01 python3[13656]: [2016-06-12 06:59:51,234: INFO/Worker-10] Processed 1000 revisions: [d05438f16f9aa3cd8dfbe47d493bdcc168448daf, ...]
+Jun 12 07:07:16 worker01 python3[13656]: [2016-06-12 07:07:16,195: INFO/Worker-10] Processed 1000 revisions: [4cf7273102dca6be96e569b8115f1371d43c3767, ...]
+Jun 12 07:15:28 worker01 python3[13656]: [2016-06-12 07:15:27,999: INFO/Worker-10] Processed 1000 revisions: [2ecb859a650ad2b10e7d0869c014d6b1b3ded55a, ...]
+Jun 12 07:24:27 worker01 python3[13656]: [2016-06-12 07:24:27,812: INFO/Worker-10] Processed 1000 revisions: [4758461520c23192618d1e78eeb23fecfcb9bd29, ...]
+Jun 12 07:35:29 worker01 python3[13656]: [2016-06-12 07:35:29,420: INFO/Worker-10] Processed 1000 revisions: [21fec7d864ab60f99863fe842680bfef1f8cd0b5, ...]
+Jun 12 07:47:12 worker01 python3[13656]: [2016-06-12 07:47:12,803: INFO/Worker-10] Processed 1000 revisions: [e3c2e7cbb7beaa344549145e2e78c77c5fd9f7c8, ...]
+Jun 12 07:58:12 worker01 python3[13656]: [2016-06-12 07:58:12,596: INFO/Worker-10] Processed 1000 revisions: [f6cf4af3d7d1744c364a9f25e92a5a6bba622837, ...]
+Jun 12 08:10:41 worker01 python3[13656]: [2016-06-12 08:10:41,787: INFO/Worker-10] Processed 1000 revisions: [3ccd855ced499e839306249a44006b33fcd9efb7, ...]
+Jun 12 08:23:42 worker01 python3[13656]: [2016-06-12 08:23:42,690: INFO/Worker-10] Processed 1000 revisions: [65092bf7e0e2df4d71a31f3d89d1233eef0e6438, ...]
+Jun 12 08:38:36 worker01 python3[13656]: [2016-06-12 08:38:36,192: INFO/Worker-10] Processed 1000 revisions: [a4c15e02c5db378dd77f0bab5e6a73a437ad8afb, ...]
+Jun 12 08:53:13 worker01 python3[13656]: [2016-06-12 08:53:13,853: INFO/Worker-10] Processed 1000 revisions: [bb81b662a5257e136c665b97d858bf4d20bf088c, ...]
+Jun 12 09:09:17 worker01 python3[13656]: [2016-06-12 09:09:17,177: INFO/Worker-10] Processed 1000 revisions: [04467b7e2bd60ac0a5c55ba184432620410f8b11, ...]
+Jun 12 09:26:04 worker01 python3[13656]: [2016-06-12 09:26:04,887: INFO/Worker-10] Processed 1000 revisions: [7b108c6627a394a2db6ad8d743f319e085014118, ...]
+Jun 12 09:44:06 worker01 python3[13656]: [2016-06-12 09:44:06,874: INFO/Worker-10] Processed 1000 revisions: [479a007698148817ab921a0a2df6a07f4558ec0e, ...]
+Jun 12 10:02:21 worker01 python3[13656]: [2016-06-12 10:02:21,001: INFO/Worker-10] Processed 1000 revisions: [2f7cbf1ff849e315b9211e6a57451c22d5a9a538, ...]
+Jun 12 10:21:57 worker01 python3[13656]: [2016-06-12 10:21:57,565: INFO/Worker-10] Processed 1000 revisions: [97650da3145a749e730367e9bb8b4b5e99733d1f, ...]
+Jun 12 10:40:39 worker01 python3[13656]: [2016-06-12 10:40:39,339: INFO/Worker-10] Processed 1000 revisions: [8aca07d408d5461e073f2a464b1bb1098a4169d6, ...]
+Jun 12 10:59:30 worker01 python3[13656]: [2016-06-12 10:59:30,232: INFO/Worker-10] Processed 1000 revisions: [66a3005e7fb08d761030438b88416a2f5354aab3, ...]
+Jun 12 11:18:59 worker01 python3[13656]: [2016-06-12 11:18:59,836: INFO/Worker-10] Processed 1000 revisions: [8d25bc6cb7e1ce4e1cf0bceca17cc8cd4701e4b1, ...]
+Jun 12 11:38:26 worker01 python3[13656]: [2016-06-12 11:38:26,167: INFO/Worker-10] Processed 1000 revisions: [77c2759fc8f419b2993b39b1423a5f48c5b26aa4, ...]
+Jun 12 11:59:25 worker01 python3[13656]: [2016-06-12 11:59:25,276: INFO/Worker-10] Processed 1000 revisions: [39ec4e85be0132737da5862397d35263930d0f60, ...]
+Jun 12 12:30:45 worker01 python3[13656]: [2016-06-12 12:30:45,885: INFO/Worker-10] Processed 1000 revisions: [7f9125098da0bf0360ce8f2c4fb70f96f5f105f3, ...]
+Jun 12 12:57:31 worker01 python3[13656]: [2016-06-12 12:57:31,495: INFO/Worker-10] Processed 1000 revisions: [f882f6cc7777f60a3e2e795bcffcaeb586defe2e, ...]
+Jun 12 13:21:53 worker01 python3[13656]: [2016-06-12 13:21:53,741: INFO/Worker-10] Processed 1000 revisions: [dfb73fa7ac834fb8863c739c6a1f40320ccca198, ...]
+Jun 12 13:45:41 worker01 python3[13656]: [2016-06-12 13:45:41,496: INFO/Worker-10] Processed 1000 revisions: [7a3dcc6abe1fe812552a5ff17123cc676a6e19ea, ...]
+Jun 12 14:10:03 worker01 python3[13656]: [2016-06-12 14:10:03,134: INFO/Worker-10] Processed 1000 revisions: [2f14c0ee2931c3bfe146af6f7baa5ffa6512a9d5, ...]
+Jun 12 14:36:48 worker01 python3[13656]: [2016-06-12 14:36:48,680: INFO/Worker-10] Processed 1000 revisions: [aa82ccb58456e1be3fc8b3b4db0c2769526f115e, ...]
+Jun 12 15:04:36 worker01 python3[13656]: [2016-06-12 15:04:36,579: INFO/Worker-10] Processed 1000 revisions: [c0ac4d6e5058a7ad19bc5b5f8ea6d0184262814b, ...]
+Jun 12 15:31:55 worker01 python3[13656]: [2016-06-12 15:31:55,484: INFO/Worker-10] Processed 1000 revisions: [8e972fa53b5e4ccaca85cf7f7087191a809d83bd, ...]
+Jun 12 15:59:34 worker01 python3[13656]: [2016-06-12 15:59:34,441: INFO/Worker-10] Processed 1000 revisions: [b846dcc3d3cea598263cffb87557aa7f7566e80f, ...]
+Jun 12 16:28:10 worker01 python3[13656]: [2016-06-12 16:28:10,446: INFO/Worker-10] Processed 1000 revisions: [bc969c3c6977374d6e6bc5fe4e0606ee60f29e90, ...]
+Jun 12 16:57:15 worker01 python3[13656]: [2016-06-12 16:57:15,045: INFO/Worker-10] Processed 1000 revisions: [e9625679cf1fe23a91f0f06f02ac03723d7112cb, ...]
+Jun 12 17:28:04 worker01 python3[13656]: [2016-06-12 17:28:04,678: INFO/Worker-10] Processed 1000 revisions: [f61326f5d12094860dead900d2d46d0c368f4e4b, ...]
+Jun 12 18:01:24 worker01 python3[13656]: [2016-06-12 18:01:24,516: INFO/Worker-10] Processed 1000 revisions: [754bfe4141e5a9165a7458945157791ac85e6ff9, ...]
+Jun 12 18:04:03 worker01 python3[13656]: [2016-06-12 18:04:03,334: INFO/Worker-10] Processed 61 revisions: [27e079019bc07ef84716c80c62ec53a39d806879, ...]
+Jun 12 18:04:43 worker01 python3[13656]: [2016-06-12 18:04:43,418: INFO/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[10b1e441-4ab0-4121-a27f-7d32f1312b1f] succeeded in 43629.105175915174s: None
+#+END_SRC

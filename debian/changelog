@@ -1,3 +1,12 @@
+swh-loader-svn (0.0.9-1~swh1) unstable-swh; urgency=medium
+
+  * v0.0.9
+  * Restrict loader to 2 possible policies: swh, git-svn
+  * Improve coverage
+  * Update README
+
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 24 Jun 2016 13:56:54 +0200
+
 swh-loader-svn (0.0.8-1~swh1) unstable-swh; urgency=medium
 
   * v0.0.8

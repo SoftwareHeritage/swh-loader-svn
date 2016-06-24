@@ -70,7 +70,7 @@ def hashtree(path, ignore_empty_folder, ignore=None):
     """Given a path and options, compute the hash's upper tree.
 
     This is not for production use.
-    It's merely a helper function used mainly in bin/hashtree.py
+    It's merely a helper function used mainly in bin/swh-hashtree
 
     Args:
         - path: The path to hash

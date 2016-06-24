@@ -3,14 +3,15 @@ AUTHORS
 LICENSE
 MANIFEST.in
 Makefile
+README
 README-dev.org
 errors.org
 requirements.txt
 setup.py
 svn-lib-client-analysis.org
 version.txt
-bin/hashtree.py
 bin/init-svn-repository.sh
+bin/swh-hashtree
 debian/changelog
 debian/compat
 debian/control
@@ -18,10 +19,10 @@ debian/copyright
 debian/rules
 debian/source/format
 docs/comparison-git-svn-swh-svn.org
+docs/swh-loader-svn.txt
 install/install-pysvn.sh
 install/install-subvertpy.sh
 resources/svn.ini
-scratch/scratch.py
 swh.loader.svn.egg-info/PKG-INFO
 swh.loader.svn.egg-info/SOURCES.txt
 swh.loader.svn.egg-info/dependency_links.txt
@@ -36,4 +37,6 @@ swh/loader/svn/svn.py
 swh/loader/svn/tasks.py
 swh/loader/svn/utils.py
 swh/loader/svn/tests/test_converters.py
+swh/loader/svn/tests/test_loader.org
+swh/loader/svn/tests/test_loader.py
 swh/loader/svn/tests/test_utils.py

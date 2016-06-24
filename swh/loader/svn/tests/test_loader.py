@@ -60,7 +60,8 @@ class TestSvnLoader:
 class GitSvnLoaderNoStorage(TestSvnLoader, GitSvnSvnLoader):
     """A GitSvnLoader with no persistence.
 
-    Context: Load an svn repository using the git-svn policy.
+    Context:
+        Load an svn repository using the git-svn policy.
 
     """
     def __init__(self, svn_url, destination_path, origin):
@@ -71,7 +72,7 @@ class SWHSvnLoaderNoStorage(TestSvnLoader, SWHSvnLoader):
     """An SWHSVNLoader with no persistence.
 
     Context:
-    Load a new svn repository using the swh policy (so no update).
+        Load a new svn repository using the swh policy (so no update).
 
     """
     def __init__(self, svn_url, destination_path, origin):
@@ -88,7 +89,12 @@ class SWHSvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
     """An SWHSVNLoader with no persistence.
 
     Context:
-    Load a known svn repository using the swh policy so we need to update it.
+        Load a known svn repository using the swh policy.
+        We can either:
+        - do nothing since it does not contain any new commit (so no
+          change)
+        - either check its history is not altered and update in
+          consequence by loading the new revision
 
     """
     def __init__(self, svn_url, destination_path, origin):
@@ -113,8 +119,44 @@ class SWHSvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
             'target_type': 'revision',
             'metadata': {
                 'extra_headers': [
-                    # should be the right uuid but we don't care much here
-                    ['svn_repo_uuid', ''],
+                    ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
+                    ['svn_revision', b'6']
+                ]
+            }
+        }
+
+
+class SWHSvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
+    """An SWHSVNLoader with no persistence.
+
+    Context: Load a known svn repository using the swh policy with its
+    history altered so we do not update it.
+
+    """
+    def __init__(self, svn_url, destination_path, origin):
+        super().__init__(svn_url, destination_path, origin)
+
+    def swh_previous_revision(self):
+        """Avoid the storage persistence call and return the expected previous
+        revision for that repository.
+
+        Check the following for explanation about the hashes:
+        - test_loader.org for (swh policy).
+        - cf. SWHSvnLoaderITTest
+
+        """
+        return {
+            # Changed the revision id's hash to simulate history altered
+            'id': hashutil.hex_to_hash(
+                'badbadbadbadf708f7466dddf547567b65f6c39d'),
+            'parents': [hashutil.hex_to_hash(
+                'a3a577948fdbda9d1061913b77a1588695eadb41')],
+            'directory': hashutil.hex_to_hash(
+                '0deab3023ac59398ae467fc4bff5583008af1ee2'),
+            'target_type': 'revision',
+            'metadata': {
+                'extra_headers': [
+                    ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
                     ['svn_revision', b'6']
                 ]
             }
@@ -122,7 +164,12 @@ class SWHSvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
 
 
 class BaseTestLoader(unittest.TestCase):
-    def setUp(self, filename='pkg-gourmet'):
+    """Base test loader class.
+
+    In its setup, it's uncompressing a local svn mirror to /tmp.
+
+    """
+    def setUp(self, archive_name='pkg-gourmet.tgz', filename='pkg-gourmet'):
         self.tmp_root_path = tempfile.mkdtemp()
 
         start_path = os.path.dirname(__file__)
@@ -130,7 +177,7 @@ class BaseTestLoader(unittest.TestCase):
                                        '../../../../..',
                                        'swh-storage-testdata',
                                        'svn-folders',
-                                       filename + '.tgz')
+                                       archive_name)
 
         # uncompress the sample folder
         subprocess.check_output(
@@ -142,8 +189,6 @@ class BaseTestLoader(unittest.TestCase):
             self.tmp_root_path, 'working-copy')
 
     def tearDown(self):
-        super().tearDownClass()
-
         shutil.rmtree(self.tmp_root_path)
 
 
@@ -266,3 +311,80 @@ class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestLoader):
         self.assertEquals(len(self.loader.all_revisions), 0)
         self.assertEquals(len(self.loader.all_releases), 0)
         self.assertEquals(len(self.loader.all_occurrences), 0)
+
+
+class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestLoader):
+    def setUp(self):
+        # the svn repository pkg-gourmet has been updated with changes
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
+
+        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
+
+        self.loader = SWHSvnLoaderUpdateHistoryAlteredNoStorage(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path,
+            origin=self.origin)
+
+    @istest
+    def process_repository(self):
+        """Process a known repository with swh policy and history altered should
+        stop and do nothing.
+
+        """
+        # when
+        self.loader.process_repository()
+
+        # then
+        # we got the previous run's last revision (rev 6)
+        # so 2 news + 1 old
+        self.assertEquals(len(self.loader.all_revisions), 0)
+        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertEquals(len(self.loader.all_occurrences), 0)
+
+
+class SWHSvnLoaderUpdateWithChangesITTest(BaseTestLoader):
+    def setUp(self):
+        # the svn repository pkg-gourmet has been updated with changes
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
+
+        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
+
+        self.loader = SWHSvnLoaderUpdateNoStorage(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path,
+            origin=self.origin)
+
+    @istest
+    def process_repository(self):
+        """Process a known repository with swh policy and new data should
+        yield new revisions and occurrence.
+
+        """
+        # when
+        self.loader.process_repository()
+
+        # then
+        # we got the previous run's last revision (rev 6)
+        # so 2 news + 1 old
+        self.assertEquals(len(self.loader.all_revisions), 2)
+        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertEquals(len(self.loader.all_occurrences), 1)
+
+        last_revision = '38d81702cb28db4f1a6821e64321e5825d1f7fd6'
+        # cf. test_loader.org for explaining from where those hashes
+        # come from
+        expected_revisions = {
+            # revision hash | directory hash
+            '7f5bc909c29d4e93d8ccfdda516e51ed44930ee1': '752c52134dcbf2fff13c7be1ce4e9e5dbf428a59',  # noqa
+            last_revision:                              '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
+        }
+
+        for rev in self.loader.all_revisions:
+            rev_id = hashutil.hash_to_hex(rev['id'])
+            directory_id = hashutil.hash_to_hex(rev['directory'])
+
+            self.assertEquals(expected_revisions[rev_id], directory_id)
+
+        occ = self.loader.all_occurrences[0]
+        self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
+        self.assertEquals(occ['origin'], self.origin['id'])

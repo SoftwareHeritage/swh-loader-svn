@@ -359,8 +359,9 @@ class SWHSvnLoader(BaseSvnLoader):
                 revision_start: swh_rev['parents']
             }
 
-            self.log.debug('svn co %s@%s' % (svnrepo.remote_url,
-                                             revision_start))
+            self.log.debug('svn export --ignore-keywords %s@%s' % (
+                svnrepo.remote_url,
+                revision_start))
 
             if swh_rev and not self.check_history_not_altered(
                     svnrepo,
@@ -370,13 +371,19 @@ class SWHSvnLoader(BaseSvnLoader):
                     svnrepo.remote_url, revision_start)
                 self.log.warn(msg)
                 return {'status': False, 'stderr': msg}
+            else:
+                # now we know history is ok, we start at next revision
+                revision_start = revision_start + 1
+                # and the parent become the latest know revision for
+                # that repository
+                revision_parents[revision_start] = [swh_rev['id']]
 
         revision_end = svnrepo.head_revision()
 
         self.log.info('[revision_start-revision_end]: [%s-%s]' % (
             revision_start, revision_end))
 
-        if revision_start == revision_end and revision_start is not 1:
+        if revision_start >= revision_end and revision_start is not 1:
             self.log.info('%s@%s already injected.' % (
                 svnrepo.remote_url, revision_end))
             return {'status': True}

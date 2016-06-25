@@ -1,8 +1,10 @@
-swh-loader-svn (0.0.9-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.10-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.10
+  * Add retry policy around britle action (connection to remote svn
+    server)
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 24 Jun 2016 13:56:54 +0200
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Sat, 25 Jun 2016 11:30:34 +0200
 
 swh-loader-svn (0.0.9-1~swh1) unstable-swh; urgency=medium
 

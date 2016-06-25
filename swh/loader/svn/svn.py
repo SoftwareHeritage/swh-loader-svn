@@ -253,7 +253,7 @@ class BaseSvnRepo():
         self.swhreplay = ra.SWHReplay(
                 conn=self.conn,
                 rootpath=self.local_url,
-                state=hashes)
+                objects=hashes)
 
         # Retrieve the commit information for revision
         commit = list(self.logs(revision, revision))[0]

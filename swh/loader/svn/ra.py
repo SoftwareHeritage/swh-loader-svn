@@ -455,23 +455,50 @@ class BaseSWHReplay:
         self.conn.replay(rev, rev+1, self.editor)
         return self.editor.state
 
+    def compute_hashes(self, rev):
+        """Compute hashes at revisions rev.
+        Expects the state to be at previous revision's state.
+
+        Args:
+            rev: The revision to start the replay from.
+
+        Returns:
+            The updated hashes between rev and rev+1.
+            Beware that this mutates the filesystem at rootpath accordingly.
+
+        """
+        raise NotImplementedError('This should be overridden by subclass')
+
+
+class SWHReplayNoEmptyFolder(BaseSWHReplay):
+    """Replay class.
+
+    This class computes hashes for all files and folders as long as
+    those folders are not empty.
+
+    If empty folder are discovered, they are removed from the
+    filesystem and their hashes are not computed.
+
+    """
+    def __init__(self, conn, rootpath, state=None):
+        self.conn = conn
+        self.rootpath = rootpath
+        self.editor = SWHEditorNoEmptyFolder(rootpath=rootpath,
+                                             state=state if state else {})
 
     def compute_hashes(self, rev):
         """Compute hashes at revisions rev.
         Expects the state to be at previous revision's state.
 
         Args:
-            rev: The revision to play the replay.
-            It is expected to be the next revision.
+            rev: The revision to start the replay from.
 
         Returns:
-            The updated state
+            The updated hashes between rev and rev+1.
             Beware that this mutates the filesystem at rootpath accordingly.
 
         """
-        self.conn.replay(rev, rev+1, self.editor)
-        state = self.editor.state
-        # When accepting empty folder, this should be removed
+        state = self.replay(rev)
         if not state:  # dangling tree at root
             # hack: empty tree at level 1: `git hash-object -t tree /dev/null`
             state[b''] = {
@@ -489,20 +516,31 @@ class BaseSWHReplay:
         return state
 
 
-class SWHReplayNoEmptyFolder(BaseSWHReplay):
-    def __init__(self, conn, rootpath, state=None):
-        self.conn = conn
-        self.rootpath = rootpath
-        self.editor = SWHEditorNoEmptyFolder(rootpath=rootpath,
-                                             state=state if state else {})
-
-
 class SWHReplay(BaseSWHReplay):
+    """Replay class.
+
+    All folders and files are considered for hash computations.
+
+    """
     def __init__(self, conn, rootpath, state=None):
         self.conn = conn
         self.rootpath = rootpath
         self.editor = SWHEditor(rootpath=rootpath,
                                 state=state if state else {})
+
+    def compute_hashes(self, rev):
+        """Compute hashes at revisions rev.
+        Expects the state to be at previous revision's state.
+
+        Args:
+            rev: The revision to start the replay from.
+
+        Returns:
+            The updated hashes between rev and rev+1.
+            Beware that this mutates the filesystem at rootpath accordingly.
+
+        """
+        return self.replay(rev)
 
 
 @click.command()

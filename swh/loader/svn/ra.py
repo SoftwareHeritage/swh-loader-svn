@@ -12,6 +12,7 @@ import os
 import shutil
 import tempfile
 
+from retrying import retry
 from subvertpy import delta, properties
 from subvertpy.ra import RemoteAccess, Auth, get_username_provider
 
@@ -428,9 +429,33 @@ class SWHEditor(BaseSWHEditor):
 
 
 class BaseSWHReplay:
-    """intended to be inherited.
+    """Base replay class.
+    Their role is to compute hashes for a particular revision.
+
+    This class is intended to be inherited to:
+    - initialize the editor (global loading policy depends on this editor)
+
+    - override the compute_hashes function in charge of computing
+    hashes between rev and rev+1 def compute_hashes(self, rev):
+
+    cf. SWHReplayNoEmptyFolder and SWHReplay for instanciated classes.
 
     """
+    @retry(stop_max_attempt_number=3)
+    def replay(self, rev):
+        """Replay svn actions between rev and rev+1.
+
+           This method updates in place the self.editor.state's reference.
+           This also updates in place the filesystem.
+
+        Returns:
+           The updated hashes (a.k.a state)
+
+        """
+        self.conn.replay(rev, rev+1, self.editor)
+        return self.editor.state
+
+
     def compute_hashes(self, rev):
         """Compute hashes at revisions rev.
         Expects the state to be at previous revision's state.

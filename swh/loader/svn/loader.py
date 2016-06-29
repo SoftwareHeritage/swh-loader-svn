@@ -18,6 +18,16 @@ from swh.loader.core.loader import SWHLoader
 from . import svn, converters
 
 
+class SvnLoaderException(ValueError):
+    """A wrapper exception to transit the swh_revision onto which the
+    loading failed.
+
+    """
+    def __init__(self, e, swh_revision):
+        super().__init__(e)
+        self.swh_revision = swh_revision
+
+
 class BaseSvnLoader(SWHLoader):
     """Base Svn loader to load one svn repository.
 
@@ -94,26 +104,37 @@ class BaseSvnLoader(SWHLoader):
         gen_revs = svnrepo.swh_hash_data_per_revision(
             revision_start,
             revision_end)
-        for rev, nextrev, commit, objects_per_path in gen_revs:
-            # compute the fs tree's checksums
-            dir_id = objects_per_path[b'']['checksums']['sha1_git']
-            swh_revision = self.build_swh_revision(
-                rev, commit, dir_id, revision_parents[rev])
-            swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
-            self.log.debug('rev: %s, swhrev: %s, dir: %s' % (
-                rev,
-                hashutil.hash_to_hex(swh_revision['id']),
-                hashutil.hash_to_hex(dir_id)))
+        try:
+            swh_revision = {}
+            for rev, nextrev, commit, objects_per_path in gen_revs:
+                # Send the associated contents/directories
+                self.maybe_load_contents(
+                    git.objects_per_type(GitType.BLOB, objects_per_path))
+                self.maybe_load_directories(
+                    git.objects_per_type(GitType.TREE, objects_per_path))
 
-            if nextrev:
-                revision_parents[nextrev] = [swh_revision['id']]
+                # compute the fs tree's checksums
+                dir_id = objects_per_path[b'']['checksums']['sha1_git']
+                swh_revision = self.build_swh_revision(
+                    rev, commit, dir_id, revision_parents[rev])
+                swh_revision['id'] = git.compute_revision_sha1_git(
+                    swh_revision)
+                self.log.debug('rev: %s, swhrev: %s, dir: %s' % (
+                    rev,
+                    hashutil.hash_to_hex(swh_revision['id']),
+                    hashutil.hash_to_hex(dir_id)))
 
-            self.maybe_load_contents(
-                git.objects_per_type(GitType.BLOB, objects_per_path))
-            self.maybe_load_directories(
-                git.objects_per_type(GitType.TREE, objects_per_path))
+                if nextrev:
+                    revision_parents[nextrev] = [swh_revision['id']]
 
-            yield swh_revision
+                yield swh_revision
+        except Exception as e:
+            # Wrap the exception with the needed revision
+            raise SvnLoaderException(e, swh_revision={
+                'id': swh_revision['id'],
+                'parents': swh_revision['parents'],
+                'metadata': swh_revision.get('metadata')
+            })
 
     def process_swh_revisions(self,
                               svnrepo,
@@ -149,7 +170,7 @@ class BaseSvnLoader(SWHLoader):
         self.log.debug('occ: %s' % occ)
         self.maybe_load_occurrences([occ])
 
-    def load(self):
+    def load(self, known_state=None):
         """Load a svn repository in swh.
 
         Checkout the svn repository locally in destination_path.
@@ -168,7 +189,7 @@ class BaseSvnLoader(SWHLoader):
 
         """
         try:
-            self.process_repository()
+            self.process_repository(known_state)
         finally:
             # flush eventual remaining data
             self.flush()
@@ -233,10 +254,12 @@ class GitSvnSvnLoader(BaseSvnLoader):
                                                     dir_id,
                                                     parents)
 
-    def process_repository(self):
-        """Load the repository's commits and send them for storage to swh.
+    def process_repository(self, known_state=None):
+        """Load the repository's svn commits and process them as swh hashes.
 
-        This does not deal with update.
+        This does not:
+        - deal with update
+        - nor with the potential known state.
 
         """
         origin = self.origin
@@ -339,7 +362,7 @@ class SWHSvnLoader(BaseSvnLoader):
                                              dir_id,
                                              parents)
 
-    def process_repository(self):
+    def process_repository(self, known_state=None):
         svnrepo = self.svnrepo
         origin = self.origin
 
@@ -349,14 +372,21 @@ class SWHSvnLoader(BaseSvnLoader):
             revision_start: []
         }
 
-        # Deal with update
-        swh_rev = self.swh_previous_revision()
+        if known_state:  # Deal with a potential known state (it's a revision)
+            # In some edge case, svn repository with lots of svn
+            # commits for example, the loader can break.  Thus, a
+            # rescheduling can take place which will try and load
+            # again the same repository but from a known state.
+            swh_rev = known_state
+        else:
+            # Deal with update
+            swh_rev = self.swh_previous_revision()
 
         if swh_rev:  # Yes, we do. Try and update it.
             extra_headers = dict(swh_rev['metadata']['extra_headers'])
             revision_start = int(extra_headers['svn_revision'])
             revision_parents = {
-                revision_start: swh_rev['parents']
+                revision_start: swh_rev['parents'],
             }
 
             self.log.debug('svn export --ignore-keywords %s@%s' % (

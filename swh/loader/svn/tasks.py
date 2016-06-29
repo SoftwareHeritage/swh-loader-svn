@@ -4,7 +4,47 @@
 # See top-level LICENSE file for more information
 
 from swh.loader.core import tasks
-from swh.loader.svn.loader import GitSvnSvnLoader, SWHSvnLoader
+from swh.core import hashutil
+
+from .loader import GitSvnSvnLoader, SWHSvnLoader, SvnLoaderException
+
+
+def loader_to_scheduler_revision(swh_revision):
+    """To avoid serialization or scheduler storage problem, transform
+    adequately the revision.
+
+    FIXME: Should be more generically dealt with in swh-scheduler's
+    side.  The advantage to having it here is that we known what we
+    store.
+
+    """
+    metadata = swh_revision['metadata']
+    for entry in metadata['extra_headers']:
+        entry[1] = entry[1].decode('utf-8')
+
+    return {
+        'id': hashutil.hash_to_hex(swh_revision['id']),
+        'parents': [hashutil.hash_to_hex(parent) for parent
+                    in swh_revision['parents']],
+        'metadata': metadata
+    }
+
+
+def scheduler_to_loader_revision(swh_revision):
+    """If the known state (a revision) is already passed, it will be
+    serializable ready but not loader ready.
+
+    FIXME: Should be more generically dealt with in swh-scheduler's
+    side.  The advantage to having it here is that we known what we
+    store.
+
+    """
+    return {
+        'id': hashutil.hex_to_hash(swh_revision['id']),
+        'parents': [hashutil.hex_to_hash(parent) for parent
+                    in swh_revision['parents']],
+        'metadata': swh_revision['metadata']
+    }
 
 
 class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
@@ -22,28 +62,70 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
 
     task_queue = 'swh_loader_svn'
 
-    def run(self, svn_url, local_path):
+    def run(self, *args, **kwargs):
         """Import a svn repository.
 
         Args:
+            - svn_url: svn's repository url
+            - destination_path: local path
+            - metadata: Extra metadata which is not None if this is a retry.
             cf. swh.loader.svn.SvnLoader.process docstring
 
         """
-        origin = {'type': 'svn', 'url': svn_url}
-        origin['id'] = self.storage.origin_add_one(origin)
+        destination_path = kwargs['destination_path']
+        svn_url = kwargs['svn_url']
+
+        if 'origin' not in kwargs:  # first time, we'll create the origin
+            origin = {
+                'type': 'svn',
+                'url': svn_url
+            }
+            origin['id'] = self.storage.origin_add_one(origin)
+            retry = False
+        else:
+            origin = {
+                'id': kwargs['origin'],
+                'url': kwargs['svn_url'],
+                'type': 'svn'
+            }
+            retry = True
 
         fetch_history_id = self.open_fetch_history(origin['id'])
 
-        # Determine which loader to trigger
-        if self.config['with_policy'] == 'gitsvn':
-            loader = GitSvnSvnLoader(svn_url, local_path, origin)
-        elif self.config['with_policy'] == 'swh':
-            loader = SWHSvnLoader(svn_url, local_path, origin)
-        else:
-            raise ValueError('Only gitsvn or swh policies are supported in'
-                             '\'with_policy\' entry. '
-                             'Please adapt your svn.ini file accordingly')
-
-        result = loader.load()
+        try:
+            # Determine which loader to trigger
+            if self.config['with_policy'] == 'gitsvn':
+                # this one compute hashes but do not store anywhere
+                loader = GitSvnSvnLoader(svn_url, destination_path, origin)
+            elif self.config['with_policy'] == 'swh':
+                # the real production use case with storage and all
+                loader = SWHSvnLoader(svn_url, destination_path, origin)
+            else:
+                raise ValueError('Only gitsvn or swh policies are supported in'
+                                 '\'with_policy\' entry. '
+                                 'Please adapt your svn.ini file accordingly')
+            if retry:
+                swh_revision = scheduler_to_loader_revision(
+                    kwargs['swh-revision'])
+                result = loader.load(swh_revision)
+            else:
+                result = loader.load()
+        except SvnLoaderException as e:
+            # reschedule a task
+            print(e)
+            swh_rev = loader_to_scheduler_revision(e.swh_revision)
+            self.scheduler_backend.create_task({
+                'type': 'svn-loader',
+                'arguments': {
+                    'args': None,
+                    'kwargs': {
+                        'origin': origin['id'],
+                        'svn_url': svn_url,
+                        'destination_path': destination_path,
+                        'swh-revision': swh_rev,
+                    }
+                }
+            })
+            result = {'status': False}
 
         self.close_fetch_history(fetch_history_id, result)

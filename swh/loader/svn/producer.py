@@ -12,18 +12,19 @@ task_name = 'swh.loader.svn.tasks.LoadSvnRepositoryTsk'
 
 def libproduce(svn_url, destination_path=None, synchroneous=False):
     from swh.scheduler.celery_backend.config import app
-    from swh.loader.svn import tasks  # noqa
+    for module in app.conf.CELERY_IMPORTS:
+        __import__(module)
 
     task = app.tasks[task_name]
     if not synchroneous and svn_url:
-        task.delay(svn_url, destination_path)
+        task.delay(svn_url=svn_url, destination_path=destination_path)
     elif synchroneous and svn_url:  # for debug purpose
-        task(svn_url, destination_path)
+        task(svn_url=svn_url, destination_path=destination_path)
     else:  # synchroneous flag is ignored in that case
         for svn_url in sys.stdin:
             svn_url = svn_url.rstrip()
             print(svn_url)
-            task.delay(svn_url, destination_path)
+            task.delay(svn_url=svn_url, destination_path=destination_path)
 
 
 @click.command()

@@ -5,6 +5,8 @@
 
 from email import utils
 
+from swh.core import hashutil
+
 from .utils import strdate_to_timestamp
 
 
@@ -190,3 +192,41 @@ def build_swh_occurrence(revision_id, origin_id, date):
             'target_type': 'revision',
             'origin': origin_id,
             'date': date}
+
+
+def loader_to_scheduler_revision(swh_revision):
+    """To avoid serialization or scheduler storage problem, transform
+    adequately the revision.
+
+    FIXME: Should be more generically dealt with in swh-scheduler's
+    side.  The advantage to having it here is that we known what we
+    store.
+
+    """
+    metadata = swh_revision['metadata']
+    for entry in metadata['extra_headers']:
+        entry[1] = entry[1].decode('utf-8')
+
+    return {
+        'id': hashutil.hash_to_hex(swh_revision['id']),
+        'parents': [hashutil.hash_to_hex(parent) for parent
+                    in swh_revision['parents']],
+        'metadata': metadata
+    }
+
+
+def scheduler_to_loader_revision(swh_revision):
+    """If the known state (a revision) is already passed, it will be
+    serializable ready but not loader ready.
+
+    FIXME: Should be more generically dealt with in swh-scheduler's
+    side.  The advantage to having it here is that we known what we
+    store.
+
+    """
+    return {
+        'id': hashutil.hex_to_hash(swh_revision['id']),
+        'parents': [hashutil.hex_to_hash(parent) for parent
+                    in swh_revision['parents']],
+        'metadata': swh_revision['metadata']
+    }

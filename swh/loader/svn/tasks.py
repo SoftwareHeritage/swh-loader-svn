@@ -4,47 +4,9 @@
 # See top-level LICENSE file for more information
 
 from swh.loader.core import tasks
-from swh.core import hashutil
 
 from .loader import GitSvnSvnLoader, SWHSvnLoader, SvnLoaderException
-
-
-def loader_to_scheduler_revision(swh_revision):
-    """To avoid serialization or scheduler storage problem, transform
-    adequately the revision.
-
-    FIXME: Should be more generically dealt with in swh-scheduler's
-    side.  The advantage to having it here is that we known what we
-    store.
-
-    """
-    metadata = swh_revision['metadata']
-    for entry in metadata['extra_headers']:
-        entry[1] = entry[1].decode('utf-8')
-
-    return {
-        'id': hashutil.hash_to_hex(swh_revision['id']),
-        'parents': [hashutil.hash_to_hex(parent) for parent
-                    in swh_revision['parents']],
-        'metadata': metadata
-    }
-
-
-def scheduler_to_loader_revision(swh_revision):
-    """If the known state (a revision) is already passed, it will be
-    serializable ready but not loader ready.
-
-    FIXME: Should be more generically dealt with in swh-scheduler's
-    side.  The advantage to having it here is that we known what we
-    store.
-
-    """
-    return {
-        'id': hashutil.hex_to_hash(swh_revision['id']),
-        'parents': [hashutil.hex_to_hash(parent) for parent
-                    in swh_revision['parents']],
-        'metadata': swh_revision['metadata']
-    }
+from .loader import converters
 
 
 class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
@@ -105,15 +67,14 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
                                  '\'with_policy\' entry. '
                                  'Please adapt your svn.ini file accordingly')
             if retry:
-                swh_revision = scheduler_to_loader_revision(
+                swh_revision = converters.scheduler_to_loader_revision(
                     kwargs['swh_revision'])
                 result = loader.load(swh_revision)
             else:
                 result = loader.load()
         except SvnLoaderException as e:
             # reschedule a task
-            print(e)
-            swh_rev = loader_to_scheduler_revision(e.swh_revision)
+            swh_rev = converters.loader_to_scheduler_revision(e.swh_revision)
             self.scheduler_backend.create_task({
                 'type': 'svn-loader',
                 'arguments': {

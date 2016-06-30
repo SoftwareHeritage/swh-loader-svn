@@ -67,8 +67,8 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
 
         Args:
             - svn_url: svn's repository url
-            - destination_path: local path
-            - metadata: Extra metadata which is not None if this is a retry.
+            - destination_path: root directory to locally retrieve svn's data
+            - swh_revision: Optional extra swh revision to start from.
             cf. swh.loader.svn.SvnLoader.process docstring
 
         """
@@ -78,7 +78,7 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
         if 'origin' not in kwargs:  # first time, we'll create the origin
             origin = {
                 'type': 'svn',
-                'url': svn_url
+                'url': svn_url,
             }
             origin['id'] = self.storage.origin_add_one(origin)
             retry = False
@@ -106,7 +106,7 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
                                  'Please adapt your svn.ini file accordingly')
             if retry:
                 swh_revision = scheduler_to_loader_revision(
-                    kwargs['swh-revision'])
+                    kwargs['swh_revision'])
                 result = loader.load(swh_revision)
             else:
                 result = loader.load()
@@ -122,7 +122,7 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
                         'origin': origin['id'],
                         'svn_url': svn_url,
                         'destination_path': destination_path,
-                        'swh-revision': swh_rev,
+                        'swh_revision': swh_rev,
                     }
                 }
             })

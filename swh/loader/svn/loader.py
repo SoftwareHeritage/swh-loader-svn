@@ -119,6 +119,7 @@ class BaseSvnLoader(SWHLoader):
                     rev, commit, dir_id, revision_parents[rev])
                 swh_revision['id'] = git.compute_revision_sha1_git(
                     swh_revision)
+
                 self.log.debug('rev: %s, swhrev: %s, dir: %s' % (
                     rev,
                     hashutil.hash_to_hex(swh_revision['id']),

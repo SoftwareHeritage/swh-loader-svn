@@ -120,7 +120,7 @@ class SWHSvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
             'metadata': {
                 'extra_headers': [
                     ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
-                    ['svn_revision', b'6']
+                    ['svn_revision', '6']
                 ]
             }
         }
@@ -365,7 +365,7 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestLoader):
 
         # then
         # we got the previous run's last revision (rev 6)
-        # so 2 news + 1 old
+        # so 2 new
         self.assertEquals(len(self.loader.all_revisions), 2)
         self.assertEquals(len(self.loader.all_releases), 0)
         self.assertEquals(len(self.loader.all_occurrences), 1)

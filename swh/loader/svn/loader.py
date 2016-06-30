@@ -50,11 +50,9 @@ class BaseSvnLoader(SWHLoader):
     """
     CONFIG_BASE_FILENAME = 'loader/svn.ini'
 
-    def __init__(self, svn_url, destination_path, origin,
-                 with_svn_update=True):
+    def __init__(self, svn_url, destination_path, origin):
         super().__init__(origin['id'],
                          logging_class='swh.loader.svn.SvnLoader')
-        self.with_svn_update = with_svn_update  # noqa
         self.origin = origin
 
     def build_swh_revision(self, rev, commit, dir_id, parents):
@@ -304,9 +302,8 @@ class SWHSvnLoader(BaseSvnLoader):
         'extra_header' to be able to deal with update.
 
     """
-    def __init__(self, svn_url, destination_path, origin,
-                 with_svn_update=True):
-        super().__init__(svn_url, destination_path, origin, with_svn_update)
+    def __init__(self, svn_url, destination_path, origin):
+        super().__init__(svn_url, destination_path, origin)
         self.svnrepo = svn.SWHSvnRepo(
             svn_url,
             origin['id'],

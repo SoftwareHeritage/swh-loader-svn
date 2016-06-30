@@ -75,9 +75,6 @@ class SWHSvnLoaderNoStorage(TestSvnLoader, SWHSvnLoader):
         Load a new svn repository using the swh policy (so no update).
 
     """
-    def __init__(self, svn_url, destination_path, origin):
-        super().__init__(svn_url, destination_path, origin)
-
     def swh_previous_revision(self):
         """We do not know this repository so no revision.
 
@@ -97,9 +94,6 @@ class SWHSvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
           consequence by loading the new revision
 
     """
-    def __init__(self, svn_url, destination_path, origin):
-        super().__init__(svn_url, destination_path, origin)
-
     def swh_previous_revision(self):
         """Avoid the storage persistence call and return the expected previous
         revision for that repository.
@@ -133,9 +127,6 @@ class SWHSvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
     history altered so we do not update it.
 
     """
-    def __init__(self, svn_url, destination_path, origin):
-        super().__init__(svn_url, destination_path, origin)
-
     def swh_previous_revision(self):
         """Avoid the storage persistence call and return the expected previous
         revision for that repository.

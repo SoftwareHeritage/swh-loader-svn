@@ -379,3 +379,230 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestLoader):
         occ = self.loader.all_occurrences[0]
         self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
         self.assertEquals(occ['origin'], self.origin['id'])
+
+
+class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestLoader):
+    def setUp(self):
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
+
+        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
+
+        self.loader = SWHSvnLoaderNoStorage(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path,
+            origin=self.origin)
+
+    @istest
+    def process_repository(self):
+        """Process a known repository with swh policy, the previous run did
+        not finish, so this finishes the loading
+
+        """
+        previous_unfinished_revision = {
+            'id': hashutil.hex_to_hash(
+                '4876cb10aec6f708f7466dddf547567b65f6c39c'),
+            'parents': [hashutil.hex_to_hash(
+                'a3a577948fdbda9d1061913b77a1588695eadb41')],
+            'directory': hashutil.hex_to_hash(
+                '0deab3023ac59398ae467fc4bff5583008af1ee2'),
+            'target_type': 'revision',
+            'metadata': {
+                'extra_headers': [
+                    ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
+                    ['svn_revision', '6']
+                ]
+            }
+        }
+        # when
+        self.loader.process_repository(
+            known_state=previous_unfinished_revision)
+
+        # then
+        # we got the previous run's last revision (rev 6)
+        # so 2 new
+        self.assertEquals(len(self.loader.all_revisions), 2)
+        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertEquals(len(self.loader.all_occurrences), 1)
+
+        last_revision = '38d81702cb28db4f1a6821e64321e5825d1f7fd6'
+        # cf. test_loader.org for explaining from where those hashes
+        # come from
+        expected_revisions = {
+            # revision hash | directory hash
+            '7f5bc909c29d4e93d8ccfdda516e51ed44930ee1': '752c52134dcbf2fff13c7be1ce4e9e5dbf428a59',  # noqa
+            last_revision:                              '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
+        }
+
+        for rev in self.loader.all_revisions:
+            rev_id = hashutil.hash_to_hex(rev['id'])
+            directory_id = hashutil.hash_to_hex(rev['directory'])
+
+            self.assertEquals(expected_revisions[rev_id], directory_id)
+
+        occ = self.loader.all_occurrences[0]
+        self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
+        self.assertEquals(occ['origin'], self.origin['id'])
+
+
+class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
+        BaseTestLoader):
+    def setUp(self):
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
+
+        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
+
+        self.loader = SWHSvnLoaderUpdateNoStorage(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path,
+            origin=self.origin)
+
+    @istest
+    def process_repository(self):
+        """known repository, swh policy, unfinished revision is less recent
+        than occurrence, we start from last occurrence.
+
+        """
+        previous_unfinished_revision = {
+            'id': hashutil.hex_to_hash(
+                'a3a577948fdbda9d1061913b77a1588695eadb41'),
+            'parents': [hashutil.hex_to_hash(
+                '3f51abf3b3d466571be0855dfa67e094f9ceff1b')],
+            'directory': hashutil.hex_to_hash(
+                '7dc52cc04c3b8bd7c085900d60c159f7b846f866'),
+            'target_type': 'revision',
+            'metadata': {
+                'extra_headers': [
+                    ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
+                    ['svn_revision', '5']
+                ]
+            }
+        }
+
+        # when
+        self.loader.process_repository(
+            known_state=previous_unfinished_revision)
+
+        # then
+        # we got the previous run's last revision (rev 6)
+        # so 2 new
+        self.assertEquals(len(self.loader.all_revisions), 2)
+        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertEquals(len(self.loader.all_occurrences), 1)
+
+        last_revision = '38d81702cb28db4f1a6821e64321e5825d1f7fd6'
+        # cf. test_loader.org for explaining from where those hashes
+        # come from
+        expected_revisions = {
+            # revision hash | directory hash
+            '7f5bc909c29d4e93d8ccfdda516e51ed44930ee1': '752c52134dcbf2fff13c7be1ce4e9e5dbf428a59',  # noqa
+            last_revision:                              '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
+        }
+
+        for rev in self.loader.all_revisions:
+            rev_id = hashutil.hash_to_hex(rev['id'])
+            directory_id = hashutil.hash_to_hex(rev['directory'])
+
+            self.assertEquals(expected_revisions[rev_id], directory_id)
+
+        occ = self.loader.all_occurrences[0]
+        self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
+        self.assertEquals(occ['origin'], self.origin['id'])
+
+
+class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
+    """An SWHSVNLoader with no persistence.
+
+    Context:
+        Load a known svn repository using the swh policy.
+        The last occurrence seen is less recent than a previous
+        unfinished crawl.
+
+    """
+    def swh_previous_revision(self):
+        """Avoid the storage persistence call and return the expected previous
+        revision for that repository.
+
+        Check the following for explanation about the hashes:
+        - test_loader.org for (swh policy).
+        - cf. SWHSvnLoaderITTest
+
+        """
+        return {
+            'id': hashutil.hex_to_hash(
+                'a3a577948fdbda9d1061913b77a1588695eadb41'),
+            'parents': [hashutil.hex_to_hash(
+                '3f51abf3b3d466571be0855dfa67e094f9ceff1b')],
+            'directory': hashutil.hex_to_hash(
+                '7dc52cc04c3b8bd7c085900d60c159f7b846f866'),
+            'target_type': 'revision',
+            'metadata': {
+                'extra_headers': [
+                    ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
+                    ['svn_revision', '5']
+                ]
+            }
+        }
+
+
+class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
+        BaseTestLoader):
+    def setUp(self):
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
+
+        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
+
+        self.loader = SWHSvnLoaderUpdateLessRecentNoStorage(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path,
+            origin=self.origin)
+
+    @istest
+    def process_repository(self):
+        """known repository, swh policy, unfinished revision is less recent
+        than occurrence, we start from last occurrence.
+
+        """
+        previous_unfinished_revision = {
+            'id': hashutil.hex_to_hash(
+                '4876cb10aec6f708f7466dddf547567b65f6c39c'),
+            'parents': [hashutil.hex_to_hash(
+                'a3a577948fdbda9d1061913b77a1588695eadb41')],
+            'directory': hashutil.hex_to_hash(
+                '0deab3023ac59398ae467fc4bff5583008af1ee2'),
+            'target_type': 'revision',
+            'metadata': {
+                'extra_headers': [
+                    ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
+                    ['svn_revision', '6']
+                ]
+            }
+        }
+        # when
+        self.loader.process_repository(
+            known_state=previous_unfinished_revision)
+
+        # then
+        # we got the previous run's last revision (rev 6)
+        # so 2 new
+        self.assertEquals(len(self.loader.all_revisions), 2)
+        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertEquals(len(self.loader.all_occurrences), 1)
+
+        last_revision = '38d81702cb28db4f1a6821e64321e5825d1f7fd6'
+        # cf. test_loader.org for explaining from where those hashes
+        # come from
+        expected_revisions = {
+            # revision hash | directory hash
+            '7f5bc909c29d4e93d8ccfdda516e51ed44930ee1': '752c52134dcbf2fff13c7be1ce4e9e5dbf428a59',  # noqa
+            last_revision:                              '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
+        }
+
+        for rev in self.loader.all_revisions:
+            rev_id = hashutil.hash_to_hex(rev['id'])
+            directory_id = hashutil.hash_to_hex(rev['directory'])
+
+            self.assertEquals(expected_revisions[rev_id], directory_id)
+
+        occ = self.loader.all_occurrences[0]
+        self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
+        self.assertEquals(occ['origin'], self.origin['id'])

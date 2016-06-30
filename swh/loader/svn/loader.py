@@ -360,6 +360,38 @@ class SWHSvnLoader(BaseSvnLoader):
                                              dir_id,
                                              parents)
 
+    def init_from(self, partial_swh_revision, previous_swh_revision):
+        """Function to determine from where to start from.
+
+        Args:
+            - partial_swh_revision: A known revision from which
+            the previous loading did not finish.
+            - known_previous_revision: A known revision from which the
+            previous loading did finish.
+
+        Returns:
+            The revision from which to start or None if nothing (fresh
+            start).
+
+        """
+        if partial_swh_revision and not previous_swh_revision:
+            return partial_swh_revision
+        if not partial_swh_revision and previous_swh_revision:
+            return previous_swh_revision
+        if partial_swh_revision and previous_swh_revision:
+            # will determine from which to start from
+            extra_headers1 = dict(
+                partial_swh_revision['metadata']['extra_headers'])
+            extra_headers2 = dict(
+                previous_swh_revision['metadata']['extra_headers'])
+            rev_start1 = int(extra_headers1['svn_revision'])
+            rev_start2 = int(extra_headers2['svn_revision'])
+            if rev_start1 <= rev_start2:
+                return previous_swh_revision
+            return partial_swh_revision
+
+        return None
+
     def process_repository(self, known_state=None):
         svnrepo = self.svnrepo
         origin = self.origin
@@ -370,15 +402,10 @@ class SWHSvnLoader(BaseSvnLoader):
             revision_start: []
         }
 
-        if known_state:  # Deal with a potential known state (it's a revision)
-            # In some edge case, svn repository with lots of svn
-            # commits for example, the loader can break.  Thus, a
-            # rescheduling can take place which will try and load
-            # again the same repository but from a known state.
-            swh_rev = known_state
-        else:
-            # Deal with update
-            swh_rev = self.swh_previous_revision()
+        # Check if we already know a previous revision for that origin
+        swh_rev = self.swh_previous_revision()
+        # Determine from which known revision to start
+        swh_rev = self.init_from(known_state, previous_swh_revision=swh_rev)
 
         if swh_rev:  # Yes, we do. Try and update it.
             extra_headers = dict(swh_rev['metadata']['extra_headers'])

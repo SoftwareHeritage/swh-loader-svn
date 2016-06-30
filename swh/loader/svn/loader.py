@@ -102,60 +102,70 @@ class BaseSvnLoader(SWHLoader):
         gen_revs = svnrepo.swh_hash_data_per_revision(
             revision_start,
             revision_end)
-        try:
-            swh_revision = {}
-            for rev, nextrev, commit, objects_per_path in gen_revs:
-                # Send the associated contents/directories
-                self.maybe_load_contents(
-                    git.objects_per_type(GitType.BLOB, objects_per_path))
-                self.maybe_load_directories(
-                    git.objects_per_type(GitType.TREE, objects_per_path))
+        swh_revision = None
+        for rev, nextrev, commit, objects_per_path in gen_revs:
+            # Send the associated contents/directories
+            self.maybe_load_contents(
+                git.objects_per_type(GitType.BLOB, objects_per_path))
+            self.maybe_load_directories(
+                git.objects_per_type(GitType.TREE, objects_per_path))
 
-                # compute the fs tree's checksums
-                dir_id = objects_per_path[b'']['checksums']['sha1_git']
-                swh_revision = self.build_swh_revision(
-                    rev, commit, dir_id, revision_parents[rev])
-                swh_revision['id'] = git.compute_revision_sha1_git(
-                    swh_revision)
+            # compute the fs tree's checksums
+            dir_id = objects_per_path[b'']['checksums']['sha1_git']
+            swh_revision = self.build_swh_revision(
+                rev, commit, dir_id, revision_parents[rev])
 
-                self.log.debug('rev: %s, swhrev: %s, dir: %s' % (
-                    rev,
-                    hashutil.hash_to_hex(swh_revision['id']),
-                    hashutil.hash_to_hex(dir_id)))
+            swh_revision['id'] = git.compute_revision_sha1_git(
+                swh_revision)
 
-                if nextrev:
-                    revision_parents[nextrev] = [swh_revision['id']]
+            self.log.debug('rev: %s, swhrev: %s, dir: %s' % (
+                rev,
+                hashutil.hash_to_hex(swh_revision['id']),
+                hashutil.hash_to_hex(dir_id)))
 
-                yield swh_revision
-        except Exception as e:
-            # Wrap the exception with the needed revision
-            raise SvnLoaderException(e, swh_revision={
-                'id': swh_revision['id'],
-                'parents': swh_revision['parents'],
-                'metadata': swh_revision.get('metadata')
-            })
+            if nextrev:
+                revision_parents[nextrev] = [swh_revision['id']]
+
+            yield swh_revision
 
     def process_swh_revisions(self,
                               svnrepo,
                               revision_start,
                               revision_end,
                               revision_parents):
-        """Process and store revision to swh (sent by by blocks of
+        """Process and store revision to swh (sent by blocks of
            'revision_packet_size')
 
            Returns:
                 The latest revision stored.
+
         """
-        for revisions in utils.grouper(
-                self.process_svn_revisions(svnrepo,
-                                           revision_start,
-                                           revision_end,
-                                           revision_parents),
-                self.config['revision_packet_size']):
-            revs = list(revisions)
-            self.log.info('Processed %s revisions: [%s, ...]' % (
-                len(revs), hashutil.hash_to_hex(revs[0]['id'])))
-            self.maybe_load_revisions(revs)
+        try:
+            swh_revision_gen = self.process_svn_revisions(svnrepo,
+                                                          revision_start,
+                                                          revision_end,
+                                                          revision_parents)
+            revs = []
+            for revisions in utils.grouper(
+                    swh_revision_gen,
+                    self.config['revision_packet_size']):
+                revs = list(revisions)
+
+                self.log.info('Processed %s revisions: [%s, ...]' % (
+                    len(revs), hashutil.hash_to_hex(revs[0]['id'])))
+                self.maybe_load_revisions(revs)
+        except Exception as e:
+            if revs:
+                self.maybe_load_revisions(revs)
+                know_swh_rev = revs[-1]
+                # Wrap the exception with the needed revision
+                raise SvnLoaderException(e, swh_revision={
+                    'id': know_swh_rev['id'],
+                    'parents': know_swh_rev['parents'],
+                    'metadata': know_swh_rev.get('metadata')
+                })
+            else:
+                raise SvnLoaderException(e, swh_revision=None)
 
         return revs[-1]
 

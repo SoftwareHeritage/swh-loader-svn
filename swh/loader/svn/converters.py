@@ -203,6 +203,9 @@ def loader_to_scheduler_revision(swh_revision):
     store.
 
     """
+    if not swh_revision:
+        return None
+
     metadata = swh_revision['metadata']
     for entry in metadata['extra_headers']:
         entry[1] = entry[1].decode('utf-8')
@@ -224,6 +227,8 @@ def scheduler_to_loader_revision(swh_revision):
     store.
 
     """
+    if not swh_revision:
+        return None
     return {
         'id': hashutil.hex_to_hash(swh_revision['id']),
         'parents': [hashutil.hex_to_hash(parent) for parent

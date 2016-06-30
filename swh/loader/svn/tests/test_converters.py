@@ -288,6 +288,10 @@ class ConvertSWHRevision(unittest.TestCase):
         })
 
     @istest
+    def loader_to_scheduler_revision_none(self):
+        self.assertIsNone(converters.loader_to_scheduler_revision(None))
+
+    @istest
     def scheduler_to_loader_revision(self):
         actual_rev = converters.scheduler_to_loader_revision({
             'id': 'ed649277abb2162cea2a904f380f962ffbd41660',
@@ -310,3 +314,7 @@ class ConvertSWHRevision(unittest.TestCase):
                 ]
             }
         })
+
+    @istest
+    def scheduler_to_loader_revision_none(self):
+        self.assertIsNone(converters.scheduler_to_loader_revision(None))

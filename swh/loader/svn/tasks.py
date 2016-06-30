@@ -87,6 +87,8 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
                     }
                 }
             })
+            self.log.error(
+                'Error during loading: %s - Svn repository rescheduled.' % e)
             result = {'status': False}
 
         self.close_fetch_history(fetch_history_id, result)

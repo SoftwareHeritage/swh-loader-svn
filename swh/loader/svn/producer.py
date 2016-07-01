@@ -28,7 +28,7 @@ def libproduce(svn_url, original_svn_url, original_svn_uuid,
              original_svn_uuid=original_svn_uuid,
              destination_path=destination_path)
     else:  # synchroneous flag is ignored in that case
-        for args in sys.stdin:
+        for svn_url in sys.stdin:
             svn_url = svn_url.rstrip()
             print(svn_url)
             task.delay(svn_url=svn_url,

@@ -4,7 +4,9 @@
 # See top-level LICENSE file for more information
 
 from swh.loader.core import tasks
-from swh.loader.svn.loader import GitSvnSvnLoader, SWHSvnLoader
+
+from .loader import GitSvnSvnLoader, SWHSvnLoader, SvnLoaderException
+from .loader import converters
 
 
 class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
@@ -22,28 +24,85 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
 
     task_queue = 'swh_loader_svn'
 
-    def run(self, svn_url, local_path):
+    def run(self, *args, **kwargs):
         """Import a svn repository.
 
         Args:
+            - svn_url: svn's repository url
+            - destination_path: root directory to locally retrieve svn's data
+            - swh_revision: Optional extra swh revision to start from.
             cf. swh.loader.svn.SvnLoader.process docstring
 
         """
-        origin = {'type': 'svn', 'url': svn_url}
-        origin['id'] = self.storage.origin_add_one(origin)
+        destination_path = kwargs['destination_path']
+        # local svn url
+        svn_url = kwargs['svn_url']
+        # if original_svn_url is mentioned, this means we load a local mirror
+        original_svn_url = kwargs.get('original_svn_url', svn_url)
+        # potential uuid overwrite
+        original_svn_uuid = kwargs.get('original_svn_uuid')
+
+        if original_svn_url != svn_url and not original_svn_uuid:
+            msg = "When loading a local mirror, you must specify the original repository's uuid."  # noqa
+            self.log.error('%s. Skipping mirror %s' % (msg, svn_url))
+            return
+
+        if 'origin' not in kwargs:  # first time, we'll create the origin
+            origin = {
+                'type': 'svn',
+                'url': original_svn_url,
+            }
+            origin['id'] = self.storage.origin_add_one(origin)
+            retry = False
+        else:
+            origin = {
+                'id': kwargs['origin'],
+                'url': original_svn_url,
+                'type': 'svn'
+            }
+            retry = True
 
         fetch_history_id = self.open_fetch_history(origin['id'])
 
-        # Determine which loader to trigger
-        if self.config['with_policy'] == 'gitsvn':
-            loader = GitSvnSvnLoader(svn_url, local_path, origin)
-        elif self.config['with_policy'] == 'swh':
-            loader = SWHSvnLoader(svn_url, local_path, origin)
-        else:
-            raise ValueError('Only gitsvn or swh policies are supported in'
-                             '\'with_policy\' entry. '
-                             'Please adapt your svn.ini file accordingly')
-
-        result = loader.load()
+        try:
+            # Determine which loader to trigger
+            if self.config['with_policy'] == 'gitsvn':
+                # this one compute hashes but do not store anywhere
+                loader = GitSvnSvnLoader(svn_url, destination_path, origin,
+                                         svn_uuid=original_svn_uuid)
+            elif self.config['with_policy'] == 'swh':
+                # the real production use case with storage and all
+                loader = SWHSvnLoader(svn_url, destination_path, origin,
+                                      svn_uuid=original_svn_uuid)
+            else:
+                raise ValueError('Only gitsvn or swh policies are supported in'
+                                 '\'with_policy\' entry. '
+                                 'Please adapt your svn.ini file accordingly')
+            if retry:
+                swh_revision = converters.scheduler_to_loader_revision(
+                    kwargs['swh_revision'])
+                result = loader.load(swh_revision)
+            else:
+                result = loader.load()
+        except SvnLoaderException as e:
+            # reschedule a task
+            swh_rev = converters.loader_to_scheduler_revision(e.swh_revision)
+            self.scheduler_backend.create_task({
+                'type': 'svn-loader',
+                'arguments': {
+                    'args': None,
+                    'kwargs': {
+                        'origin': origin['id'],
+                        'svn_url': svn_url,
+                        'original_svn_url': original_svn_url,
+                        'original_svn_uuid': original_svn_uuid,
+                        'destination_path': destination_path,
+                        'swh_revision': swh_rev,
+                    }
+                }
+            })
+            self.log.error(
+                'Error during loading: %s - Svn repository rescheduled.' % e)
+            result = {'status': False}
 
         self.close_fetch_history(fetch_history_id, result)

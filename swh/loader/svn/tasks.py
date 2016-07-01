@@ -35,19 +35,29 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
 
         """
         destination_path = kwargs['destination_path']
+        # local svn url
         svn_url = kwargs['svn_url']
+        # if original_svn_url is mentioned, this means we load a local mirror
+        original_svn_url = kwargs.get('original_svn_url', svn_url)
+        # potential uuid overwrite
+        original_svn_uuid = kwargs.get('original_svn_uuid')
+
+        if original_svn_url != svn_url and not original_svn_uuid:
+            msg = "When loading a local mirror, you must specify the original repository's uuid."  # noqa
+            self.log.error('%s. Skipping mirror %s' % (msg, svn_url))
+            return
 
         if 'origin' not in kwargs:  # first time, we'll create the origin
             origin = {
                 'type': 'svn',
-                'url': svn_url,
+                'url': original_svn_url,
             }
             origin['id'] = self.storage.origin_add_one(origin)
             retry = False
         else:
             origin = {
                 'id': kwargs['origin'],
-                'url': kwargs['svn_url'],
+                'url': original_svn_url,
                 'type': 'svn'
             }
             retry = True
@@ -58,10 +68,12 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
             # Determine which loader to trigger
             if self.config['with_policy'] == 'gitsvn':
                 # this one compute hashes but do not store anywhere
-                loader = GitSvnSvnLoader(svn_url, destination_path, origin)
+                loader = GitSvnSvnLoader(svn_url, destination_path, origin,
+                                         svn_uuid=original_svn_uuid)
             elif self.config['with_policy'] == 'swh':
                 # the real production use case with storage and all
-                loader = SWHSvnLoader(svn_url, destination_path, origin)
+                loader = SWHSvnLoader(svn_url, destination_path, origin,
+                                      svn_uuid=original_svn_uuid)
             else:
                 raise ValueError('Only gitsvn or swh policies are supported in'
                                  '\'with_policy\' entry. '
@@ -82,6 +94,8 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
                     'kwargs': {
                         'origin': origin['id'],
                         'svn_url': svn_url,
+                        'original_svn_url': original_svn_url,
+                        'original_svn_uuid': original_svn_uuid,
                         'destination_path': destination_path,
                         'swh_revision': swh_rev,
                     }

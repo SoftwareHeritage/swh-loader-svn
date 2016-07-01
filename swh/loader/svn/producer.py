@@ -10,33 +10,51 @@ import sys
 task_name = 'swh.loader.svn.tasks.LoadSvnRepositoryTsk'
 
 
-def libproduce(svn_url, destination_path=None, synchroneous=False):
+def libproduce(svn_url, original_svn_url, original_svn_uuid,
+               destination_path=None, synchroneous=False):
     from swh.scheduler.celery_backend.config import app
     for module in app.conf.CELERY_IMPORTS:
         __import__(module)
 
     task = app.tasks[task_name]
     if not synchroneous and svn_url:
-        task.delay(svn_url=svn_url, destination_path=destination_path)
+        task.delay(svn_url=svn_url,
+                   original_svn_url=original_svn_url,
+                   original_svn_uuid=original_svn_uuid,
+                   destination_path=destination_path)
     elif synchroneous and svn_url:  # for debug purpose
-        task(svn_url=svn_url, destination_path=destination_path)
+        task(svn_url=svn_url,
+             original_svn_url=original_svn_url,
+             original_svn_uuid=original_svn_uuid,
+             destination_path=destination_path)
     else:  # synchroneous flag is ignored in that case
-        for svn_url in sys.stdin:
+        for args in sys.stdin:
             svn_url = svn_url.rstrip()
             print(svn_url)
-            task.delay(svn_url=svn_url, destination_path=destination_path)
+            task.delay(svn_url=svn_url,
+                       original_svn_url=original_svn_url,
+                       original_svn_uuid=original_svn_uuid,
+                       destination_path=destination_path)
 
 
 @click.command()
 @click.option('--svn-url',
-              help="svn repository's remote url.")
+              help="svn repository's mirror url.")
+@click.option('--original-svn-url', default=None,
+              help='svn repository\'s original remote url '
+                   '(if different than --svn-url).')
+@click.option('--original-svn-uuid', default=None,
+              help='svn repository\'s original uuid '
+                   '(to provide when using --original-svn-url)')
 @click.option('--destination-path',
               help="(optional) svn checkout destination.")
 @click.option('--synchroneous',
               is_flag=True,
               help="To execute directly the svn loading.")
-def produce(svn_url, destination_path, synchroneous):
-    libproduce(svn_url, destination_path, synchroneous)
+def produce(svn_url, original_svn_url, original_svn_uuid, destination_path,
+            synchroneous):
+    libproduce(svn_url, original_svn_url, original_svn_uuid, destination_path,
+               synchroneous)
 
 
 if __name__ == '__main__':

@@ -260,3 +260,61 @@ class ConvertGitSvnDate(unittest.TestCase):
                           converters.svn_date_to_gitsvn_date(''))
         self.assertEquals({'timestamp': 0, 'offset': 0},
                           converters.svn_date_to_gitsvn_date(None))
+
+
+class ConvertSWHRevision(unittest.TestCase):
+    @istest
+    def loader_to_scheduler_revision(self):
+        actual_rev = converters.loader_to_scheduler_revision({
+            'parents': [b'e\n\xbe\xe9\xc0\x87y\xfeG\xf7\xcfG\x82h\xa8i\xe8\xfe\xe2\x13'],  # noqa
+            'id': b'\xedd\x92w\xab\xb2\x16,\xea*\x90O8\x0f\x96/\xfb\xd4\x16`',
+            'metadata': {
+                'extra_headers': [
+                    ['svn_repo_uuid', b'bc7d6c17-68a5-4917-9c54-c565d7424229'],
+                    ['svn_revision', b'4']
+                ]
+            }
+        })
+
+        self.assertEquals(actual_rev, {
+            'id': 'ed649277abb2162cea2a904f380f962ffbd41660',
+            'parents': ['650abee9c08779fe47f7cf478268a869e8fee213'],
+            'metadata': {
+                'extra_headers': [
+                    ['svn_repo_uuid', 'bc7d6c17-68a5-4917-9c54-c565d7424229'],
+                    ['svn_revision', '4']
+                ]
+            }
+        })
+
+    @istest
+    def loader_to_scheduler_revision_none(self):
+        self.assertIsNone(converters.loader_to_scheduler_revision(None))
+
+    @istest
+    def scheduler_to_loader_revision(self):
+        actual_rev = converters.scheduler_to_loader_revision({
+            'id': 'ed649277abb2162cea2a904f380f962ffbd41660',
+            'parents': ['650abee9c08779fe47f7cf478268a869e8fee213'],
+            'metadata': {
+                'extra_headers': [
+                    ['svn_repo_uuid', 'bc7d6c17-68a5-4917-9c54-c565d7424229'],
+                    ['svn_revision', '4']
+                ]
+            }
+        })
+
+        self.assertEquals(actual_rev, {
+            'parents': [b'e\n\xbe\xe9\xc0\x87y\xfeG\xf7\xcfG\x82h\xa8i\xe8\xfe\xe2\x13'],  # noqa
+            'id': b'\xedd\x92w\xab\xb2\x16,\xea*\x90O8\x0f\x96/\xfb\xd4\x16`',
+            'metadata': {
+                'extra_headers': [
+                    ['svn_repo_uuid', 'bc7d6c17-68a5-4917-9c54-c565d7424229'],
+                    ['svn_revision', '4']
+                ]
+            }
+        })
+
+    @istest
+    def scheduler_to_loader_revision_none(self):
+        self.assertIsNone(converters.scheduler_to_loader_revision(None))

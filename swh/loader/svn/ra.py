@@ -12,7 +12,6 @@ import os
 import shutil
 import tempfile
 
-from retrying import retry
 from subvertpy import delta, properties
 from subvertpy.ra import RemoteAccess, Auth, get_username_provider
 
@@ -442,7 +441,6 @@ class BaseSWHReplay:
     cf. SWHReplayNoEmptyFolder and SWHReplay for instanciated classes.
 
     """
-    @retry(stop_max_attempt_number=3)
     def replay(self, rev):
         """Replay svn actions between rev and rev+1.
 

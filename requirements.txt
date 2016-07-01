@@ -4,7 +4,7 @@
 vcversioner
 swh.core >= 0.0.19
 swh.model >= 0.0.11
-swh.scheduler >= 0.0.6
+swh.scheduler >= 0.0.7
 swh.loader.core >= 0.0.10
 click
 retrying

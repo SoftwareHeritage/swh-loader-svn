@@ -18,6 +18,16 @@ from swh.loader.core.loader import SWHLoader
 from . import svn, converters
 
 
+class SvnLoaderException(ValueError):
+    """A wrapper exception to transit the swh_revision onto which the
+    loading failed.
+
+    """
+    def __init__(self, e, swh_revision):
+        super().__init__(e)
+        self.swh_revision = swh_revision
+
+
 class BaseSvnLoader(SWHLoader):
     """Base Svn loader to load one svn repository.
 
@@ -40,11 +50,9 @@ class BaseSvnLoader(SWHLoader):
     """
     CONFIG_BASE_FILENAME = 'loader/svn.ini'
 
-    def __init__(self, svn_url, destination_path, origin,
-                 with_svn_update=True):
+    def __init__(self, svn_url, destination_path, origin):
         super().__init__(origin['id'],
                          logging_class='swh.loader.svn.SvnLoader')
-        self.with_svn_update = with_svn_update  # noqa
         self.origin = origin
 
     def build_swh_revision(self, rev, commit, dir_id, parents):
@@ -94,12 +102,22 @@ class BaseSvnLoader(SWHLoader):
         gen_revs = svnrepo.swh_hash_data_per_revision(
             revision_start,
             revision_end)
+        swh_revision = None
         for rev, nextrev, commit, objects_per_path in gen_revs:
+            # Send the associated contents/directories
+            self.maybe_load_contents(
+                git.objects_per_type(GitType.BLOB, objects_per_path))
+            self.maybe_load_directories(
+                git.objects_per_type(GitType.TREE, objects_per_path))
+
             # compute the fs tree's checksums
             dir_id = objects_per_path[b'']['checksums']['sha1_git']
             swh_revision = self.build_swh_revision(
                 rev, commit, dir_id, revision_parents[rev])
-            swh_revision['id'] = git.compute_revision_sha1_git(swh_revision)
+
+            swh_revision['id'] = git.compute_revision_sha1_git(
+                swh_revision)
+
             self.log.debug('rev: %s, swhrev: %s, dir: %s' % (
                 rev,
                 hashutil.hash_to_hex(swh_revision['id']),
@@ -108,11 +126,6 @@ class BaseSvnLoader(SWHLoader):
             if nextrev:
                 revision_parents[nextrev] = [swh_revision['id']]
 
-            self.maybe_load_contents(
-                git.objects_per_type(GitType.BLOB, objects_per_path))
-            self.maybe_load_directories(
-                git.objects_per_type(GitType.TREE, objects_per_path))
-
             yield swh_revision
 
     def process_swh_revisions(self,
@@ -120,22 +133,39 @@ class BaseSvnLoader(SWHLoader):
                               revision_start,
                               revision_end,
                               revision_parents):
-        """Process and store revision to swh (sent by by blocks of
+        """Process and store revision to swh (sent by blocks of
            'revision_packet_size')
 
            Returns:
                 The latest revision stored.
+
         """
-        for revisions in utils.grouper(
-                self.process_svn_revisions(svnrepo,
-                                           revision_start,
-                                           revision_end,
-                                           revision_parents),
-                self.config['revision_packet_size']):
-            revs = list(revisions)
-            self.log.info('Processed %s revisions: [%s, ...]' % (
-                len(revs), hashutil.hash_to_hex(revs[0]['id'])))
-            self.maybe_load_revisions(revs)
+        try:
+            swh_revision_gen = self.process_svn_revisions(svnrepo,
+                                                          revision_start,
+                                                          revision_end,
+                                                          revision_parents)
+            revs = []
+            for revisions in utils.grouper(
+                    swh_revision_gen,
+                    self.config['revision_packet_size']):
+                revs = list(revisions)
+
+                self.log.info('Processed %s revisions: [%s, ...]' % (
+                    len(revs), hashutil.hash_to_hex(revs[0]['id'])))
+                self.maybe_load_revisions(revs)
+        except Exception as e:
+            if revs:
+                self.maybe_load_revisions(revs)
+                know_swh_rev = revs[-1]
+                # Wrap the exception with the needed revision
+                raise SvnLoaderException(e, swh_revision={
+                    'id': know_swh_rev['id'],
+                    'parents': know_swh_rev['parents'],
+                    'metadata': know_swh_rev.get('metadata')
+                })
+            else:
+                raise SvnLoaderException(e, swh_revision=None)
 
         return revs[-1]
 
@@ -149,7 +179,7 @@ class BaseSvnLoader(SWHLoader):
         self.log.debug('occ: %s' % occ)
         self.maybe_load_occurrences([occ])
 
-    def load(self):
+    def load(self, known_state=None):
         """Load a svn repository in swh.
 
         Checkout the svn repository locally in destination_path.
@@ -168,7 +198,7 @@ class BaseSvnLoader(SWHLoader):
 
         """
         try:
-            self.process_repository()
+            self.process_repository(known_state)
         finally:
             # flush eventual remaining data
             self.flush()
@@ -199,7 +229,7 @@ class GitSvnSvnLoader(BaseSvnLoader):
         --no-metadata`
 
     """
-    def __init__(self, svn_url, destination_path, origin):
+    def __init__(self, svn_url, destination_path, origin, svn_uuid=None):
         super().__init__(svn_url, destination_path, origin)
         # We don't want to persist result in git-svn policy
         self.config['send_contents'] = False
@@ -212,7 +242,8 @@ class GitSvnSvnLoader(BaseSvnLoader):
             svn_url,
             origin['id'],
             self.storage,
-            destination_path=destination_path)
+            destination_path=destination_path,
+            svn_uuid=svn_uuid)
 
     def build_swh_revision(self, rev, commit, dir_id, parents):
         """Build the swh revision a-la git-svn.
@@ -233,10 +264,12 @@ class GitSvnSvnLoader(BaseSvnLoader):
                                                     dir_id,
                                                     parents)
 
-    def process_repository(self):
-        """Load the repository's commits and send them for storage to swh.
+    def process_repository(self, known_state=None):
+        """Load the repository's svn commits and process them as swh hashes.
 
-        This does not deal with update.
+        This does not:
+        - deal with update
+        - nor with the potential known state.
 
         """
         origin = self.origin
@@ -280,14 +313,14 @@ class SWHSvnLoader(BaseSvnLoader):
         'extra_header' to be able to deal with update.
 
     """
-    def __init__(self, svn_url, destination_path, origin,
-                 with_svn_update=True):
-        super().__init__(svn_url, destination_path, origin, with_svn_update)
+    def __init__(self, svn_url, destination_path, origin, svn_uuid=None):
+        super().__init__(svn_url, destination_path, origin)
         self.svnrepo = svn.SWHSvnRepo(
             svn_url,
             origin['id'],
             self.storage,
-            destination_path=destination_path)
+            destination_path=destination_path,
+            svn_uuid=svn_uuid)
 
     def swh_previous_revision(self):
         """Retrieve swh's previous revision if any.
@@ -339,7 +372,39 @@ class SWHSvnLoader(BaseSvnLoader):
                                              dir_id,
                                              parents)
 
-    def process_repository(self):
+    def init_from(self, partial_swh_revision, previous_swh_revision):
+        """Function to determine from where to start from.
+
+        Args:
+            - partial_swh_revision: A known revision from which
+            the previous loading did not finish.
+            - known_previous_revision: A known revision from which the
+            previous loading did finish.
+
+        Returns:
+            The revision from which to start or None if nothing (fresh
+            start).
+
+        """
+        if partial_swh_revision and not previous_swh_revision:
+            return partial_swh_revision
+        if not partial_swh_revision and previous_swh_revision:
+            return previous_swh_revision
+        if partial_swh_revision and previous_swh_revision:
+            # will determine from which to start from
+            extra_headers1 = dict(
+                partial_swh_revision['metadata']['extra_headers'])
+            extra_headers2 = dict(
+                previous_swh_revision['metadata']['extra_headers'])
+            rev_start1 = int(extra_headers1['svn_revision'])
+            rev_start2 = int(extra_headers2['svn_revision'])
+            if rev_start1 <= rev_start2:
+                return previous_swh_revision
+            return partial_swh_revision
+
+        return None
+
+    def process_repository(self, known_state=None):
         svnrepo = self.svnrepo
         origin = self.origin
 
@@ -349,14 +414,16 @@ class SWHSvnLoader(BaseSvnLoader):
             revision_start: []
         }
 
-        # Deal with update
+        # Check if we already know a previous revision for that origin
         swh_rev = self.swh_previous_revision()
+        # Determine from which known revision to start
+        swh_rev = self.init_from(known_state, previous_swh_revision=swh_rev)
 
         if swh_rev:  # Yes, we do. Try and update it.
             extra_headers = dict(swh_rev['metadata']['extra_headers'])
             revision_start = int(extra_headers['svn_revision'])
             revision_parents = {
-                revision_start: swh_rev['parents']
+                revision_start: swh_rev['parents'],
             }
 
             self.log.debug('svn export --ignore-keywords %s@%s' % (

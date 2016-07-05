@@ -4,12 +4,23 @@
 # See top-level LICENSE file for more information
 
 from swh.loader.core import tasks
+from swh.scheduler.backend import OneShotSchedulerBackend
 
 from .loader import GitSvnSvnLoader, SWHSvnLoader, SvnLoaderException
 from .loader import converters
 
 
-class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
+class ReportToSchedulerWhenFail:
+    """Mixin to permit to enhance LoadSvnRepositoryTsk with scheduler
+    backend dependency.
+
+    """
+    def __init__(self):
+        super().__init__()
+        self.scheduler_backend = OneShotSchedulerBackend()
+
+
+class LoadSvnRepositoryTsk(ReportToSchedulerWhenFail, tasks.LoaderCoreTask):
     """Import one svn repository to Software Heritage.
 
     """

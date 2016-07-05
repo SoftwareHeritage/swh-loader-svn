@@ -38,26 +38,30 @@ class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
         # local svn url
         svn_url = kwargs['svn_url']
         # if original_svn_url is mentioned, this means we load a local mirror
-        original_svn_url = kwargs.get('original_svn_url', svn_url)
+        original_svn_url = kwargs.get('original_svn_url')
         # potential uuid overwrite
         original_svn_uuid = kwargs.get('original_svn_uuid')
 
-        if original_svn_url != svn_url and not original_svn_uuid:
+        # Make sure we have all that's needed
+        if original_svn_url and not original_svn_uuid:
             msg = "When loading a local mirror, you must specify the original repository's uuid."  # noqa
             self.log.error('%s. Skipping mirror %s' % (msg, svn_url))
             return
 
+        # Determine the origin url
+        origin_url = original_svn_url if original_svn_url else svn_url
+
         if 'origin' not in kwargs:  # first time, we'll create the origin
             origin = {
                 'type': 'svn',
-                'url': original_svn_url,
+                'url': origin_url,
             }
             origin['id'] = self.storage.origin_add_one(origin)
             retry = False
         else:
             origin = {
                 'id': kwargs['origin'],
-                'url': original_svn_url,
+                'url': origin_url,
                 'type': 'svn'
             }
             retry = True

@@ -156,13 +156,15 @@ class BaseSvnLoader(SWHLoader):
                 self.maybe_load_revisions(revs)
         except Exception as e:
             if revs:
+                # flush remaining revisions
                 self.maybe_load_revisions(revs)
-                know_swh_rev = revs[-1]
-                # Wrap the exception with the needed revision
+                # Take the last one as the last known revisions
+                known_swh_rev = revs[-1]
+                # Then notify something is wrong, and we stopped at that rev.
                 raise SvnLoaderException(e, swh_revision={
-                    'id': know_swh_rev['id'],
-                    'parents': know_swh_rev['parents'],
-                    'metadata': know_swh_rev.get('metadata')
+                    'id': known_swh_rev['id'],
+                    'parents': known_swh_rev['parents'],
+                    'metadata': known_swh_rev.get('metadata')
                 })
             else:
                 raise SvnLoaderException(e, swh_revision=None)

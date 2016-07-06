@@ -9,4 +9,4 @@ swh.loader.core >= 0.0.10
 click
 retrying
 dateutil
-subvertpy >= 0.9.3
+subvertpy >= 0.9.4

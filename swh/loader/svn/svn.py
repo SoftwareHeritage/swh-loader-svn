@@ -193,7 +193,8 @@ class BaseSvnRepo():
         """
         self.client.export(self.remote_url,
                            to=self.local_url.decode('utf-8'),
-                           rev=revision)
+                           rev=revision,
+                           ignore_keywords=True)
 
     def swh_previous_revision(self):
         """Look for possible existing revision in swh.

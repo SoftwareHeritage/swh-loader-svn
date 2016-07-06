@@ -1,8 +1,9 @@
-swh-loader-svn (0.0.11-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.12-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.12
+  * Inhibit keyword expansion during export phase (svn update)
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 01 Jul 2016 16:51:38 +0200
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 06 Jul 2016 16:17:51 +0200
 
 swh-loader-svn (0.0.11-1~swh1) unstable-swh; urgency=medium
 

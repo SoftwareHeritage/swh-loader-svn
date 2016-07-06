@@ -1,7 +1,7 @@
 click
-dateutil
+python-dateutil
 retrying
-subvertpy>=0.9.3
+subvertpy>=0.9.4
 swh.core>=0.0.19
 swh.loader.core>=0.0.10
 swh.model>=0.0.11

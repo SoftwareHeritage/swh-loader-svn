@@ -8,5 +8,5 @@ swh.scheduler >= 0.0.7
 swh.loader.core >= 0.0.10
 click
 retrying
-dateutil
+python-dateutil
 subvertpy >= 0.9.4

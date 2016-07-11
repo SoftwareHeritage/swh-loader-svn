@@ -20,10 +20,14 @@ from swh.loader.svn.utils import hashtree
 @click.option('--ignore', multiple=True,
               help='Ignore pattern.')
 def main(path, ignore_empty_folder, ignore=None):
-    h = hashtree(path, ignore_empty_folder, ignore)
-
-    if h:
-        print(hashutil.hash_to_hex(h['sha1_git']))
+    try:
+        h = hashtree(path, ignore_empty_folder, ignore)
+    except Exception as e:
+        print(e)
+        return
+    else:
+        if h:
+            print(hashutil.hash_to_hex(h['sha1_git']))
 
 
 if __name__ == '__main__':

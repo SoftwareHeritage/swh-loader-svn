@@ -84,11 +84,9 @@ def hashtree(path, ignore_empty_folder, ignore=None):
     """
     if os.path.exists(path):
         if not os.path.isdir(path):
-            print('%s should be a directory!' % path)
-            return
+            raise ValueError('%s should be a directory!' % path)
     else:
-        print('%s should exist!' % path)
-        return
+        raise ValueError('%s should exist!' % path)
 
     if isinstance(path, str):
         path = path.encode('utf-8')

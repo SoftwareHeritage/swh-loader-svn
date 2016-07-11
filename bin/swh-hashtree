@@ -19,7 +19,7 @@ from swh.loader.svn.utils import hashtree
               help='Ignore empty folder.')
 @click.option('--ignore', multiple=True,
               help='Ignore pattern.')
-def main(path, ignore_empty_folder, ignore=None):
+def main(path, ignore_empty_folder=False, ignore=None):
     try:
         h = hashtree(path, ignore_empty_folder, ignore)
     except Exception as e:

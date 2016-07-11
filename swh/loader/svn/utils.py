@@ -66,7 +66,7 @@ def convert_hashes_with_relative_path(hashes, rootpath):
     return h
 
 
-def hashtree(path, ignore_empty_folder, ignore=None):
+def hashtree(path, ignore_empty_folder=False, ignore=None):
     """Given a path and options, compute the hash's upper tree.
 
     This is not for production use.

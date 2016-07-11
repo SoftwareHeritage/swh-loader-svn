@@ -3,21 +3,17 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-import os
-import shutil
-import subprocess
-import tempfile
-import unittest
-
 from nose.tools import istest
 
 from swh.core import hashutil
 from swh.loader.svn.loader import GitSvnSvnLoader, SWHSvnLoader
 
+from test_base import BaseTestSvnLoader
 
 # Define loaders with no storage
 # They'll just accumulate the data in place
 # Only for testing purposes.
+
 
 class TestSvnLoader:
     """Mixin class to inhibit the persistence and keep in memory the data
@@ -154,36 +150,7 @@ class SWHSvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
         }
 
 
-class BaseTestLoader(unittest.TestCase):
-    """Base test loader class.
-
-    In its setup, it's uncompressing a local svn mirror to /tmp.
-
-    """
-    def setUp(self, archive_name='pkg-gourmet.tgz', filename='pkg-gourmet'):
-        self.tmp_root_path = tempfile.mkdtemp()
-
-        start_path = os.path.dirname(__file__)
-        svn_mirror_repo = os.path.join(start_path,
-                                       '../../../../..',
-                                       'swh-storage-testdata',
-                                       'svn-folders',
-                                       archive_name)
-
-        # uncompress the sample folder
-        subprocess.check_output(
-            ['tar', 'xvf', svn_mirror_repo, '-C', self.tmp_root_path],
-        )
-
-        self.svn_mirror_url = 'file://' + self.tmp_root_path + '/' + filename
-        self.destination_path = os.path.join(
-            self.tmp_root_path, 'working-copy')
-
-    def tearDown(self):
-        shutil.rmtree(self.tmp_root_path)
-
-
-class GitSvnLoaderITTest(BaseTestLoader):
+class GitSvnLoaderITTest(BaseTestSvnLoader):
     def setUp(self):
         super().setUp()
 
@@ -230,7 +197,7 @@ class GitSvnLoaderITTest(BaseTestLoader):
         self.assertEquals(occ['origin'], self.origin['id'])
 
 
-class SWHSvnLoaderNewRepositoryITTest(BaseTestLoader):
+class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
     def setUp(self):
         super().setUp()
 
@@ -278,7 +245,7 @@ class SWHSvnLoaderNewRepositoryITTest(BaseTestLoader):
         self.assertEquals(occ['origin'], self.origin['id'])
 
 
-class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestLoader):
+class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestSvnLoader):
     def setUp(self):
         super().setUp()
 
@@ -304,7 +271,7 @@ class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestLoader):
         self.assertEquals(len(self.loader.all_occurrences), 0)
 
 
-class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestLoader):
+class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestSvnLoader):
     def setUp(self):
         # the svn repository pkg-gourmet has been updated with changes
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
@@ -333,7 +300,7 @@ class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestLoader):
         self.assertEquals(len(self.loader.all_occurrences), 0)
 
 
-class SWHSvnLoaderUpdateWithChangesITTest(BaseTestLoader):
+class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
     def setUp(self):
         # the svn repository pkg-gourmet has been updated with changes
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
@@ -384,7 +351,7 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestLoader):
         self.assertEquals(occ['origin'], self.origin['id'])
 
 
-class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestLoader):
+class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
     def setUp(self):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
 
@@ -451,7 +418,7 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestLoader):
 
 
 class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
-        BaseTestLoader):
+        BaseTestSvnLoader):
     def setUp(self):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
 
@@ -554,7 +521,7 @@ class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
 
 
 class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
-        BaseTestLoader):
+        BaseTestSvnLoader):
     def setUp(self):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
 

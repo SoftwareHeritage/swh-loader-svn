@@ -357,18 +357,20 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestLoader):
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 new
-        self.assertEquals(len(self.loader.all_revisions), 3)
+        self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
         self.assertEquals(len(self.loader.all_occurrences), 1)
 
-        last_revision = '99c27ebbd43feca179ac0e895af131d8314cafe1'
+        last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
         # come from
         expected_revisions = {
             # revision hash | directory hash
             '7f5bc909c29d4e93d8ccfdda516e51ed44930ee1': '752c52134dcbf2fff13c7be1ce4e9e5dbf428a59',  # noqa
             '38d81702cb28db4f1a6821e64321e5825d1f7fd6': '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
-            last_revision:                              '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
+            '99c27ebbd43feca179ac0e895af131d8314cafe1': '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
+            '902f29b4323a9b9de3af6d28e72dd581e76d9397': 'c4e12483f0a13e6851459295a4ae735eb4e4b5c4',  # noqa
+            last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
         for rev in self.loader.all_revisions:
@@ -421,18 +423,20 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestLoader):
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 new
-        self.assertEquals(len(self.loader.all_revisions), 3)
+        self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
         self.assertEquals(len(self.loader.all_occurrences), 1)
 
-        last_revision = '99c27ebbd43feca179ac0e895af131d8314cafe1'
+        last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
         # come from
         expected_revisions = {
             # revision hash | directory hash
             '7f5bc909c29d4e93d8ccfdda516e51ed44930ee1': '752c52134dcbf2fff13c7be1ce4e9e5dbf428a59',  # noqa
             '38d81702cb28db4f1a6821e64321e5825d1f7fd6': '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
-            last_revision:                              '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
+            '99c27ebbd43feca179ac0e895af131d8314cafe1': '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
+            '902f29b4323a9b9de3af6d28e72dd581e76d9397': 'c4e12483f0a13e6851459295a4ae735eb4e4b5c4',  # noqa
+            last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
         for rev in self.loader.all_revisions:
@@ -487,18 +491,20 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 new
-        self.assertEquals(len(self.loader.all_revisions), 3)
+        self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
         self.assertEquals(len(self.loader.all_occurrences), 1)
 
-        last_revision = '99c27ebbd43feca179ac0e895af131d8314cafe1'
+        last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
         # come from
         expected_revisions = {
             # revision hash | directory hash
             '7f5bc909c29d4e93d8ccfdda516e51ed44930ee1': '752c52134dcbf2fff13c7be1ce4e9e5dbf428a59',  # noqa
             '38d81702cb28db4f1a6821e64321e5825d1f7fd6': '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
-            last_revision:                              '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
+            '99c27ebbd43feca179ac0e895af131d8314cafe1': '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
+            '902f29b4323a9b9de3af6d28e72dd581e76d9397': 'c4e12483f0a13e6851459295a4ae735eb4e4b5c4',  # noqa
+            last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
         for rev in self.loader.all_revisions:
@@ -587,18 +593,20 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 new
-        self.assertEquals(len(self.loader.all_revisions), 3)
+        self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
         self.assertEquals(len(self.loader.all_occurrences), 1)
 
-        last_revision = '99c27ebbd43feca179ac0e895af131d8314cafe1'
+        last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
         # come from
         expected_revisions = {
             # revision hash | directory hash
             '7f5bc909c29d4e93d8ccfdda516e51ed44930ee1': '752c52134dcbf2fff13c7be1ce4e9e5dbf428a59',  # noqa
             '38d81702cb28db4f1a6821e64321e5825d1f7fd6': '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
-            last_revision:                              '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
+            '99c27ebbd43feca179ac0e895af131d8314cafe1': '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
+            '902f29b4323a9b9de3af6d28e72dd581e76d9397': 'c4e12483f0a13e6851459295a4ae735eb4e4b5c4',  # noqa
+            last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
         for rev in self.loader.all_revisions:

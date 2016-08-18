@@ -3,21 +3,17 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-import os
-import shutil
-import subprocess
-import tempfile
-import unittest
-
 from nose.tools import istest
 
 from swh.core import hashutil
 from swh.loader.svn.loader import GitSvnSvnLoader, SWHSvnLoader
 
+from test_base import BaseTestSvnLoader
 
 # Define loaders with no storage
 # They'll just accumulate the data in place
 # Only for testing purposes.
+
 
 class TestSvnLoader:
     """Mixin class to inhibit the persistence and keep in memory the data
@@ -154,36 +150,7 @@ class SWHSvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
         }
 
 
-class BaseTestLoader(unittest.TestCase):
-    """Base test loader class.
-
-    In its setup, it's uncompressing a local svn mirror to /tmp.
-
-    """
-    def setUp(self, archive_name='pkg-gourmet.tgz', filename='pkg-gourmet'):
-        self.tmp_root_path = tempfile.mkdtemp()
-
-        start_path = os.path.dirname(__file__)
-        svn_mirror_repo = os.path.join(start_path,
-                                       '../../../../..',
-                                       'swh-storage-testdata',
-                                       'svn-folders',
-                                       archive_name)
-
-        # uncompress the sample folder
-        subprocess.check_output(
-            ['tar', 'xvf', svn_mirror_repo, '-C', self.tmp_root_path],
-        )
-
-        self.svn_mirror_url = 'file://' + self.tmp_root_path + '/' + filename
-        self.destination_path = os.path.join(
-            self.tmp_root_path, 'working-copy')
-
-    def tearDown(self):
-        shutil.rmtree(self.tmp_root_path)
-
-
-class GitSvnLoaderITTest(BaseTestLoader):
+class GitSvnLoaderITTest(BaseTestSvnLoader):
     def setUp(self):
         super().setUp()
 
@@ -230,7 +197,7 @@ class GitSvnLoaderITTest(BaseTestLoader):
         self.assertEquals(occ['origin'], self.origin['id'])
 
 
-class SWHSvnLoaderNewRepositoryITTest(BaseTestLoader):
+class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
     def setUp(self):
         super().setUp()
 
@@ -278,7 +245,7 @@ class SWHSvnLoaderNewRepositoryITTest(BaseTestLoader):
         self.assertEquals(occ['origin'], self.origin['id'])
 
 
-class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestLoader):
+class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestSvnLoader):
     def setUp(self):
         super().setUp()
 
@@ -304,7 +271,7 @@ class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestLoader):
         self.assertEquals(len(self.loader.all_occurrences), 0)
 
 
-class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestLoader):
+class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestSvnLoader):
     def setUp(self):
         # the svn repository pkg-gourmet has been updated with changes
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
@@ -333,7 +300,7 @@ class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestLoader):
         self.assertEquals(len(self.loader.all_occurrences), 0)
 
 
-class SWHSvnLoaderUpdateWithChangesITTest(BaseTestLoader):
+class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
     def setUp(self):
         # the svn repository pkg-gourmet has been updated with changes
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
@@ -357,17 +324,20 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestLoader):
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 new
-        self.assertEquals(len(self.loader.all_revisions), 2)
+        self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
         self.assertEquals(len(self.loader.all_occurrences), 1)
 
-        last_revision = '38d81702cb28db4f1a6821e64321e5825d1f7fd6'
+        last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
         # come from
         expected_revisions = {
             # revision hash | directory hash
             '7f5bc909c29d4e93d8ccfdda516e51ed44930ee1': '752c52134dcbf2fff13c7be1ce4e9e5dbf428a59',  # noqa
-            last_revision:                              '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
+            '38d81702cb28db4f1a6821e64321e5825d1f7fd6': '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
+            '99c27ebbd43feca179ac0e895af131d8314cafe1': '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
+            '902f29b4323a9b9de3af6d28e72dd581e76d9397': 'c4e12483f0a13e6851459295a4ae735eb4e4b5c4',  # noqa
+            last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
         for rev in self.loader.all_revisions:
@@ -381,7 +351,7 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestLoader):
         self.assertEquals(occ['origin'], self.origin['id'])
 
 
-class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestLoader):
+class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
     def setUp(self):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
 
@@ -420,17 +390,20 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestLoader):
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 new
-        self.assertEquals(len(self.loader.all_revisions), 2)
+        self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
         self.assertEquals(len(self.loader.all_occurrences), 1)
 
-        last_revision = '38d81702cb28db4f1a6821e64321e5825d1f7fd6'
+        last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
         # come from
         expected_revisions = {
             # revision hash | directory hash
             '7f5bc909c29d4e93d8ccfdda516e51ed44930ee1': '752c52134dcbf2fff13c7be1ce4e9e5dbf428a59',  # noqa
-            last_revision:                              '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
+            '38d81702cb28db4f1a6821e64321e5825d1f7fd6': '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
+            '99c27ebbd43feca179ac0e895af131d8314cafe1': '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
+            '902f29b4323a9b9de3af6d28e72dd581e76d9397': 'c4e12483f0a13e6851459295a4ae735eb4e4b5c4',  # noqa
+            last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
         for rev in self.loader.all_revisions:
@@ -445,7 +418,7 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestLoader):
 
 
 class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
-        BaseTestLoader):
+        BaseTestSvnLoader):
     def setUp(self):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
 
@@ -485,17 +458,20 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 new
-        self.assertEquals(len(self.loader.all_revisions), 2)
+        self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
         self.assertEquals(len(self.loader.all_occurrences), 1)
 
-        last_revision = '38d81702cb28db4f1a6821e64321e5825d1f7fd6'
+        last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
         # come from
         expected_revisions = {
             # revision hash | directory hash
             '7f5bc909c29d4e93d8ccfdda516e51ed44930ee1': '752c52134dcbf2fff13c7be1ce4e9e5dbf428a59',  # noqa
-            last_revision:                              '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
+            '38d81702cb28db4f1a6821e64321e5825d1f7fd6': '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
+            '99c27ebbd43feca179ac0e895af131d8314cafe1': '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
+            '902f29b4323a9b9de3af6d28e72dd581e76d9397': 'c4e12483f0a13e6851459295a4ae735eb4e4b5c4',  # noqa
+            last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
         for rev in self.loader.all_revisions:
@@ -545,7 +521,7 @@ class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
 
 
 class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
-        BaseTestLoader):
+        BaseTestSvnLoader):
     def setUp(self):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
 
@@ -584,17 +560,20 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 new
-        self.assertEquals(len(self.loader.all_revisions), 2)
+        self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
         self.assertEquals(len(self.loader.all_occurrences), 1)
 
-        last_revision = '38d81702cb28db4f1a6821e64321e5825d1f7fd6'
+        last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
         # come from
         expected_revisions = {
             # revision hash | directory hash
             '7f5bc909c29d4e93d8ccfdda516e51ed44930ee1': '752c52134dcbf2fff13c7be1ce4e9e5dbf428a59',  # noqa
-            last_revision:                              '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
+            '38d81702cb28db4f1a6821e64321e5825d1f7fd6': '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
+            '99c27ebbd43feca179ac0e895af131d8314cafe1': '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
+            '902f29b4323a9b9de3af6d28e72dd581e76d9397': 'c4e12483f0a13e6851459295a4ae735eb4e4b5c4',  # noqa
+            last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
         for rev in self.loader.all_revisions:

@@ -174,6 +174,17 @@ Checking the log, we see those new svn commits:
 #+BEGIN_SRC sh
 $ svn log
 ------------------------------------------------------------------------
+r11 | tony | 2016-07-11 10:38:43 +0200 (Mon, 11 Jul 2016) | 1 line
+
+Delete broken link
+------------------------------------------------------------------------
+r10 | tony | 2016-07-11 10:09:13 +0200 (Mon, 11 Jul 2016) | 1 line
+
+Add bin/hello executable
+------------------------------------------------------------------------
+r9 | tony | 2016-07-07 11:13:52 +0200 (Thu, 07 Jul 2016) | 1 line
+
+------------------------------------------------------------------------
 r8 | tony | 2016-06-24 11:08:42 +0200 (Fri, 24 Jun 2016) | 1 line
 
 Add link to README
@@ -193,6 +204,9 @@ b'tree 752c52134dcbf2fff13c7be1ce4e9e5dbf428a59\nparent 4876cb10aec6f708f7466ddd
 [2016-06-24 11:18:21,055: DEBUG/Worker-1] rev: 7, swhrev: 7f5bc909c29d4e93d8ccfdda516e51ed44930ee1, dir: 752c52134dcbf2fff13c7be1ce4e9e5dbf428a59
 b'tree 39c813fb4717a4864bacefbd90b51a3241ae4140\nparent 7f5bc909c29d4e93d8ccfdda516e51ed44930ee1\nauthor tony 1466759322.099151 +0000\ncommitter tony 1466759322.099151 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 8\n\nAdd link to README'
 [2016-06-24 11:18:21,066: DEBUG/Worker-1] rev: 8, swhrev: 38d81702cb28db4f1a6821e64321e5825d1f7fd6, dir: 39c813fb4717a4864bacefbd90b51a3241ae4140
+[2016-07-11 10:47:18,609: DEBUG/Worker-1] rev: 9, swhrev: 99c27ebbd43feca179ac0e895af131d8314cafe1, dir: 3397ca7f709639cbd36b18a0d1b70bce80018c45
+[2016-07-11 10:47:18,644: DEBUG/Worker-1] rev: 10, swhrev: 902f29b4323a9b9de3af6d28e72dd581e76d9397, dir: c4e12483f0a13e6851459295a4ae735eb4e4b5c4
+[2016-07-11 10:47:18,831: DEBUG/Worker-1] rev: 11, swhrev: 171dc35522bfd17dda4e90a542a0377fb2fc707a, dir: fd24a76c87a3207428e06612b49860fc78e9f6dc
 #+END_SRC
 
 |--------------+------------------------------------------+------------------------------------------|
@@ -200,6 +214,9 @@ b'tree 39c813fb4717a4864bacefbd90b51a3241ae4140\nparent 7f5bc909c29d4e93d8ccfdda
 |--------------+------------------------------------------+------------------------------------------|
 |            7 | 7f5bc909c29d4e93d8ccfdda516e51ed44930ee1 | 752c52134dcbf2fff13c7be1ce4e9e5dbf428a59 |
 |            8 | 38d81702cb28db4f1a6821e64321e5825d1f7fd6 | 39c813fb4717a4864bacefbd90b51a3241ae4140 |
+|            9 | 99c27ebbd43feca179ac0e895af131d8314cafe1 | 3397ca7f709639cbd36b18a0d1b70bce80018c45 |
+|           10 | 902f29b4323a9b9de3af6d28e72dd581e76d9397 | c4e12483f0a13e6851459295a4ae735eb4e4b5c4 |
+|           11 | 171dc35522bfd17dda4e90a542a0377fb2fc707a | fd24a76c87a3207428e06612b49860fc78e9f6dc |
 |--------------+------------------------------------------+------------------------------------------|
 *** Checks
 **** Trees

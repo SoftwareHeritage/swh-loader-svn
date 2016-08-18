@@ -96,12 +96,19 @@ class LoadSvnRepositoryTsk(ReportToSchedulerWhenFail, tasks.LoaderCoreTask):
             if retry:
                 swh_revision = converters.scheduler_to_loader_revision(
                     kwargs['swh_revision'])
-                result = loader.load(swh_revision)
             else:
-                result = loader.load()
+                swh_revision = None
+
+            result = loader.load(swh_revision)
         except SvnLoaderException as e:
-            # reschedule a task
-            swh_rev = converters.loader_to_scheduler_revision(e.swh_revision)
+            # Reschedule a task if possible
+            if retry and not e.swh_revision:
+                swh_rev = swh_revision
+            else:
+                swh_rev = e.swh_revision
+
+            swh_rev = converters.loader_to_scheduler_revision(swh_rev)
+
             self.scheduler_backend.create_task({
                 'type': 'svn-loader',
                 'arguments': {
@@ -113,6 +120,7 @@ class LoadSvnRepositoryTsk(ReportToSchedulerWhenFail, tasks.LoaderCoreTask):
                         'original_svn_uuid': original_svn_uuid,
                         'destination_path': destination_path,
                         'swh_revision': swh_rev,
+                        'error': str(e),
                     }
                 }
             })

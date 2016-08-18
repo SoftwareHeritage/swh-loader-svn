@@ -66,7 +66,7 @@ def convert_hashes_with_relative_path(hashes, rootpath):
     return h
 
 
-def hashtree(path, ignore_empty_folder, ignore=None):
+def hashtree(path, ignore_empty_folder=False, ignore=None):
     """Given a path and options, compute the hash's upper tree.
 
     This is not for production use.
@@ -84,11 +84,9 @@ def hashtree(path, ignore_empty_folder, ignore=None):
     """
     if os.path.exists(path):
         if not os.path.isdir(path):
-            print('%s should be a directory!' % path)
-            return
+            raise ValueError('%s should be a directory!' % path)
     else:
-        print('%s should exist!' % path)
-        return
+        raise ValueError('%s should exist!' % path)
 
     if isinstance(path, str):
         path = path.encode('utf-8')

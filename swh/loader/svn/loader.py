@@ -452,7 +452,7 @@ class SWHSvnLoader(BaseSvnLoader):
         self.log.info('[revision_start-revision_end]: [%s-%s]' % (
             revision_start, revision_end))
 
-        if revision_start >= revision_end and revision_start is not 1:
+        if revision_start > revision_end and revision_start is not 1:
             self.log.info('%s@%s already injected.' % (
                 svnrepo.remote_url, revision_end))
             return {'status': True}

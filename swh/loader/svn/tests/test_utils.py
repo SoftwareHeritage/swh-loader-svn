@@ -3,11 +3,15 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import os
 import unittest
 
 from nose.tools import istest
+from test_base import BaseTestTreeLoader
 
 from swh.loader.svn import utils
+
+from swh.model import git
 
 
 class TestUtils(unittest.TestCase):
@@ -98,3 +102,88 @@ class TestHashesConvert(unittest.TestCase):
             b'/tmp/tmp.c39vkrp1.swh.loader/pkg-fox/')
 
         self.assertEquals(actual_output, self.expected_output)
+
+
+class HashtreeITTest(BaseTestTreeLoader):
+    @istest
+    def hashtree_not_existing_path(self):
+        # path does not exist
+        with self.assertRaises(ValueError):
+            utils.hashtree('/not/exists', ignore_empty_folder=False)
+
+    @istest
+    def hashtree_not_a_dir(self):
+        fpath = '/tmp/foobar'
+        with open(fpath, 'wb') as f:
+            f.write(b'foo')
+
+        # path is not a folder
+        with self.assertRaises(ValueError):
+            utils.hashtree(fpath, ignore_empty_folder=True)
+
+        os.unlink(fpath)
+
+    @istest
+    def hashtree_with_empty_folder(self):
+        # not ignoring empty folder
+        # no pattern to ignore
+        # this is the base case
+        root_hash = self.tmp_root_path.encode('utf-8')
+        actual_hash = utils.hashtree(root_hash,
+                                     ignore_empty_folder=False)
+
+        expected_hashes = git.compute_hashes_from_directory(
+            self.tmp_root_path.encode('utf-8'))
+
+        expected_hash = expected_hashes[root_hash]['checksums']['sha1_git']
+        self.assertEquals(actual_hash['sha1_git'], expected_hash)
+
+    @istest
+    def hashtree_ignore_pattern_with_empty_folder(self):
+        # not ignoring empty folder
+        # 'empty-folder' pattern to ignore
+        root_hash = self.tmp_root_path.encode('utf-8')
+        actual_hash = utils.hashtree(root_hash,
+                                     ignore_empty_folder=False,
+                                     ignore=['empty-folder'])
+
+        expected_hashes = git.compute_hashes_from_directory(
+            self.tmp_root_path.encode('utf-8'),
+            dir_ok_fn=lambda dp: b'empty-folder' not in dp)
+
+        expected_hash = expected_hashes[root_hash]['checksums']['sha1_git']
+        self.assertEquals(actual_hash['sha1_git'], expected_hash)
+
+    @istest
+    def hashtree_ignore_pattern_no_empty_folder(self):
+        # ignoring empty folder
+        # '/barfoo/' pattern to ignore
+        root_hash = self.tmp_root_path.encode('utf-8')
+        actual_hash = utils.hashtree(root_hash,
+                                     ignore_empty_folder=True,
+                                     ignore=['/barfoo/'])
+
+        def ignore_fn(dp):
+            return b'/barfoo/' not in dp
+
+        expected_hashes = git.compute_hashes_from_directory(
+            self.tmp_root_path.encode('utf-8'),
+            dir_ok_fn=ignore_fn,
+            remove_empty_folder=True)
+
+        expected_hash = expected_hashes[root_hash]['checksums']['sha1_git']
+        self.assertEquals(actual_hash['sha1_git'], expected_hash)
+
+    @istest
+    def hashtree_no_ignore_pattern_no_empty_folder(self):
+        # ignoring empty folder
+        root_hash = self.tmp_root_path.encode('utf-8')
+        actual_hash = utils.hashtree(root_hash,
+                                     ignore_empty_folder=True)
+
+        expected_hashes = git.compute_hashes_from_directory(
+            self.tmp_root_path.encode('utf-8'),
+            remove_empty_folder=True)
+
+        expected_hash = expected_hashes[root_hash]['checksums']['sha1_git']
+        self.assertEquals(actual_hash['sha1_git'], expected_hash)

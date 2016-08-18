@@ -207,7 +207,8 @@ def loader_to_scheduler_revision(swh_revision):
         return None
 
     metadata = swh_revision['metadata']
-    for entry in metadata['extra_headers']:
+    for entry in (e for e in metadata['extra_headers']
+                  if isinstance(e[1], bytes)):
         entry[1] = entry[1].decode('utf-8')
 
     return {

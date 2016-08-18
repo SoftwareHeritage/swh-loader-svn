@@ -1,5 +1,6 @@
 swh-loader-svn (0.0.1-1) unstable; urgency=low
 
-  *
+  * Import initial source package.
 
- -- AUTHOR-NAME <AUTHOR-EMAIL>  <UTC-DATE>
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 13 Apr 2016 16:44:38 +0200
+ 

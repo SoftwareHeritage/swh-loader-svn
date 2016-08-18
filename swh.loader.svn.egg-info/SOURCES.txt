@@ -12,6 +12,7 @@ svn-lib-client-analysis.org
 version.txt
 bin/init-svn-repository.sh
 bin/swh-hashtree
+bin/swh-svn
 debian/changelog
 debian/compat
 debian/control
@@ -36,6 +37,7 @@ swh/loader/svn/ra.py
 swh/loader/svn/svn.py
 swh/loader/svn/tasks.py
 swh/loader/svn/utils.py
+swh/loader/svn/tests/test_base.py
 swh/loader/svn/tests/test_converters.py
 swh/loader/svn/tests/test_loader.org
 swh/loader/svn/tests/test_loader.py

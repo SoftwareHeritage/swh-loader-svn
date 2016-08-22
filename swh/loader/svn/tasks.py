@@ -3,24 +3,15 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import datetime
+
+from swh.core import hashutil
 from swh.loader.core import tasks
-from swh.scheduler.backend import OneShotSchedulerBackend
 
-from .loader import GitSvnSvnLoader, SWHSvnLoader, SvnLoaderException
-from .loader import converters
+from .loader import GitSvnSvnLoader, SWHSvnLoader
 
 
-class ReportToSchedulerWhenFail:
-    """Mixin to permit to enhance LoadSvnRepositoryTsk with scheduler
-    backend dependency.
-
-    """
-    def __init__(self):
-        super().__init__()
-        self.scheduler_backend = OneShotSchedulerBackend()
-
-
-class LoadSvnRepositoryTsk(ReportToSchedulerWhenFail, tasks.LoaderCoreTask):
+class LoadSvnRepositoryTsk(tasks.LoaderCoreTask):
     """Import one svn repository to Software Heritage.
 
     """
@@ -64,68 +55,53 @@ class LoadSvnRepositoryTsk(ReportToSchedulerWhenFail, tasks.LoaderCoreTask):
 
         if 'origin' not in kwargs:  # first time, we'll create the origin
             origin = {
-                'type': 'svn',
                 'url': origin_url,
+                'type': 'svn',
             }
             origin['id'] = self.storage.origin_add_one(origin)
-            retry = False
         else:
             origin = {
                 'id': kwargs['origin'],
                 'url': origin_url,
                 'type': 'svn'
             }
-            retry = True
 
-        fetch_history_id = self.open_fetch_history(origin['id'])
+        date_visit = datetime.datetime.now(tz=datetime.timezone.utc)
+        origin_visit = self.storage.origin_visit_add(origin['id'],
+                                                     date_visit)
 
-        try:
-            # Determine which loader to trigger
-            if self.config['with_policy'] == 'gitsvn':
-                # this one compute hashes but do not store anywhere
-                loader = GitSvnSvnLoader(svn_url, destination_path, origin,
-                                         svn_uuid=original_svn_uuid)
-            elif self.config['with_policy'] == 'swh':
-                # the real production use case with storage and all
-                loader = SWHSvnLoader(svn_url, destination_path, origin,
-                                      svn_uuid=original_svn_uuid)
-            else:
-                raise ValueError('Only gitsvn or swh policies are supported in'
-                                 '\'with_policy\' entry. '
-                                 'Please adapt your svn.ini file accordingly')
-            if retry:
-                swh_revision = converters.scheduler_to_loader_revision(
-                    kwargs['swh_revision'])
-            else:
-                swh_revision = None
+        origin_visit.update({
+            'date': date_visit
+        })
 
-            result = loader.load(swh_revision)
-        except SvnLoaderException as e:
-            # Reschedule a task if possible
-            if retry and not e.swh_revision:
-                swh_rev = swh_revision
-            else:
-                swh_rev = e.swh_revision
+        # Determine which loader to trigger
+        if self.config['with_policy'] == 'gitsvn':
+            # this one compute hashes but do not store anywhere
+            loader = GitSvnSvnLoader(svn_url, destination_path, origin,
+                                     svn_uuid=original_svn_uuid)
+        elif self.config['with_policy'] == 'swh':
+            # the real production use case with storage and all
+            loader = SWHSvnLoader(svn_url, destination_path, origin,
+                                  svn_uuid=original_svn_uuid)
+        else:
+            raise ValueError('Only gitsvn or swh policies are supported in'
+                             '\'with_policy\' entry. '
+                             'Please adapt your svn.ini file accordingly')
+        if 'swh_revision' in kwargs:
+            swh_revision = hashutil.hex_to_hash(kwargs['swh_revision'])
+        else:
+            swh_revision = None
 
-            swh_rev = converters.loader_to_scheduler_revision(swh_rev)
+        result = loader.load(origin_visit, swh_revision)
 
-            self.scheduler_backend.create_task({
-                'type': 'svn-loader',
-                'arguments': {
-                    'args': None,
-                    'kwargs': {
-                        'origin': origin['id'],
-                        'svn_url': svn_url,
-                        'original_svn_url': original_svn_url,
-                        'original_svn_uuid': original_svn_uuid,
-                        'destination_path': destination_path,
-                        'swh_revision': swh_rev,
-                        'error': str(e),
-                    }
-                }
+        # Check for partial completion to complete state data
+        if 'completion' in result and result['completion'] == 'partial':
+            state = result['state']
+            state.update({
+                'svn_url': svn_url,
+                'original_svn_url': origin_url,
+                'original_svn_uuid': original_svn_uuid,
             })
-            self.log.error(
-                'Error during loading: %s - Svn repository rescheduled.' % e)
-            result = {'status': False}
+            result['state'] = state
 
-        self.close_fetch_history(fetch_history_id, result)
+        return result

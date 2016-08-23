@@ -50,8 +50,7 @@ class BaseSvnLoader(SWHLoader):
     CONFIG_BASE_FILENAME = 'loader/svn.ini'
 
     def __init__(self, svn_url, destination_path, origin):
-        super().__init__(origin['id'],
-                         logging_class='swh.loader.svn.SvnLoader')
+        super().__init__(logging_class='swh.loader.svn.SvnLoader')
         self.origin = origin
 
     def build_swh_revision(self, rev, commit, dir_id, parents):

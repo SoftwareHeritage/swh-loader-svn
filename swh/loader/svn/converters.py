@@ -183,7 +183,7 @@ def build_gitsvn_swh_revision(rev, commit, dir_id, parents):
     }
 
 
-def build_swh_occurrence(revision_id, origin_id, date):
+def build_swh_occurrence(revision_id, origin_id, visit):
     """Build a swh occurrence from the revision id, origin id, and date.
 
     """
@@ -191,7 +191,7 @@ def build_swh_occurrence(revision_id, origin_id, date):
             'target': revision_id,
             'target_type': 'revision',
             'origin': origin_id,
-            'date': date}
+            'visit': visit}
 
 
 def loader_to_scheduler_revision(swh_revision):

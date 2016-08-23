@@ -7,7 +7,7 @@ import click
 import sys
 
 
-task_name = 'swh.loader.svn.tasks.LoadSvnRepositoryTsk'
+task_name = 'swh.loader.svn.tasks.LoadSWHSvnRepositoryTsk'
 
 
 def libproduce(svn_url, original_svn_url, original_svn_uuid,

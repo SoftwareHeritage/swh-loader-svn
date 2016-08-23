@@ -201,14 +201,15 @@ class TestSWHOccurrence(unittest.TestCase):
     def build_swh_occurrence(self):
         actual_occ = converters.build_swh_occurrence('revision-id',
                                                      'origin-id',
-                                                     'some-date')
+                                                     visit=10)
 
         self.assertEquals(actual_occ, {
             'branch': 'master',
             'target': 'revision-id',
             'target_type': 'revision',
             'origin': 'origin-id',
-            'date': 'some-date'})
+            'visit': 10
+        })
 
 
 class ConvertSWHDate(unittest.TestCase):

@@ -196,21 +196,36 @@ class BaseSvnRepo():
                            rev=revision,
                            ignore_keywords=True)
 
-    def swh_previous_revision(self):
+    def swh_previous_revision(self, previous_swh_revision=None):
         """Look for possible existing revision in swh.
 
+        Args:
+            previous_swh_revision: (optional) id of a possible
+            previous swh revision
+
         Returns:
-            The previous swh revision if found, None otherwise.
+            If previous_swh_revision is not None and do exists,
+            returns the complete instance.
+            Otherwise, check for a possible occurrence and returns the
+            targeted complete revision if it does exists.
+            Otherwise, returns None.
 
         """
         storage = self.storage
-        occ = storage.occurrence_get(self.origin_id)
-        if occ:
-            revision_id = occ[0]['target']
-            revisions = storage.revision_get([revision_id])
+        # got no previous revision, will check if some occurrence
+        # already exists for that origin
+        if not previous_swh_revision:
+            occ = storage.occurrence_get(self.origin_id)
+            if occ:
+                revision_id = occ[0]['target']
+                revisions = storage.revision_get([revision_id])
 
-            if revisions:
-                return revisions[0]
+                if revisions:
+                    return revisions[0]
+        else:
+            revs = storage.revision_get([previous_swh_revision])
+            if revs:
+                return revs[0]
 
     def swh_hash_data_per_revision(self, start_revision, end_revision):
         """Compute swh hash data per each revision between start_revision and

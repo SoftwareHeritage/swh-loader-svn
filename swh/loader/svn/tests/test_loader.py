@@ -52,6 +52,10 @@ class TestSvnLoader:
     def maybe_load_occurrences(self, all_occurrences):
         self.all_occurrences.extend(all_occurrences)
 
+    def process_swh_origin_visit(self, origin_visit, status):
+        # Do nothing during origin_visit update
+        pass
+
 
 class GitSvnLoaderNoStorage(TestSvnLoader, GitSvnSvnLoader):
     """A GitSvnLoader with no persistence.
@@ -71,7 +75,7 @@ class SWHSvnLoaderNoStorage(TestSvnLoader, SWHSvnLoader):
         Load a new svn repository using the swh policy (so no update).
 
     """
-    def swh_previous_revision(self):
+    def swh_previous_revision(self, prev_swh_revision=None):
         """We do not know this repository so no revision.
 
         """
@@ -90,7 +94,7 @@ class SWHSvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
           consequence by loading the new revision
 
     """
-    def swh_previous_revision(self):
+    def swh_previous_revision(self, prev_swh_revision=None):
         """Avoid the storage persistence call and return the expected previous
         revision for that repository.
 
@@ -123,7 +127,7 @@ class SWHSvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
     history altered so we do not update it.
 
     """
-    def swh_previous_revision(self):
+    def swh_previous_revision(self, prev_swh_revision=None):
         """Avoid the storage persistence call and return the expected previous
         revision for that repository.
 
@@ -156,6 +160,11 @@ class GitSvnLoaderITTest(BaseTestSvnLoader):
 
         self.origin = {'id': 1, 'type': 'svn', 'url': 'file:///dev/null'}
 
+        self.origin_visit = {
+            'origin': self.origin['id'],
+            'visit': 1,
+        }
+
         self.loader = GitSvnLoaderNoStorage(
             svn_url=self.svn_mirror_url,
             destination_path=self.destination_path,
@@ -165,7 +174,7 @@ class GitSvnLoaderITTest(BaseTestSvnLoader):
     def process_repository(self):
         """Process a repository with gitsvn policy should be ok."""
         # when
-        self.loader.process_repository()
+        self.loader.process_repository(self.origin_visit)
 
         # then
         self.assertEquals(len(self.loader.all_revisions), 6)
@@ -203,6 +212,11 @@ class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
 
         self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
 
+        self.origin_visit = {
+            'origin': self.origin['id'],
+            'visit': 2,
+        }
+
         self.loader = SWHSvnLoaderNoStorage(
             svn_url=self.svn_mirror_url,
             destination_path=self.destination_path,
@@ -214,7 +228,7 @@ class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
 
         """
         # when
-        self.loader.process_repository()
+        self.loader.process_repository(self.origin_visit)
 
         # then
         self.assertEquals(len(self.loader.all_revisions), 6)
@@ -251,6 +265,11 @@ class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestSvnLoader):
 
         self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
 
+        self.origin_visit = {
+            'origin': self.origin['id'],
+            'visit': 3,
+        }
+
         self.loader = SWHSvnLoaderUpdateNoStorage(
             svn_url=self.svn_mirror_url,
             destination_path=self.destination_path,
@@ -263,7 +282,7 @@ class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestSvnLoader):
 
         """
         # when
-        self.loader.process_repository()
+        self.loader.process_repository(self.origin_visit)
 
         # then
         self.assertEquals(len(self.loader.all_revisions), 0)
@@ -278,6 +297,11 @@ class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestSvnLoader):
 
         self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
 
+        self.origin_visit = {
+            'origin': self.origin['id'],
+            'visit': 4,
+        }
+
         self.loader = SWHSvnLoaderUpdateHistoryAlteredNoStorage(
             svn_url=self.svn_mirror_url,
             destination_path=self.destination_path,
@@ -290,7 +314,7 @@ class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestSvnLoader):
 
         """
         # when
-        self.loader.process_repository()
+        self.loader.process_repository(self.origin_visit)
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -307,6 +331,11 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
 
         self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
 
+        self.origin_visit = {
+            'origin': self.origin['id'],
+            'visit': 5,
+        }
+
         self.loader = SWHSvnLoaderUpdateNoStorage(
             svn_url=self.svn_mirror_url,
             destination_path=self.destination_path,
@@ -319,7 +348,7 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
 
         """
         # when
-        self.loader.process_repository()
+        self.loader.process_repository(self.origin_visit)
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -357,6 +386,11 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
 
         self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
 
+        self.origin_visit = {
+            'origin': self.origin['id'],
+            'visit': 6
+        }
+
         self.loader = SWHSvnLoaderNoStorage(
             svn_url=self.svn_mirror_url,
             destination_path=self.destination_path,
@@ -385,7 +419,8 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
         }
         # when
         self.loader.process_repository(
-            known_state=previous_unfinished_revision)
+            self.origin_visit,
+            last_known_swh_revision=previous_unfinished_revision)
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -424,6 +459,11 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
 
         self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
 
+        self.origin_visit = {
+            'origin': self.origin['id'],
+            'visit': 9,
+        }
+
         self.loader = SWHSvnLoaderUpdateNoStorage(
             svn_url=self.svn_mirror_url,
             destination_path=self.destination_path,
@@ -453,7 +493,8 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
 
         # when
         self.loader.process_repository(
-            known_state=previous_unfinished_revision)
+            self.origin_visit,
+            last_known_swh_revision=previous_unfinished_revision)
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -494,7 +535,7 @@ class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
         unfinished crawl.
 
     """
-    def swh_previous_revision(self):
+    def swh_previous_revision(self, prev_swh_revision=None):
         """Avoid the storage persistence call and return the expected previous
         revision for that repository.
 
@@ -527,6 +568,11 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
 
         self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
 
+        self.origin_visit = {
+            'origin': self.origin['id'],
+            'visit': 1,
+        }
+
         self.loader = SWHSvnLoaderUpdateLessRecentNoStorage(
             svn_url=self.svn_mirror_url,
             destination_path=self.destination_path,
@@ -555,7 +601,8 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
         }
         # when
         self.loader.process_repository(
-            known_state=previous_unfinished_revision)
+            self.origin_visit,
+            last_known_swh_revision=previous_unfinished_revision)
 
         # then
         # we got the previous run's last revision (rev 6)

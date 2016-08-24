@@ -180,8 +180,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
                 raise SvnLoaderException(e, swh_revision={
                     'id': known_swh_rev['id'],
                 })
-            else:
-                raise SvnLoaderException(e, swh_revision=None)
+            raise e
 
         return revs[-1]
 

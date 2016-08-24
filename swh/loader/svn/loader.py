@@ -233,7 +233,7 @@ class GitSvnSvnLoader(BaseSvnLoader):
         --no-metadata`
 
     """
-    def __init__(self, svn_url, destination_path, origin, svn_uuid=None):
+    def __init__(self, svn_url, destination_path, origin):
         super().__init__(svn_url, destination_path, origin)
         # We don't want to persist result in git-svn policy
         self.config['send_contents'] = False
@@ -246,8 +246,7 @@ class GitSvnSvnLoader(BaseSvnLoader):
             svn_url,
             origin['id'],
             self.storage,
-            destination_path=destination_path,
-            svn_uuid=svn_uuid)
+            destination_path=destination_path)
 
     def build_swh_revision(self, rev, commit, dir_id, parents):
         """Build the swh revision a-la git-svn.
@@ -338,14 +337,13 @@ class SWHSvnLoader(BaseSvnLoader):
         'extra_header' to be able to deal with update.
 
     """
-    def __init__(self, svn_url, destination_path, origin, svn_uuid=None):
+    def __init__(self, svn_url, destination_path, origin):
         super().__init__(svn_url, destination_path, origin)
         self.svnrepo = svn.SWHSvnRepo(
             svn_url,
             origin['id'],
             self.storage,
-            destination_path=destination_path,
-            svn_uuid=svn_uuid)
+            destination_path=destination_path)
 
     def swh_previous_revision(self, prev_swh_revision=None):
         """Retrieve swh's previous revision if any.

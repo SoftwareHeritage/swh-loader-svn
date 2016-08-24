@@ -3,114 +3,15 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-import datetime
+from swh.scheduler.task import Task
 
-from swh.core import hashutil
-from swh.loader.core import tasks
-
-from .loader import GitSvnSvnLoader, SWHSvnLoader
+from .loader import SWHSvnLoader
 
 
-class LoadGitSvnRepositoryTsk(tasks.LoaderCoreTask):
-    """
-    Import one svn repository to Software Heritage with git-svn policy.
-
-    Note: NOT FOR PRODUCTION
-
-    """
-    CONFIG_BASE_FILENAME = 'loader/svn.ini'
-
-    ADDITIONAL_CONFIG = {
-        'storage_class': ('str', 'remote_storage'),
-        'storage_args': ('list[str]', ['http://localhost:5000/']),
-    }
-
-    task_queue = 'swh_loader_gitsvn'
-
-    def run(self, *args, **kwargs):
-        """Import a svn repository.
-
-        Args:
-            args: ordered arguments (expected None)
-            kwargs: Dictionary with the following expected keys:
-              - svn_url: (mandatory) svn's repository url
-              - destination_path: (mandatory) root directory to
-                locally retrieve svn's data
-              - original_svn_url: (optional) original svn url (if
-                svn_url is a local mirror for example)
-              - original_svn_uuid: (optional) original svn uuid (same
-                use case than previous line)
-
-        """
-        destination_path = kwargs['destination_path']
-        # local svn url
-        svn_url = kwargs['svn_url']
-        # if original_svn_url is mentioned, this means we load a local mirror
-        original_svn_url = kwargs.get('original_svn_url')
-        # potential uuid overwrite
-        original_svn_uuid = kwargs.get('original_svn_uuid')
-
-        # Make sure we have all that's needed
-        if original_svn_url and not original_svn_uuid:
-            msg = "When loading a local mirror, you must specify the original repository's uuid."  # noqa
-            self.log.error('%s. Skipping mirror %s' % (msg, svn_url))
-            return
-
-        # Determine the origin url
-        origin_url = original_svn_url if original_svn_url else svn_url
-
-        if 'origin' not in kwargs:  # first time, we'll create the origin
-            origin = {
-                'url': origin_url,
-                'type': 'svn',
-            }
-            origin['id'] = self.storage.origin_add_one(origin)
-        else:
-            origin = {
-                'id': kwargs['origin'],
-                'url': origin_url,
-                'type': 'svn'
-            }
-
-        date_visit = datetime.datetime.now(tz=datetime.timezone.utc)
-        origin_visit = self.storage.origin_visit_add(origin['id'],
-                                                     date_visit)
-
-        origin_visit.update({
-            'date': date_visit
-        })
-
-        # this one compute hashes but do not store anywhere
-        loader = GitSvnSvnLoader(svn_url, destination_path, origin,
-                                 svn_uuid=original_svn_uuid)
-
-        result = loader.load(origin_visit)
-
-        # Check for partial completion to complete state data
-        if 'completion' in result and result['completion'] == 'partial':
-            state = result['state']
-            state.update({
-                'destination_path': destination_path,
-                'svn_url': svn_url,
-                'original_svn_url': origin_url,
-                'original_svn_uuid': original_svn_uuid,
-            })
-            result['state'] = state
-
-        return result
-
-
-class LoadSWHSvnRepositoryTsk(tasks.LoaderCoreTask):
+class LoadSWHSvnRepositoryTsk(Task):
     """Import one svn repository to Software Heritage.
 
     """
-    CONFIG_BASE_FILENAME = 'loader/svn.ini'
-
-    ADDITIONAL_CONFIG = {
-        'storage_class': ('str', 'remote_storage'),
-        'storage_args': ('list[str]', ['http://localhost:5000/']),
-    }
-
     task_queue = 'swh_loader_svn'
 
     def run(self, *args, **kwargs):
@@ -122,73 +23,9 @@ class LoadSWHSvnRepositoryTsk(tasks.LoaderCoreTask):
               - svn_url: (mandatory) svn's repository url
               - destination_path: (mandatory) root directory to
                 locally retrieve svn's data
-              - original_svn_url: (optional) original svn url (if
-                svn_url is a local mirror for example)
-              - original_svn_uuid: (optional) original svn uuid (same
-                use case than previous line)
               - swh_revision: (optional) extra SWH revision hex to
                 start from.  cf. swh.loader.svn.SvnLoader.process
                 docstring
 
         """
-        destination_path = kwargs['destination_path']
-        # local svn url
-        svn_url = kwargs['svn_url']
-        # if original_svn_url is mentioned, this means we load a local mirror
-        original_svn_url = kwargs.get('original_svn_url')
-        # potential uuid overwrite
-        original_svn_uuid = kwargs.get('original_svn_uuid')
-
-        # Make sure we have all that's needed
-        if original_svn_url and not original_svn_uuid:
-            msg = "When loading a local mirror, you must specify the original repository's uuid."  # noqa
-            self.log.error('%s. Skipping mirror %s' % (msg, svn_url))
-            return
-
-        # Determine the origin url
-        origin_url = original_svn_url if original_svn_url else svn_url
-
-        if 'origin' not in kwargs:  # first time, we'll create the origin
-            origin = {
-                'url': origin_url,
-                'type': 'svn',
-            }
-            origin['id'] = self.storage.origin_add_one(origin)
-        else:
-            origin = {
-                'id': kwargs['origin'],
-                'url': origin_url,
-                'type': 'svn'
-            }
-
-        date_visit = datetime.datetime.now(tz=datetime.timezone.utc)
-        origin_visit = self.storage.origin_visit_add(origin['id'],
-                                                     date_visit)
-
-        origin_visit.update({
-            'date': date_visit
-        })
-
-        # the real production use case with storage and all
-        loader = SWHSvnLoader(svn_url, destination_path, origin,
-                              svn_uuid=original_svn_uuid)
-
-        if 'swh_revision' in kwargs:
-            swh_revision = hashutil.hex_to_hash(kwargs['swh_revision'])
-        else:
-            swh_revision = None
-
-        result = loader.load(origin_visit, swh_revision)
-
-        # Check for partial completion to complete state data
-        if 'completion' in result and result['completion'] == 'partial':
-            state = result['state']
-            state.update({
-                'destination_path': destination_path,
-                'svn_url': svn_url,
-                'original_svn_url': origin_url,
-                'original_svn_uuid': original_svn_uuid,
-            })
-            result['state'] = state
-
-        return result
+        SWHSvnLoader().load(*args, **kwargs)

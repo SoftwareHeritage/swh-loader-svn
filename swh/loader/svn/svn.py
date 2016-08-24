@@ -44,8 +44,7 @@ class BaseSvnRepo():
 
     """
     def __init__(self, remote_url, origin_id, storage,
-                 destination_path=None,
-                 svn_uuid=None):
+                 destination_path=None):
         self.remote_url = remote_url.rstrip('/')
         self.storage = storage
         self.origin_id = origin_id
@@ -75,10 +74,7 @@ class BaseSvnRepo():
         self.local_url = os.path.join(self.local_dirname, local_name).encode(
             'utf-8')
 
-        if svn_uuid:
-            self.uuid = svn_uuid.encode('utf-8')
-        else:
-            self.uuid = self.conn.get_uuid().encode('utf-8')
+        self.uuid = self.conn.get_uuid().encode('utf-8')
 
     def __str__(self):
         return str({'remote_url': self.remote_url,
@@ -306,8 +302,7 @@ class GitSvnSvnRepo(BaseSvnRepo):
                  destination_path=None,
                  svn_uuid=None):
         super().__init__(remote_url, origin_id, storage,
-                         destination_path=destination_path,
-                         svn_uuid=svn_uuid)
+                         destination_path=destination_path)
         self.swhreplay = ra.SWHReplayNoEmptyFolder(
             conn=self.conn,
             rootpath=self.local_url)
@@ -369,11 +364,9 @@ class SWHSvnRepo(BaseSvnRepo):
 
     """
     def __init__(self, remote_url, origin_id, storage,
-                 destination_path=None,
-                 svn_uuid=None):
+                 destination_path=None):
         super().__init__(remote_url, origin_id, storage,
-                         destination_path=destination_path,
-                         svn_uuid=svn_uuid)
+                         destination_path=destination_path)
         self.swhreplay = ra.SWHReplay(
             conn=self.conn,
             rootpath=self.local_url)

@@ -8,16 +8,18 @@ swh-storage.
 
 """
 
+import abc
+import datetime
 
-from swh.core import utils
-from swh.model import git, hashutil
+from swh.core import utils, hashutil
+from swh.model import git
 from swh.model.git import GitType
 
 from swh.loader.core.loader import SWHLoader
 from . import svn, converters
 
 
-class SvnLoaderException(ValueError):
+class SvnLoaderEventful(ValueError):
     """A wrapper exception to transit the swh_revision onto which the
     loading failed.
 
@@ -27,7 +29,15 @@ class SvnLoaderException(ValueError):
         self.swh_revision = swh_revision
 
 
-class BaseSvnLoader(SWHLoader):
+class SvnLoaderUneventful(ValueError):
+    pass
+
+
+class SvnLoaderHistoryAltered(ValueError):
+    pass
+
+
+class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
     """Base Svn loader to load one svn repository.
 
     There exists 2 different policies:
@@ -49,11 +59,25 @@ class BaseSvnLoader(SWHLoader):
     """
     CONFIG_BASE_FILENAME = 'loader/svn.ini'
 
-    def __init__(self, svn_url, destination_path, origin):
-        super().__init__(origin['id'],
-                         logging_class='swh.loader.svn.SvnLoader')
-        self.origin = origin
+    def __init__(self):
+        super().__init__(logging_class='swh.loader.svn.SvnLoader')
 
+    @abc.abstractmethod
+    def get_svn_repo(self, svn_url, destination_path, origin):
+        """Instantiates the needed svnrepo collaborator to permit reading svn
+        repository.
+
+        Args:
+            svn_url: the svn repository url to read from
+            destination_path: the local path on disk to compute data
+            origin: the corresponding origin
+
+        Returns:
+            Instance of swh.loader.svn.svn clients
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def build_swh_revision(self, rev, commit, dir_id, parents):
         """Convert an svn revision to an swh one according to the loader's
         policy (git-svn or swh).
@@ -68,8 +92,9 @@ class BaseSvnLoader(SWHLoader):
         Returns:
             The swh revision
         """
-        raise NotImplementedError('This should be overriden by subclass')
+        raise NotImplementedError
 
+    @abc.abstractmethod
     def process_repository(self, origin_visit, last_known_swh_revision=None):
         """The main idea of this function is to:
         - iterate over the svn commit logs
@@ -83,7 +108,7 @@ class BaseSvnLoader(SWHLoader):
         - send that occurrence for storage in swh-storage.
 
         """
-        raise NotImplementedError('This should be implemented in subclass.')
+        raise NotImplementedError
 
     def process_svn_revisions(self, svnrepo, revision_start, revision_end,
                               revision_parents):
@@ -160,11 +185,10 @@ class BaseSvnLoader(SWHLoader):
                 # Take the last one as the last known revisions
                 known_swh_rev = revs[-1]
                 # Then notify something is wrong, and we stopped at that rev.
-                raise SvnLoaderException(e, swh_revision={
+                raise SvnLoaderEventful(e, swh_revision={
                     'id': known_swh_rev['id'],
                 })
-            else:
-                raise SvnLoaderException(e, swh_revision=None)
+            raise e
 
         return revs[-1]
 
@@ -186,7 +210,7 @@ class BaseSvnLoader(SWHLoader):
                                          origin_visit['visit'],
                                          status=status)
 
-    def load(self, origin_visit, last_known_swh_revision=None):
+    def load(self, *args, **kwargs):
         """Load a svn repository in swh.
 
         Checkout the svn repository locally in destination_path.
@@ -204,12 +228,104 @@ class BaseSvnLoader(SWHLoader):
               gives the state to pass along for the next schedule
 
         """
+        self.prepare(*args, **kwargs)
         try:
-            return self.process_repository(origin_visit,
-                                           last_known_swh_revision)
-        finally:
+            latest_rev = self.process_repository(
+                self.origin_visit, self.last_known_swh_revision)
+
             self.flush()
+            self.close_success()
+        except SvnLoaderEventful as e:
+            latest_rev = e.swh_revision
+            self.process_swh_occurrence(latest_rev, self.origin_visit)
+            self.process_swh_origin_visit(self.origin_visit, status='partial')
+            self.close_failure()
+            return {
+                'eventful': True,
+                'completion': 'partial',
+                'state': {
+                    'origin': self.origin_visit['origin'],
+                    'revision': hashutil.hash_to_hex(latest_rev['id'])
+                }
+            }
+        except (SvnLoaderHistoryAltered, SvnLoaderUneventful):
+            self.process_swh_occurrence(latest_rev, self.origin_visit)
+            self.process_swh_origin_visit(self.origin_visit, status='partial')
+            self.close_failure()
+            return {
+                'eventful': False,
+            }
+        except Exception as e:
+            self.process_swh_origin_visit(self.origin_visit, status='partial')
+            self.close_failure()
+            raise e
+        else:
+            self.process_swh_occurrence(latest_rev, self.origin_visit)
+            self.process_swh_origin_visit(self.origin_visit, status='full')
+            self.close_failure()
+            return {
+                'eventful': True,
+                'completion': 'full',
+            }
+        finally:
             self.svnrepo.clean_fs()
+
+    def prepare(self, *args, **kwargs):
+        """
+        Prepare origin, fetch_origin, origin_visit
+        Then load a svn repository.
+
+        Then close origin_visit, fetch_history according to status success or
+        failure.
+
+        First:
+        - creates an origin if it does not exist
+        - creates a fetch_history entry
+        - creates an origin_visit
+        - Then loads the svn repository
+
+        """
+        destination_path = kwargs['destination_path']
+        # local svn url
+        svn_url = kwargs['svn_url']
+
+        if 'origin' not in kwargs:  # first time, we'll create the origin
+            origin = {
+                'url': svn_url,
+                'type': 'svn',
+            }
+            origin['id'] = self.storage.origin_add_one(origin)
+        else:
+            origin = {
+                'id': kwargs['origin'],
+                'url': svn_url,
+                'type': 'svn'
+            }
+
+        if 'swh_revision' in kwargs:
+            self.last_known_swh_revision = hashutil.hex_to_hash(
+                kwargs['swh_revision'])
+        else:
+            self.last_known_swh_revision = None
+
+        self.svnrepo = self.get_svn_repo(svn_url, destination_path, origin)
+        self.origin_id = origin['id']
+
+        self.fetch_history_id = self.open_fetch_history()
+
+        date_visit = datetime.datetime.now(tz=datetime.timezone.utc)
+        self.origin_visit = self.storage.origin_visit_add(
+            self.origin_id, date_visit)
+
+    def close_success(self):
+        self.close_fetch_history_success(self.fetch_history_id)
+        self.storage.origin_visit_update(
+            self.origin_id, self.origin_visit['visit'], status='full')
+
+    def close_failure(self):
+        self.close_fetch_history_failure(self.fetch_history_id)
+        self.storage.origin_visit_update(
+            self.origin_id, self.origin_visit['visit'], status='partial')
 
 
 class GitSvnSvnLoader(BaseSvnLoader):
@@ -234,8 +350,8 @@ class GitSvnSvnLoader(BaseSvnLoader):
         --no-metadata`
 
     """
-    def __init__(self, svn_url, destination_path, origin, svn_uuid=None):
-        super().__init__(svn_url, destination_path, origin)
+    def __init__(self):
+        super().__init__()
         # We don't want to persist result in git-svn policy
         self.config['send_contents'] = False
         self.config['send_directories'] = False
@@ -243,12 +359,10 @@ class GitSvnSvnLoader(BaseSvnLoader):
         self.config['send_releases'] = False
         self.config['send_occurrences'] = False
 
-        self.svnrepo = svn.GitSvnSvnRepo(
-            svn_url,
-            origin['id'],
-            self.storage,
-            destination_path=destination_path,
-            svn_uuid=svn_uuid)
+    def get_svn_repo(self, svn_url, destination_path, origin):
+        return svn.GitSvnSvnRepo(
+            svn_url, origin['id'], self.storage,
+            destination_path=destination_path)
 
     def build_swh_revision(self, rev, commit, dir_id, parents):
         """Build the swh revision a-la git-svn.
@@ -293,38 +407,14 @@ class GitSvnSvnLoader(BaseSvnLoader):
         if revision_start > revision_end and revision_start is not 1:
             self.log.info('%s@%s already injected.' % (
                 svnrepo.remote_url, revision_end))
-            return {
-                'eventful': False
-            }
+            raise SvnLoaderUneventful
 
         self.log.info('Processing %s.' % svnrepo)
 
         # process and store revision to swh (sent by by blocks of
         # 'revision_packet_size')
-        try:
-            latest_rev = self.process_swh_revisions(svnrepo,
-                                                    revision_start,
-                                                    revision_end,
-                                                    revision_parents)
-        except SvnLoaderException as e:
-            latest_rev = e.swh_revision
-            self.process_swh_occurrence(latest_rev, origin_visit)
-            self.process_swh_origin_visit(origin_visit, status='partial')
-            return {
-                'eventful': True,
-                'completion': 'partial',
-                'state': {
-                    'origin': origin_visit['origin'],
-                    'revision': hashutil.hash_to_hex(latest_rev['id'])
-                }
-            }
-        else:
-            self.process_swh_occurrence(latest_rev, origin_visit)
-            self.process_swh_origin_visit(origin_visit, status='full')
-            return {
-                'eventful': True,
-                'completion': 'full',
-            }
+        return self.process_swh_revisions(
+            svnrepo, revision_start, revision_end, revision_parents)
 
 
 class SWHSvnLoader(BaseSvnLoader):
@@ -339,14 +429,13 @@ class SWHSvnLoader(BaseSvnLoader):
         'extra_header' to be able to deal with update.
 
     """
-    def __init__(self, svn_url, destination_path, origin, svn_uuid=None):
-        super().__init__(svn_url, destination_path, origin)
-        self.svnrepo = svn.SWHSvnRepo(
-            svn_url,
-            origin['id'],
-            self.storage,
-            destination_path=destination_path,
-            svn_uuid=svn_uuid)
+    def __init__(self):
+        super().__init__()
+
+    def get_svn_repo(self, svn_url, destination_path, origin):
+        return svn.SWHSvnRepo(
+            svn_url, origin['id'], self.storage,
+            destination_path=destination_path)
 
     def swh_previous_revision(self, prev_swh_revision=None):
         """Retrieve swh's previous revision if any.
@@ -463,10 +552,7 @@ class SWHSvnLoader(BaseSvnLoader):
                 msg = 'History of svn %s@%s history modified. Skipping...' % (  # noqa
                     svnrepo.remote_url, revision_start)
                 self.log.warn(msg)
-                return {
-                    'eventful': False,
-                    'status': 'failed',
-                }
+                raise SvnLoaderHistoryAltered
             else:
                 # now we know history is ok, we start at next revision
                 revision_start = revision_start + 1
@@ -482,35 +568,11 @@ class SWHSvnLoader(BaseSvnLoader):
         if revision_start > revision_end and revision_start is not 1:
             self.log.info('%s@%s already injected.' % (
                 svnrepo.remote_url, revision_end))
-            return {
-                'eventful': False
-            }
+            raise SvnLoaderUneventful
 
         self.log.info('Processing %s.' % svnrepo)
 
-        try:
-            # process and store revision to swh (sent by by blocks of
-            # 'revision_packet_size')
-            latest_rev = self.process_swh_revisions(svnrepo,
-                                                    revision_start,
-                                                    revision_end,
-                                                    revision_parents)
-        except SvnLoaderException as e:
-            latest_rev = e.swh_revision
-            self.process_swh_occurrence(latest_rev, origin_visit)
-            self.process_swh_origin_visit(origin_visit, status='full')
-            return {
-                'eventful': True,
-                'completion': 'partial',
-                'state': {
-                    'origin': origin_visit['origin'],
-                    'revision': hashutil.hash_to_hex(latest_rev['id'])
-                }
-            }
-        else:
-            self.process_swh_occurrence(latest_rev, origin_visit)
-            self.process_swh_origin_visit(origin_visit, status='full')
-            return {
-                'eventful': True,
-                'completion': 'full',
-            }
+        # process and store revision to swh (sent by by blocks of
+        # 'revision_packet_size')
+        return self.process_swh_revisions(
+            svnrepo, revision_start, revision_end, revision_parents)

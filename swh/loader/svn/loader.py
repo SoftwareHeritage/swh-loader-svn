@@ -223,14 +223,16 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         """
         self.prepare(*args, **kwargs)
         try:
-            return self.process_repository(self.origin_visit,
-                                           self.last_known_swh_revision)
+            result = self.process_repository(self.origin_visit,
+                                             self.last_known_swh_revision)
+            self.flush()
             self.close_success()
+            return result
         except:
+            self.flush()
             self.close_failure()
             raise
         finally:
-            self.flush()
             self.svnrepo.clean_fs()
 
     def prepare(self, *args, **kwargs):
@@ -281,7 +283,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
             self.origin_id, date_visit)
 
     def close_success(self):
-        self.close_fetch_history_success(self.fetch_history_id, {})
+        self.close_fetch_history_success(self.fetch_history_id)
         self.storage.origin_visit_update(
             self.origin_id, self.origin_visit['visit'], status='full')
 

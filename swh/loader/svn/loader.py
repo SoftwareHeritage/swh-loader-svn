@@ -19,7 +19,7 @@ from swh.loader.core.loader import SWHLoader
 from . import svn, converters
 
 
-class SvnLoaderException(ValueError):
+class SvnLoaderEventful(ValueError):
     """A wrapper exception to transit the swh_revision onto which the
     loading failed.
 
@@ -27,6 +27,14 @@ class SvnLoaderException(ValueError):
     def __init__(self, e, swh_revision):
         super().__init__(e)
         self.swh_revision = swh_revision
+
+
+class SvnLoaderUneventful(ValueError):
+    pass
+
+
+class SvnLoaderHistoryAltered(ValueError):
+    pass
 
 
 class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
@@ -177,7 +185,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
                 # Take the last one as the last known revisions
                 known_swh_rev = revs[-1]
                 # Then notify something is wrong, and we stopped at that rev.
-                raise SvnLoaderException(e, swh_revision={
+                raise SvnLoaderEventful(e, swh_revision={
                     'id': known_swh_rev['id'],
                 })
             raise e
@@ -222,15 +230,43 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         """
         self.prepare(*args, **kwargs)
         try:
-            result = self.process_repository(self.origin_visit,
-                                             self.last_known_swh_revision)
+            latest_rev = self.process_repository(
+                self.origin_visit, self.last_known_swh_revision)
+
             self.flush()
             self.close_success()
-            return result
-        except:
-            self.flush()
+        except SvnLoaderEventful as e:
+            latest_rev = e.swh_revision
+            self.process_swh_occurrence(latest_rev, self.origin_visit)
+            self.process_swh_origin_visit(self.origin_visit, status='partial')
             self.close_failure()
-            raise
+            return {
+                'eventful': True,
+                'completion': 'partial',
+                'state': {
+                    'origin': self.origin_visit['origin'],
+                    'revision': hashutil.hash_to_hex(latest_rev['id'])
+                }
+            }
+        except (SvnLoaderHistoryAltered, SvnLoaderUneventful):
+            self.process_swh_occurrence(latest_rev, self.origin_visit)
+            self.process_swh_origin_visit(self.origin_visit, status='partial')
+            self.close_failure()
+            return {
+                'eventful': False,
+            }
+        except Exception as e:
+            self.process_swh_origin_visit(self.origin_visit, status='partial')
+            self.close_failure()
+            raise e
+        else:
+            self.process_swh_occurrence(latest_rev, self.origin_visit)
+            self.process_swh_origin_visit(self.origin_visit, status='full')
+            self.close_failure()
+            return {
+                'eventful': True,
+                'completion': 'full',
+            }
         finally:
             self.svnrepo.clean_fs()
 
@@ -371,38 +407,14 @@ class GitSvnSvnLoader(BaseSvnLoader):
         if revision_start > revision_end and revision_start is not 1:
             self.log.info('%s@%s already injected.' % (
                 svnrepo.remote_url, revision_end))
-            return {
-                'eventful': False
-            }
+            raise SvnLoaderUneventful
 
         self.log.info('Processing %s.' % svnrepo)
 
         # process and store revision to swh (sent by by blocks of
         # 'revision_packet_size')
-        try:
-            latest_rev = self.process_swh_revisions(svnrepo,
-                                                    revision_start,
-                                                    revision_end,
-                                                    revision_parents)
-        except SvnLoaderException as e:
-            latest_rev = e.swh_revision
-            self.process_swh_occurrence(latest_rev, origin_visit)
-            self.process_swh_origin_visit(origin_visit, status='partial')
-            return {
-                'eventful': True,
-                'completion': 'partial',
-                'state': {
-                    'origin': origin_visit['origin'],
-                    'revision': hashutil.hash_to_hex(latest_rev['id'])
-                }
-            }
-        else:
-            self.process_swh_occurrence(latest_rev, origin_visit)
-            self.process_swh_origin_visit(origin_visit, status='full')
-            return {
-                'eventful': True,
-                'completion': 'full',
-            }
+        return self.process_swh_revisions(
+            svnrepo, revision_start, revision_end, revision_parents)
 
 
 class SWHSvnLoader(BaseSvnLoader):
@@ -540,10 +552,7 @@ class SWHSvnLoader(BaseSvnLoader):
                 msg = 'History of svn %s@%s history modified. Skipping...' % (  # noqa
                     svnrepo.remote_url, revision_start)
                 self.log.warn(msg)
-                return {
-                    'eventful': False,
-                    'status': 'failed',
-                }
+                raise SvnLoaderHistoryAltered
             else:
                 # now we know history is ok, we start at next revision
                 revision_start = revision_start + 1
@@ -559,35 +568,11 @@ class SWHSvnLoader(BaseSvnLoader):
         if revision_start > revision_end and revision_start is not 1:
             self.log.info('%s@%s already injected.' % (
                 svnrepo.remote_url, revision_end))
-            return {
-                'eventful': False
-            }
+            raise SvnLoaderUneventful
 
         self.log.info('Processing %s.' % svnrepo)
 
-        try:
-            # process and store revision to swh (sent by by blocks of
-            # 'revision_packet_size')
-            latest_rev = self.process_swh_revisions(svnrepo,
-                                                    revision_start,
-                                                    revision_end,
-                                                    revision_parents)
-        except SvnLoaderException as e:
-            latest_rev = e.swh_revision
-            self.process_swh_occurrence(latest_rev, origin_visit)
-            self.process_swh_origin_visit(origin_visit, status='full')
-            return {
-                'eventful': True,
-                'completion': 'partial',
-                'state': {
-                    'origin': origin_visit['origin'],
-                    'revision': hashutil.hash_to_hex(latest_rev['id'])
-                }
-            }
-        else:
-            self.process_swh_occurrence(latest_rev, origin_visit)
-            self.process_swh_origin_visit(origin_visit, status='full')
-            return {
-                'eventful': True,
-                'completion': 'full',
-            }
+        # process and store revision to swh (sent by by blocks of
+        # 'revision_packet_size')
+        return self.process_swh_revisions(
+            svnrepo, revision_start, revision_end, revision_parents)

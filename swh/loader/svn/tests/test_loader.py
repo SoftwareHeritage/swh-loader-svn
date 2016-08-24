@@ -7,6 +7,7 @@ from nose.tools import istest
 
 from swh.core import hashutil
 from swh.loader.svn.loader import GitSvnSvnLoader, SWHSvnLoader
+from swh.loader.svn.loader import SvnLoaderHistoryAltered, SvnLoaderUneventful
 
 from test_base import BaseTestSvnLoader
 
@@ -190,7 +191,6 @@ class GitSvnLoaderITTest(BaseTestSvnLoader):
         # then
         self.assertEquals(len(self.loader.all_revisions), 6)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 1)
 
         last_revision = 'bad4a83737f337d47e0ba681478214b07a707218'
         # cf. test_loader.org for explaining from where those hashes
@@ -210,11 +210,6 @@ class GitSvnLoaderITTest(BaseTestSvnLoader):
             directory_id = hashutil.hash_to_hex(rev['directory'])
 
             self.assertEquals(expected_revisions[rev_id], directory_id)
-
-        occ = self.loader.all_occurrences[0]
-        self.assertEquals(hashutil.hash_to_hex(occ['target']),
-                          last_revision)
-        self.assertEquals(occ['origin'], self.origin['id'])
 
 
 class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
@@ -243,7 +238,6 @@ class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
         # then
         self.assertEquals(len(self.loader.all_revisions), 6)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 1)
 
         last_revision = '4876cb10aec6f708f7466dddf547567b65f6c39c'
         # cf. test_loader.org for explaining from where those hashes
@@ -263,10 +257,6 @@ class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
             directory_id = hashutil.hash_to_hex(rev['directory'])
 
             self.assertEquals(expected_revisions[rev_id], directory_id)
-
-        occ = self.loader.all_occurrences[0]
-        self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
-        self.assertEquals(occ['origin'], self.origin['id'])
 
 
 class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestSvnLoader):
@@ -291,12 +281,12 @@ class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestSvnLoader):
 
         """
         # when
-        self.loader.process_repository(self.origin_visit)
+        with self.assertRaises(SvnLoaderUneventful):
+            self.loader.process_repository(self.origin_visit)
 
         # then
         self.assertEquals(len(self.loader.all_revisions), 0)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 0)
 
 
 class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestSvnLoader):
@@ -322,14 +312,14 @@ class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestSvnLoader):
 
         """
         # when
-        self.loader.process_repository(self.origin_visit)
+        with self.assertRaises(SvnLoaderHistoryAltered):
+            self.loader.process_repository(self.origin_visit)
 
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 news + 1 old
         self.assertEquals(len(self.loader.all_revisions), 0)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 0)
 
 
 class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
@@ -362,7 +352,6 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
         # so 2 new
         self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 1)
 
         last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
@@ -381,10 +370,6 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
             directory_id = hashutil.hash_to_hex(rev['directory'])
 
             self.assertEquals(expected_revisions[rev_id], directory_id)
-
-        occ = self.loader.all_occurrences[0]
-        self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
-        self.assertEquals(occ['origin'], self.origin['id'])
 
 
 class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
@@ -433,7 +418,6 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
         # so 2 new
         self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 1)
 
         last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
@@ -452,10 +436,6 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
             directory_id = hashutil.hash_to_hex(rev['directory'])
 
             self.assertEquals(expected_revisions[rev_id], directory_id)
-
-        occ = self.loader.all_occurrences[0]
-        self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
-        self.assertEquals(occ['origin'], self.origin['id'])
 
 
 class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
@@ -506,7 +486,6 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
         # so 2 new
         self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 1)
 
         last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
@@ -525,10 +504,6 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
             directory_id = hashutil.hash_to_hex(rev['directory'])
 
             self.assertEquals(expected_revisions[rev_id], directory_id)
-
-        occ = self.loader.all_occurrences[0]
-        self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
-        self.assertEquals(occ['origin'], self.origin['id'])
 
 
 class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
@@ -613,7 +588,6 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
         # so 2 new
         self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 1)
 
         last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
@@ -632,7 +606,3 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
             directory_id = hashutil.hash_to_hex(rev['directory'])
 
             self.assertEquals(expected_revisions[rev_id], directory_id)
-
-        occ = self.loader.all_occurrences[0]
-        self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
-        self.assertEquals(occ['origin'], self.origin['id'])

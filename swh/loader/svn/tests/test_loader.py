@@ -22,8 +22,8 @@ class TestSvnLoader:
     cf. GitSvnLoaderNoStorage, SWHSvnLoaderNoStorage
 
     """
-    def __init__(self, svn_url, destination_path, origin):
-        super().__init__(svn_url, destination_path, origin)
+    def __init__(self):
+        super().__init__()
         # We don't want to persist any result in this test context
         self.config['send_contents'] = False
         self.config['send_directories'] = False
@@ -56,6 +56,17 @@ class TestSvnLoader:
         # Do nothing during origin_visit update
         pass
 
+    # Override to do nothing at the end
+    def close_failure(self):
+        pass
+
+    def close_success(self):
+        pass
+
+    # Override to only prepare the svn repository
+    def prepare(self, *args, **kwargs):
+        self.svnrepo = self.get_svn_repo(*args)
+
 
 class GitSvnLoaderNoStorage(TestSvnLoader, GitSvnSvnLoader):
     """A GitSvnLoader with no persistence.
@@ -64,8 +75,8 @@ class GitSvnLoaderNoStorage(TestSvnLoader, GitSvnSvnLoader):
         Load an svn repository using the git-svn policy.
 
     """
-    def __init__(self, svn_url, destination_path, origin):
-        super().__init__(svn_url, destination_path, origin)
+    def __init__(self):
+        super().__init__()
 
 
 class SWHSvnLoaderNoStorage(TestSvnLoader, SWHSvnLoader):
@@ -165,10 +176,10 @@ class GitSvnLoaderITTest(BaseTestSvnLoader):
             'visit': 1,
         }
 
-        self.loader = GitSvnLoaderNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        # prepare the loader
+        self.loader = GitSvnLoaderNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -217,10 +228,9 @@ class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
             'visit': 2,
         }
 
-        self.loader = SWHSvnLoaderNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        self.loader = SWHSvnLoaderNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -270,10 +280,9 @@ class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestSvnLoader):
             'visit': 3,
         }
 
-        self.loader = SWHSvnLoaderUpdateNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        self.loader = SWHSvnLoaderUpdateNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -302,10 +311,9 @@ class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestSvnLoader):
             'visit': 4,
         }
 
-        self.loader = SWHSvnLoaderUpdateHistoryAlteredNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        self.loader = SWHSvnLoaderUpdateHistoryAlteredNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -336,10 +344,9 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
             'visit': 5,
         }
 
-        self.loader = SWHSvnLoaderUpdateNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        self.loader = SWHSvnLoaderUpdateNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -391,10 +398,9 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
             'visit': 6
         }
 
-        self.loader = SWHSvnLoaderNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        self.loader = SWHSvnLoaderNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -464,10 +470,9 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
             'visit': 9,
         }
 
-        self.loader = SWHSvnLoaderUpdateNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        self.loader = SWHSvnLoaderUpdateNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -573,10 +578,9 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
             'visit': 1,
         }
 
-        self.loader = SWHSvnLoaderUpdateLessRecentNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        self.loader = SWHSvnLoaderUpdateLessRecentNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):

@@ -3,25 +3,15 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-import datetime
-
-from swh.core import hashutil
-from swh.loader.core import tasks
+from swh.scheduler.task import Task
 
 from .loader import SWHSvnLoader
 
 
-class LoadSWHSvnRepositoryTsk(tasks.LoaderCoreTask):
+class LoadSWHSvnRepositoryTsk(Task):
     """Import one svn repository to Software Heritage.
 
     """
-    CONFIG_BASE_FILENAME = 'loader/svn.ini'
-
-    ADDITIONAL_CONFIG = {
-        'storage_class': ('str', 'remote_storage'),
-        'storage_args': ('list[str]', ['http://localhost:5000/']),
-    }
-
     task_queue = 'swh_loader_svn'
 
     def run(self, *args, **kwargs):
@@ -38,48 +28,4 @@ class LoadSWHSvnRepositoryTsk(tasks.LoaderCoreTask):
                 docstring
 
         """
-        destination_path = kwargs['destination_path']
-        # local svn url
-        svn_url = kwargs['svn_url']
-
-        if 'origin' not in kwargs:  # first time, we'll create the origin
-            origin = {
-                'url': svn_url,
-                'type': 'svn',
-            }
-            origin['id'] = self.storage.origin_add_one(origin)
-        else:
-            origin = {
-                'id': kwargs['origin'],
-                'url': svn_url,
-                'type': 'svn'
-            }
-
-        date_visit = datetime.datetime.now(tz=datetime.timezone.utc)
-        origin_visit = self.storage.origin_visit_add(origin['id'],
-                                                     date_visit)
-
-        origin_visit.update({
-            'date': date_visit
-        })
-
-        # the real production use case with storage and all
-        loader = SWHSvnLoader(svn_url, destination_path, origin)
-
-        if 'swh_revision' in kwargs:
-            swh_revision = hashutil.hex_to_hash(kwargs['swh_revision'])
-        else:
-            swh_revision = None
-
-        result = loader.load(origin_visit, swh_revision)
-
-        # Check for partial completion to complete state data
-        if 'completion' in result and result['completion'] == 'partial':
-            state = result['state']
-            state.update({
-                'destination_path': destination_path,
-                'svn_url': svn_url,
-            })
-            result['state'] = state
-
-        return result
+        SWHSvnLoader().load(*args, **kwargs)

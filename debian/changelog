@@ -1,3 +1,10 @@
+swh-loader-svn (0.0.15-1~swh1) unstable-swh; urgency=medium
+
+  * v0.0.15
+  * Update svn loader to register origin_visit's state
+
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 24 Aug 2016 14:56:54 +0200
+
 swh-loader-svn (0.0.14-1~swh1) unstable-swh; urgency=medium
 
   * v0.0.14

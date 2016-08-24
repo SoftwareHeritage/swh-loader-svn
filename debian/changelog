@@ -1,8 +1,9 @@
-swh-loader-svn (0.0.14-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.15-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.15
+  * Update svn loader to register origin_visit's state
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Tue, 23 Aug 2016 16:38:17 +0200
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 24 Aug 2016 14:56:54 +0200
 
 swh-loader-svn (0.0.14-1~swh1) unstable-swh; urgency=medium
 

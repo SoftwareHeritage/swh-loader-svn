@@ -6,7 +6,7 @@ swh.core >= 0.0.19
 swh.storage >= 0.0.50
 swh.model >= 0.0.11
 swh.scheduler >= 0.0.7
-swh.loader.core >= 0.0.10
+swh.loader.core >= 0.0.11
 click
 retrying
 python-dateutil

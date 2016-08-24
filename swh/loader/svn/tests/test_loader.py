@@ -7,6 +7,7 @@ from nose.tools import istest
 
 from swh.core import hashutil
 from swh.loader.svn.loader import GitSvnSvnLoader, SWHSvnLoader
+from swh.loader.svn.loader import SvnLoaderHistoryAltered, SvnLoaderUneventful
 
 from test_base import BaseTestSvnLoader
 
@@ -22,8 +23,8 @@ class TestSvnLoader:
     cf. GitSvnLoaderNoStorage, SWHSvnLoaderNoStorage
 
     """
-    def __init__(self, svn_url, destination_path, origin):
-        super().__init__(svn_url, destination_path, origin)
+    def __init__(self):
+        super().__init__()
         # We don't want to persist any result in this test context
         self.config['send_contents'] = False
         self.config['send_directories'] = False
@@ -56,6 +57,17 @@ class TestSvnLoader:
         # Do nothing during origin_visit update
         pass
 
+    # Override to do nothing at the end
+    def close_failure(self):
+        pass
+
+    def close_success(self):
+        pass
+
+    # Override to only prepare the svn repository
+    def prepare(self, *args, **kwargs):
+        self.svnrepo = self.get_svn_repo(*args)
+
 
 class GitSvnLoaderNoStorage(TestSvnLoader, GitSvnSvnLoader):
     """A GitSvnLoader with no persistence.
@@ -64,8 +76,8 @@ class GitSvnLoaderNoStorage(TestSvnLoader, GitSvnSvnLoader):
         Load an svn repository using the git-svn policy.
 
     """
-    def __init__(self, svn_url, destination_path, origin):
-        super().__init__(svn_url, destination_path, origin)
+    def __init__(self):
+        super().__init__()
 
 
 class SWHSvnLoaderNoStorage(TestSvnLoader, SWHSvnLoader):
@@ -165,10 +177,10 @@ class GitSvnLoaderITTest(BaseTestSvnLoader):
             'visit': 1,
         }
 
-        self.loader = GitSvnLoaderNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        # prepare the loader
+        self.loader = GitSvnLoaderNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -179,7 +191,6 @@ class GitSvnLoaderITTest(BaseTestSvnLoader):
         # then
         self.assertEquals(len(self.loader.all_revisions), 6)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 1)
 
         last_revision = 'bad4a83737f337d47e0ba681478214b07a707218'
         # cf. test_loader.org for explaining from where those hashes
@@ -200,11 +211,6 @@ class GitSvnLoaderITTest(BaseTestSvnLoader):
 
             self.assertEquals(expected_revisions[rev_id], directory_id)
 
-        occ = self.loader.all_occurrences[0]
-        self.assertEquals(hashutil.hash_to_hex(occ['target']),
-                          last_revision)
-        self.assertEquals(occ['origin'], self.origin['id'])
-
 
 class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
     def setUp(self):
@@ -217,10 +223,9 @@ class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
             'visit': 2,
         }
 
-        self.loader = SWHSvnLoaderNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        self.loader = SWHSvnLoaderNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -233,7 +238,6 @@ class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
         # then
         self.assertEquals(len(self.loader.all_revisions), 6)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 1)
 
         last_revision = '4876cb10aec6f708f7466dddf547567b65f6c39c'
         # cf. test_loader.org for explaining from where those hashes
@@ -254,10 +258,6 @@ class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
 
             self.assertEquals(expected_revisions[rev_id], directory_id)
 
-        occ = self.loader.all_occurrences[0]
-        self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
-        self.assertEquals(occ['origin'], self.origin['id'])
-
 
 class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestSvnLoader):
     def setUp(self):
@@ -270,10 +270,9 @@ class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestSvnLoader):
             'visit': 3,
         }
 
-        self.loader = SWHSvnLoaderUpdateNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        self.loader = SWHSvnLoaderUpdateNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -282,12 +281,12 @@ class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestSvnLoader):
 
         """
         # when
-        self.loader.process_repository(self.origin_visit)
+        with self.assertRaises(SvnLoaderUneventful):
+            self.loader.process_repository(self.origin_visit)
 
         # then
         self.assertEquals(len(self.loader.all_revisions), 0)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 0)
 
 
 class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestSvnLoader):
@@ -302,10 +301,9 @@ class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestSvnLoader):
             'visit': 4,
         }
 
-        self.loader = SWHSvnLoaderUpdateHistoryAlteredNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        self.loader = SWHSvnLoaderUpdateHistoryAlteredNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -314,14 +312,14 @@ class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestSvnLoader):
 
         """
         # when
-        self.loader.process_repository(self.origin_visit)
+        with self.assertRaises(SvnLoaderHistoryAltered):
+            self.loader.process_repository(self.origin_visit)
 
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 news + 1 old
         self.assertEquals(len(self.loader.all_revisions), 0)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 0)
 
 
 class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
@@ -336,10 +334,9 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
             'visit': 5,
         }
 
-        self.loader = SWHSvnLoaderUpdateNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        self.loader = SWHSvnLoaderUpdateNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -355,7 +352,6 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
         # so 2 new
         self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 1)
 
         last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
@@ -375,10 +371,6 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
 
             self.assertEquals(expected_revisions[rev_id], directory_id)
 
-        occ = self.loader.all_occurrences[0]
-        self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
-        self.assertEquals(occ['origin'], self.origin['id'])
-
 
 class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
     def setUp(self):
@@ -391,10 +383,9 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
             'visit': 6
         }
 
-        self.loader = SWHSvnLoaderNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        self.loader = SWHSvnLoaderNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -427,7 +418,6 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
         # so 2 new
         self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 1)
 
         last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
@@ -447,10 +437,6 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
 
             self.assertEquals(expected_revisions[rev_id], directory_id)
 
-        occ = self.loader.all_occurrences[0]
-        self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
-        self.assertEquals(occ['origin'], self.origin['id'])
-
 
 class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
         BaseTestSvnLoader):
@@ -464,10 +450,9 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
             'visit': 9,
         }
 
-        self.loader = SWHSvnLoaderUpdateNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        self.loader = SWHSvnLoaderUpdateNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -501,7 +486,6 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
         # so 2 new
         self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 1)
 
         last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
@@ -520,10 +504,6 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
             directory_id = hashutil.hash_to_hex(rev['directory'])
 
             self.assertEquals(expected_revisions[rev_id], directory_id)
-
-        occ = self.loader.all_occurrences[0]
-        self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
-        self.assertEquals(occ['origin'], self.origin['id'])
 
 
 class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
@@ -573,10 +553,9 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
             'visit': 1,
         }
 
-        self.loader = SWHSvnLoaderUpdateLessRecentNoStorage(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            origin=self.origin)
+        self.loader = SWHSvnLoaderUpdateLessRecentNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
 
     @istest
     def process_repository(self):
@@ -609,7 +588,6 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
         # so 2 new
         self.assertEquals(len(self.loader.all_revisions), 5)
         self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_occurrences), 1)
 
         last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
@@ -628,7 +606,3 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
             directory_id = hashutil.hash_to_hex(rev['directory'])
 
             self.assertEquals(expected_revisions[rev_id], directory_id)
-
-        occ = self.loader.all_occurrences[0]
-        self.assertEquals(hashutil.hash_to_hex(occ['target']), last_revision)
-        self.assertEquals(occ['origin'], self.origin['id'])

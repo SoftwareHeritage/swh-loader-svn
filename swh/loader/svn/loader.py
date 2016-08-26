@@ -237,6 +237,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
             latest_rev = self.process_repository(
                 self.origin_visit, self.last_known_swh_revision)
         except SvnLoaderEventful as e:
+            self.log.error('Eventful partial visit. Detail: %s' % e)
             latest_rev = e.swh_revision
             self.process_swh_occurrence(latest_rev, self.origin_visit)
             self.close_failure()
@@ -248,7 +249,8 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
                     'revision': hashutil.hash_to_hex(latest_rev['id'])
                 }
             }
-        except (SvnLoaderHistoryAltered, SvnLoaderUneventful):
+        except (SvnLoaderHistoryAltered, SvnLoaderUneventful) as e:
+            self.log.error('Uneventful visit. Detail: %s' % e)
             self.process_swh_occurrence(latest_rev, self.origin_visit)
             self.close_failure()
             return {

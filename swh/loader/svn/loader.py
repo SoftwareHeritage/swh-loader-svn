@@ -202,13 +202,17 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         self.log.debug('occ: %s' % occ)
         self.maybe_load_occurrences([occ])
 
-    def process_swh_origin_visit(self, origin_visit, status):
-        """Update origin_visit with status.
+    def close_success(self):
+        self.close_fetch_history_success(self.fetch_history_id)
+        self.storage.origin_visit_update(self.origin_visit['origin'],
+                                         self.origin_visit['visit'],
+                                         status='full')
 
-        """
-        self.storage.origin_visit_update(origin_visit['origin'],
-                                         origin_visit['visit'],
-                                         status=status)
+    def close_failure(self):
+        self.close_fetch_history_failure(self.fetch_history_id)
+        self.storage.origin_visit_update(self.origin_visit['origin'],
+                                         self.origin_visit['visit'],
+                                         status='partial')
 
     def load(self, *args, **kwargs):
         """Load a svn repository in swh.
@@ -238,7 +242,6 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         except SvnLoaderEventful as e:
             latest_rev = e.swh_revision
             self.process_swh_occurrence(latest_rev, self.origin_visit)
-            self.process_swh_origin_visit(self.origin_visit, status='partial')
             self.close_failure()
             return {
                 'eventful': True,
@@ -250,18 +253,15 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
             }
         except (SvnLoaderHistoryAltered, SvnLoaderUneventful):
             self.process_swh_occurrence(latest_rev, self.origin_visit)
-            self.process_swh_origin_visit(self.origin_visit, status='partial')
             self.close_failure()
             return {
                 'eventful': False,
             }
         except Exception as e:
-            self.process_swh_origin_visit(self.origin_visit, status='partial')
             self.close_failure()
             raise e
         else:
             self.process_swh_occurrence(latest_rev, self.origin_visit)
-            self.process_swh_origin_visit(self.origin_visit, status='full')
             self.close_failure()
             return {
                 'eventful': True,
@@ -316,16 +316,6 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         date_visit = datetime.datetime.now(tz=datetime.timezone.utc)
         self.origin_visit = self.storage.origin_visit_add(
             self.origin_id, date_visit)
-
-    def close_success(self):
-        self.close_fetch_history_success(self.fetch_history_id)
-        self.storage.origin_visit_update(
-            self.origin_id, self.origin_visit['visit'], status='full')
-
-    def close_failure(self):
-        self.close_fetch_history_failure(self.fetch_history_id)
-        self.storage.origin_visit_update(
-            self.origin_id, self.origin_visit['visit'], status='partial')
 
 
 class GitSvnSvnLoader(BaseSvnLoader):

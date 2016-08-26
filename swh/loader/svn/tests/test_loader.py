@@ -53,10 +53,6 @@ class TestSvnLoader:
     def maybe_load_occurrences(self, all_occurrences):
         self.all_occurrences.extend(all_occurrences)
 
-    def process_swh_origin_visit(self, origin_visit, status):
-        # Do nothing during origin_visit update
-        pass
-
     # Override to do nothing at the end
     def close_failure(self):
         pass

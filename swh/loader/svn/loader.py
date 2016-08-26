@@ -238,7 +238,6 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
                 self.origin_visit, self.last_known_swh_revision)
 
             self.flush()
-            self.close_success()
         except SvnLoaderEventful as e:
             latest_rev = e.swh_revision
             self.process_swh_occurrence(latest_rev, self.origin_visit)
@@ -262,7 +261,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
             raise e
         else:
             self.process_swh_occurrence(latest_rev, self.origin_visit)
-            self.close_failure()
+            self.close_success()
             return {
                 'eventful': True,
                 'completion': 'full',

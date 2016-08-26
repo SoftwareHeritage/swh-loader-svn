@@ -236,8 +236,6 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         try:
             latest_rev = self.process_repository(
                 self.origin_visit, self.last_known_swh_revision)
-
-            self.flush()
         except SvnLoaderEventful as e:
             latest_rev = e.swh_revision
             self.process_swh_occurrence(latest_rev, self.origin_visit)
@@ -267,6 +265,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
                 'completion': 'full',
             }
         finally:
+            self.flush()
             self.svnrepo.clean_fs()
 
     def prepare(self, *args, **kwargs):

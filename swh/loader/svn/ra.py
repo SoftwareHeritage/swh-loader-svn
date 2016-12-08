@@ -600,5 +600,6 @@ def main(local_url, svn_url, revision_start, revision_end, debug, cleanup,
             if os.path.exists(rootpath):
                 shutil.rmtree(rootpath)
 
+
 if __name__ == '__main__':
     main()

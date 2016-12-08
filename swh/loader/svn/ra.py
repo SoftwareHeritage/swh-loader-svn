@@ -82,11 +82,37 @@ def apply_txdelta_handler(sbuf, target_stream):
     return apply_window
 
 
+def apply_txdelta_handler_with_line_ending_conversion(sbuf, target_stream):
+    """Return a function that can be called repeatedly with txdelta windows.
+    When done, closes the target_stream.
+
+    Adapted from subvertpy.delta.apply_txdelta_handler to:
+    - close the stream when done.
+    - remove carriage return character
+
+    Args
+        sbuf: Source buffer
+        target_stream: Target stream to write to.
+
+    Returns
+         Function to be called to apply txdelta windows
+
+    """
+    def apply_window(window):
+        if window is None:
+            target_stream.close()
+            return  # Last call
+        patch = delta.apply_txdelta_window(sbuf, window)
+        target_stream.write(patch.replace(b'\r', b''))
+    return apply_window
+
+
 class SWHFileEditor:
     """File Editor in charge of updating file on disk and memory objects.
 
     """
-    __slots__ = ['objects', 'path', 'fullpath', 'executable', 'link']
+    __slots__ = ['objects', 'path', 'fullpath', 'executable', 'link',
+                 'convert_line_ending']
 
     def __init__(self, objects, rootpath, path):
         self.objects = objects
@@ -95,6 +121,7 @@ class SWHFileEditor:
         self.executable = 0
         self.link = None
         self.fullpath = os.path.join(rootpath, path)
+        self.convert_line_ending = False
 
     def change_prop(self, key, value):
         if key == properties.PROP_EXECUTABLE:
@@ -104,6 +131,8 @@ class SWHFileEditor:
                 self.executable = 1
         elif key == properties.PROP_SPECIAL:
             self.link = True
+        elif key == 'svn:eol-style' and (value == 'native' or value == 'LF'):
+            self.convert_line_ending = True
 
     def __make_symlink(self):
         """Convert the svnlink to a symlink on disk.
@@ -151,6 +180,9 @@ class SWHFileEditor:
             sbuf = b''
 
         t = open(self.fullpath, 'wb')
+        if self.convert_line_ending:
+            return apply_txdelta_handler_with_line_ending_conversion(
+                sbuf, target_stream=t)
         return apply_txdelta_handler(sbuf, target_stream=t)
 
     def close(self):

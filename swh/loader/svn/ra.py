@@ -63,7 +63,8 @@ def apply_txdelta_handler(sbuf, target_stream):
     """Return a function that can be called repeatedly with txdelta windows.
     When done, closes the target_stream.
 
-    Adapted from subvertpy.delta.apply_txdelta_handler.
+    Adapted from subvertpy.delta.apply_txdelta_handler to close the
+    stream when done.
 
     Args
         sbuf: Source buffer
@@ -71,6 +72,7 @@ def apply_txdelta_handler(sbuf, target_stream):
 
     Returns
          Function to be called to apply txdelta windows
+
     """
     def apply_window(window):
         if window is None:
@@ -155,7 +157,7 @@ class SWHFileEditor:
         """When done with the file, this is called.
         So the file exists and is updated, we can:
         - adapt accordingly its execution flag if any
-        - compute the objects
+        - compute the objects' checksums
 
         """
         if self.link:

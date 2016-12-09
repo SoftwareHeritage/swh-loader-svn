@@ -251,7 +251,8 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
             }
         except (SvnLoaderHistoryAltered, SvnLoaderUneventful) as e:
             self.log.error('Uneventful visit. Detail: %s' % e)
-            self.process_swh_occurrence(latest_rev, self.origin_visit)
+            # FIXME: This fails because latest_rev is not bound
+            # self.process_swh_occurrence(latest_rev, self.origin_visit)
             self.close_failure()
             return {
                 'eventful': False,

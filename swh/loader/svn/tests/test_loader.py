@@ -602,3 +602,72 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
             directory_id = hashutil.hash_to_hex(rev['directory'])
 
             self.assertEquals(expected_revisions[rev_id], directory_id)
+
+
+class SWHSvnLoaderUpdateAndTestCornerCasesAboutEolITTest(BaseTestSvnLoader):
+    def setUp(self):
+        super().setUp(archive_name='pkg-gourmet-with-eol-corner-cases.tgz')
+
+        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
+
+        self.origin_visit = {
+            'origin': self.origin['id'],
+            'visit': 1,
+        }
+
+        self.loader = SWHSvnLoaderUpdateLessRecentNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
+
+    @istest
+    def process_repository(self):
+        """EOL corner cases and update.
+
+        """
+        previous_unfinished_revision = {
+            'id': hashutil.hex_to_hash(
+                '171dc35522bfd17dda4e90a542a0377fb2fc707a'),
+            'parents': [hashutil.hex_to_hash(
+                '902f29b4323a9b9de3af6d28e72dd581e76d9397')],
+            'directory': hashutil.hex_to_hash(
+                'fd24a76c87a3207428e06612b49860fc78e9f6dc'),
+            'target_type': 'revision',
+            'metadata': {
+                'extra_headers': [
+                    ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
+                    ['svn_revision', '11']
+                ]
+            }
+        }
+        # when
+        self.loader.process_repository(
+            self.origin_visit,
+            last_known_swh_revision=previous_unfinished_revision)
+
+        # then
+        # we got the previous run's last revision (rev 11)
+        # so 8 new
+        self.assertEquals(len(self.loader.all_revisions), 8)
+        self.assertEquals(len(self.loader.all_releases), 0)
+
+        last_revision = '0148ae3eaa520b73a50802c59f3f416b7a36cf8c'
+
+        # cf. test_loader.org for explaining from where those hashes
+        # come from
+        expected_revisions = {
+            # revision hash | directory hash
+            '027e8769f4786597436ab94a91f85527d04a6cbb': '2d9ca72c6afec6284fb01e459588cbb007017c8c',  # noqa
+            '4474d96018877742d9697d5c76666c9693353bfc': 'ab111577e0ab39e4a157c476072af48f2641d93f',  # noqa
+            '97ad21eab92961e2a22ca0285f09c6d1e9a7ffbc': 'ab111577e0ab39e4a157c476072af48f2641d93f',  # noqa
+            'd04ea8afcee6205cc8384c091bfc578931c169fd': 'b0a648b02e55a4dce356ac35187a058f89694ec7',  # noqa
+            'ded78810401fd354ffe894aa4a1e5c7d30a645d1': 'b0a648b02e55a4dce356ac35187a058f89694ec7',  # noqa
+            '4ee95e39358712f53c4fc720da3fafee9249ed19': 'c3c98df624733fef4e592bef983f93e2ed02b179',  # noqa
+            'ffa901b69ca0f46a2261f42948838d19709cb9f8': 'c3c98df624733fef4e592bef983f93e2ed02b179',  # noqa
+            last_revision:                              '844d4646d6c2b4f3a3b2b22ab0ee38c7df07bab2',  # noqa
+        }
+
+        for rev in self.loader.all_revisions:
+            rev_id = hashutil.hash_to_hex(rev['id'])
+            directory_id = hashutil.hash_to_hex(rev['directory'])
+
+            self.assertEquals(expected_revisions[rev_id], directory_id)

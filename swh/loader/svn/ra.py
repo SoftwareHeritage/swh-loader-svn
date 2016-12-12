@@ -207,7 +207,7 @@ class BaseDirSWHEditor:
     cf. SWHDirEditorNoEmptyFolder for an implementation that deletes
     empty folder
 
-    Instantiate a new class inheriting frmo this class and define the
+    Instantiate a new class inheriting from this class and define the
     following function:
 
     - def update_checksum(self):

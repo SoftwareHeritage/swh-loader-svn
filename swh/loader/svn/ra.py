@@ -78,7 +78,8 @@ def apply_txdelta_handler(sbuf, target_stream):
         if window is None:
             target_stream.close()
             return  # Last call
-        target_stream.write(delta.apply_txdelta_window(sbuf, window))
+        patch = delta.apply_txdelta_window(sbuf, window)
+        target_stream.write(patch)
     return apply_window
 
 

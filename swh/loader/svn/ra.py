@@ -87,7 +87,8 @@ class SWHFileEditor:
     """File Editor in charge of updating file on disk and memory objects.
 
     """
-    __slots__ = ['objects', 'path', 'fullpath', 'executable', 'link']
+    __slots__ = ['objects', 'path', 'fullpath', 'executable', 'link',
+                 'convert_eol']
 
     def __init__(self, objects, rootpath, path):
         self.objects = objects
@@ -96,6 +97,7 @@ class SWHFileEditor:
         self.executable = 0
         self.link = None
         self.fullpath = os.path.join(rootpath, path)
+        self.convert_eol = False
 
     def change_prop(self, key, value):
         if key == properties.PROP_EXECUTABLE:
@@ -105,6 +107,8 @@ class SWHFileEditor:
                 self.executable = 1
         elif key == properties.PROP_SPECIAL:
             self.link = True
+        elif key == 'svn:eol-style' and value in {'LF', 'native'}:
+            self.convert_eol = True
 
     def __make_symlink(self):
         """Convert the svnlink to a symlink on disk.
@@ -174,6 +178,12 @@ class SWHFileEditor:
             os.chmod(self.fullpath, 0o755)
         elif self.executable == 2:
             os.chmod(self.fullpath, 0o644)
+
+        if self.convert_eol:
+            with open(self.fullpath, 'rb') as f:
+                raw = f.read()
+            with open(self.fullpath, 'wb') as f:
+                f.write(raw.replace(b'\r', b''))
 
         # And now compute file's checksums
         self.objects[self.path] = {

@@ -189,6 +189,27 @@ class BaseSvnRepo():
                            rev=revision,
                            ignore_keywords=True)
 
+    def export_temporary(self, revision):
+        """Export the repository to a given revision in a temporary location.
+        This is up to the caller of this function to clean up the
+        temporary location when done (cf. self.clean_fs method)
+
+        Args:
+            revision: Revision to export at
+
+        Returns:
+            The local_url where the repository was exported.
+
+        """
+        local_dirname = tempfile.mkdtemp(
+            prefix='check-revision-%s.' % revision,
+            dir=self.root_dir)
+        local_name = os.path.basename(self.remote_url)
+        local_url = os.path.join(local_dirname, local_name)
+        self.client.export(
+            self.remote_url, to=local_url, rev=revision, ignore_keywords=True)
+        return local_url
+
     def swh_previous_revision(self, previous_swh_revision=None):
         """Look for possible existing revision in swh.
 
@@ -274,11 +295,19 @@ class BaseSvnRepo():
 
         yield revision, revision + 1, commit, hashes
 
-    def clean_fs(self):
+    def clean_fs(self, local_dirname=None):
         """Clean up the local working copy.
 
+        Args:
+            local_dirname (str): Path to remove recursively if
+            provided. Otherwise, remove the temporary upper root tree
+            used for svn repository loading.
+
         """
-        shutil.rmtree(self.local_dirname)
+        if local_dirname:
+            shutil.rmtree(local_dirname)
+        else:
+            shutil.rmtree(self.local_dirname)
 
 
 class SWHSvnRepo(BaseSvnRepo):

@@ -37,6 +37,9 @@ class TestSvnLoader:
         self.all_revisions = []
         self.all_releases = []
         self.all_occurrences = []
+        # Check at each svn revision that the hash tree computation
+        # does not diverge
+        self.check_revision = 1
 
     def maybe_load_contents(self, all_contents):
         self.all_contents.extend(all_contents)

@@ -17,6 +17,7 @@ from swh.model.git import GitType
 
 from swh.loader.core.loader import SWHLoader
 from . import svn, converters
+from .utils import hashtree
 
 
 class SvnLoaderEventful(ValueError):
@@ -56,8 +57,26 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
     """
     CONFIG_BASE_FILENAME = 'loader/svn.ini'
 
+    ADDITIONAL_CONFIG = {
+        'check_revision': ('int', 1000),
+    }
+
     def __init__(self):
         super().__init__(logging_class='swh.loader.svn.SvnLoader')
+        self.check_revision = self.config['check_revision']
+
+    @abc.abstractmethod
+    def swh_revision_hash_tree_at_svn_revision(self, revision):
+        """Compute and return the hash tree at a given svn revision.
+
+        Args:
+            rev (int): the svn revision we want to check
+
+        Returns:
+            The hash tree directory as bytes.
+
+        """
+        pass
 
     @abc.abstractmethod
     def get_svn_repo(self, svn_url, destination_path, origin):
@@ -116,15 +135,21 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         tree hash and blobs and send for swh storage to store.
         Then computes and yields the swh revision.
 
+        Note that at every self.check_revision, an svn export is done
+        and a hash tree is computed to check that no divergence
+        occurred.
+
         Yields:
-            swh revision
+            swh revision as a dictionary with keys, sha1_git, sha1, etc...
 
         """
         gen_revs = svnrepo.swh_hash_data_per_revision(
             revision_start,
             revision_end)
         swh_revision = None
+        count = 0
         for rev, nextrev, commit, objects_per_path in gen_revs:
+            count += 1
             # Send the associated contents/directories
             self.maybe_load_contents(
                 git.objects_per_type(GitType.BLOB, objects_per_path))
@@ -143,6 +168,18 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
                 rev,
                 hashutil.hash_to_hex(swh_revision['id']),
                 hashutil.hash_to_hex(dir_id)))
+
+            if (count % self.check_revision) == 0:  # hash computation check
+                self.log.info('Checking hash computations on revision %s...' %
+                              rev)
+                checked_dir_id = self.swh_revision_hash_tree_at_svn_revision(
+                    rev)
+                if checked_dir_id != dir_id:
+                    err = 'Hash tree computation divergence detected (%s != %s), stopping!' % (  # noqa
+                        hashutil.hash_to_hex(dir_id),
+                        hashutil.hash_to_hex(checked_dir_id)
+                    )
+                    raise ValueError(err)
 
             if nextrev:
                 revision_parents[nextrev] = [swh_revision['id']]
@@ -330,6 +367,15 @@ class SWHSvnLoader(BaseSvnLoader):
     """
     def __init__(self):
         super().__init__()
+
+    def swh_revision_hash_tree_at_svn_revision(self, revision):
+        """Compute a given hash tree at specific revision.
+
+        """
+        local_url = self.svnrepo.export_temporary(revision)
+        h = hashtree(local_url)['sha1_git']
+        self.svnrepo.clean_fs(local_url)
+        return h
 
     def get_svn_repo(self, svn_url, destination_path, origin):
         return svn.SWHSvnRepo(

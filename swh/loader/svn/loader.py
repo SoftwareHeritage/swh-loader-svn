@@ -38,11 +38,8 @@ class SvnLoaderHistoryAltered(ValueError):
 
 
 class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
-    """Base Svn loader to load one svn repository.
-
-    There exists 2 different policies:
-    - git-svn one (not for production): cf. GitSvnSvnLoader
-    - SWH one: cf. SWHSvnLoader
+    """Base Svn loader to load one svn repository according to specific
+    policies (only swh one now).
 
     The main entry point of this is (no need to override it)
     - def load(self, origin_visit, last_known_swh_revision=None): pass
@@ -317,95 +314,6 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         date_visit = datetime.datetime.now(tz=datetime.timezone.utc)
         self.origin_visit = self.storage.origin_visit_add(
             self.origin_id, date_visit)
-
-
-class GitSvnSvnLoader(BaseSvnLoader):
-    """Git-svn like loader (compute hashes a-la git-svn)
-
-    Notes:
-        This implementation is:
-        - NOT for production
-        - NOT able to deal with update.
-
-    Default policy:
-        Its default policy is to enrich (or even alter) information at
-        each svn revision. It will:
-
-        - truncate the timestamp of the svn commit date
-        - alter the user to be an email using the repository's uuid as
-          mailserver (user -> user@<repo-uuid>)
-        - fills in the gap for empty author with '(no author)' name
-        - remove empty folder (thus not counting them during hash computation)
-
-        The equivalent git command is: `git svn clone <repo-url> -q
-        --no-metadata`
-
-    """
-    def __init__(self):
-        super().__init__()
-        # We don't want to persist result in git-svn policy
-        self.config['send_contents'] = False
-        self.config['send_directories'] = False
-        self.config['send_revisions'] = False
-        self.config['send_releases'] = False
-        self.config['send_occurrences'] = False
-
-    def get_svn_repo(self, svn_url, destination_path, origin):
-        return svn.GitSvnSvnRepo(
-            svn_url, origin['id'], self.storage,
-            destination_path=destination_path)
-
-    def build_swh_revision(self, rev, commit, dir_id, parents):
-        """Build the swh revision a-la git-svn.
-
-        Args:
-            rev: the svn revision
-            commit: the commit metadata
-            dir_id: the upper tree's hash identifier
-            parents: the parents' identifiers
-
-        Returns:
-            The swh revision corresponding to the svn revision
-            without any extra headers.
-
-        """
-        return converters.build_gitsvn_swh_revision(rev,
-                                                    commit,
-                                                    dir_id,
-                                                    parents)
-
-    def process_repository(self, origin_visit, last_known_swh_revision=None):
-        """Load the repository's svn commits and process them as swh hashes.
-
-        This does not:
-        - deal with update
-        - nor with the potential known state.
-
-        """
-        svnrepo = self.svnrepo
-
-        # default configuration
-        revision_start = 1
-        revision_parents = {
-            revision_start: []
-        }
-
-        revision_end = svnrepo.head_revision()
-
-        self.log.info('[revision_start-revision_end]: [%s-%s]' % (
-            revision_start, revision_end))
-
-        if revision_start > revision_end and revision_start is not 1:
-            self.log.info('%s@%s already injected.' % (
-                svnrepo.remote_url, revision_end))
-            raise SvnLoaderUneventful
-
-        self.log.info('Processing %s.' % svnrepo)
-
-        # process and store revision to swh (sent by by blocks of
-        # 'revision_packet_size')
-        return self.process_swh_revisions(
-            svnrepo, revision_start, revision_end, revision_parents)
 
 
 class SWHSvnLoader(BaseSvnLoader):

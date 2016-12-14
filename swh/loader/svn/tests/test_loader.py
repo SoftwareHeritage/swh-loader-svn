@@ -6,7 +6,7 @@
 from nose.tools import istest
 
 from swh.core import hashutil
-from swh.loader.svn.loader import GitSvnSvnLoader, SWHSvnLoader
+from swh.loader.svn.loader import SWHSvnLoader
 from swh.loader.svn.loader import SvnLoaderHistoryAltered, SvnLoaderUneventful
 
 from test_base import BaseTestSvnLoader
@@ -20,7 +20,7 @@ class TestSvnLoader:
     """Mixin class to inhibit the persistence and keep in memory the data
     sent for storage.
 
-    cf. GitSvnLoaderNoStorage, SWHSvnLoaderNoStorage
+    cf. SWHSvnLoaderNoStorage
 
     """
     def __init__(self):
@@ -63,17 +63,6 @@ class TestSvnLoader:
     # Override to only prepare the svn repository
     def prepare(self, *args, **kwargs):
         self.svnrepo = self.get_svn_repo(*args)
-
-
-class GitSvnLoaderNoStorage(TestSvnLoader, GitSvnSvnLoader):
-    """A GitSvnLoader with no persistence.
-
-    Context:
-        Load an svn repository using the git-svn policy.
-
-    """
-    def __init__(self):
-        super().__init__()
 
 
 class SWHSvnLoaderNoStorage(TestSvnLoader, SWHSvnLoader):
@@ -160,52 +149,6 @@ class SWHSvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
                 ]
             }
         }
-
-
-class GitSvnLoaderITTest(BaseTestSvnLoader):
-    def setUp(self):
-        super().setUp()
-
-        self.origin = {'id': 1, 'type': 'svn', 'url': 'file:///dev/null'}
-
-        self.origin_visit = {
-            'origin': self.origin['id'],
-            'visit': 1,
-        }
-
-        # prepare the loader
-        self.loader = GitSvnLoaderNoStorage()
-        self.loader.prepare(
-            self.svn_mirror_url, self.destination_path, self.origin)
-
-    @istest
-    def process_repository(self):
-        """Process a repository with gitsvn policy should be ok."""
-        # when
-        self.loader.process_repository(self.origin_visit)
-
-        # then
-        self.assertEquals(len(self.loader.all_revisions), 6)
-        self.assertEquals(len(self.loader.all_releases), 0)
-
-        last_revision = 'bad4a83737f337d47e0ba681478214b07a707218'
-        # cf. test_loader.org for explaining from where those hashes
-        # come from
-        expected_revisions = {
-            # revision hash | directory hash  # noqa
-            '22c0fa5195a53f2e733ec75a9b6e9d1624a8b771': '4b825dc642cb6eb9a060e54bf8d69288fbee4904',  # noqa
-            '17a631d474f49bbebfdf3d885dcde470d7faafd7': '4b825dc642cb6eb9a060e54bf8d69288fbee4904',  # noqa
-            'c8a9172b2a615d461154f61158180de53edc6070': '4b825dc642cb6eb9a060e54bf8d69288fbee4904',  # noqa
-            '7c8f83394b6e8966eb46f0d3416c717612198a4b': '4b825dc642cb6eb9a060e54bf8d69288fbee4904',  # noqa
-            '852547b3b2bb76c8582cee963e8aa180d552a15c': 'ab047e38d1532f61ff5c3621202afc3e763e9945',  # noqa
-            last_revision:                              '9bcfc25001b71c333b4b5a89224217de81c56e2e',  # noqa
-        }
-
-        for rev in self.loader.all_revisions:
-            rev_id = hashutil.hash_to_hex(rev['id'])
-            directory_id = hashutil.hash_to_hex(rev['directory'])
-
-            self.assertEquals(expected_revisions[rev_id], directory_id)
 
 
 class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):

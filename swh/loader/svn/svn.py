@@ -51,36 +51,33 @@ class BaseSvnRepo():
 
         if destination_path:
             os.makedirs(destination_path, exist_ok=True)
-            root_dir = destination_path
+            self.root_dir = destination_path
         else:
-            root_dir = '/tmp'
-
-        self.local_dirname = tempfile.mkdtemp(suffix='.swh.loader',
-                                              prefix='tmp.',
-                                              dir=root_dir)
-
-        local_name = os.path.basename(self.remote_url)
+            self.root_dir = '/tmp'
 
         auth = Auth([get_username_provider()])
         # one connection for log iteration
-        self.conn_log = RemoteAccess(self.remote_url,
-                                     auth=auth)
+        self.conn_log = RemoteAccess(self.remote_url, auth=auth)
         # another for replay
-        self.conn = RemoteAccess(self.remote_url,
-                                 auth=auth)
+        self.conn = RemoteAccess(self.remote_url, auth=auth)
         # one client for update operation
         self.client = client.Client(auth=auth)
 
+        self.local_dirname = tempfile.mkdtemp(
+            suffix='.swh.loader', prefix='tmp.', dir=self.root_dir)
+        local_name = os.path.basename(self.remote_url)
         self.local_url = os.path.join(self.local_dirname, local_name).encode(
             'utf-8')
 
         self.uuid = self.conn.get_uuid().encode('utf-8')
 
     def __str__(self):
-        return str({'remote_url': self.remote_url,
-                    'local_url': self.local_url,
-                    'uuid': self.uuid,
-                    'swh-origin': self.origin_id})
+        return str({
+            'remote_url': self.remote_url,
+            'local_url': self.local_url,
+            'uuid': self.uuid,
+            'swh-origin': self.origin_id
+        })
 
     def head_revision(self):
         """Retrieve current revision of the repository's working copy.

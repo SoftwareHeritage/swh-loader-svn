@@ -364,11 +364,10 @@ class SWHSvnLoader(BaseSvnLoader):
     This implementation is able to deal with update on known svn repository.
 
     Default policy:
-        It's to not add any information and be as close as possible
-        from the svn data the server sent its way.
-
-        The only thing that are added are the swh's revision
-        'extra_header' to be able to deal with update.
+        Keep data as close as possible from the original svn data.  We
+        only add information that are needed for update or continuing
+        from last known revision (svn revision and svn repository's
+        uuid).
 
     """
     def __init__(self):

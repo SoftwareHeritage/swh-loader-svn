@@ -296,7 +296,12 @@ class BaseDirSWHEditor:
         return SWHFileEditor(self.objects, rootpath=self.rootpath, path=path)
 
     def change_prop(self, key, value):
-        pass
+        """Change property callback on directory.
+
+        """
+        if key == properties.PROP_EXTERNALS:
+            raise ValueError(
+                "Property '%s' detected. Not implemented yet." % key)
 
     def delete_entry(self, path, revision):
         """Remove a path.

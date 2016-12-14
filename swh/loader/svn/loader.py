@@ -55,7 +55,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         store the result to swh storage.
 
     """
-    CONFIG_BASE_FILENAME = 'loader/svn.ini'
+    CONFIG_BASE_FILENAME = 'loader/svn'
 
     ADDITIONAL_CONFIG = {
         'check_revision': ('int', 1000),

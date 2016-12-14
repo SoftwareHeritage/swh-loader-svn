@@ -302,8 +302,14 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
                 'completion': 'full',
             }
         finally:
-            self.flush()
-            self.svnrepo.clean_fs()
+            self.clean()
+
+    @abc.abstractmethod
+    def clean(self):
+        """Clean up after working.
+
+        """
+        pass
 
     def prepare(self, *args, **kwargs):
         """
@@ -367,6 +373,15 @@ class SWHSvnLoader(BaseSvnLoader):
     """
     def __init__(self):
         super().__init__()
+
+    def clean(self):
+        """Clean after oneself.
+
+        This is in charge to flush the remaining data to write in swh storage.
+        And to clean up the svn repository's working representation on disk.
+        """
+        self.flush()
+        self.svnrepo.clean_fs()
 
     def swh_revision_hash_tree_at_svn_revision(self, revision):
         """Compute a given hash tree at specific revision.

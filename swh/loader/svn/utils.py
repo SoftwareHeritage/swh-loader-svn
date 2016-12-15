@@ -4,8 +4,12 @@
 # See top-level LICENSE file for more information
 
 import os
+import tempfile
+import shutil
 
 from dateutil import parser
+from subprocess import PIPE, Popen, check_call
+
 from swh.model import git
 
 
@@ -126,3 +130,38 @@ def hashtree(path, ignore_empty_folder=False, ignore=None):
     h = objects[path]['checksums']
 
     return h
+
+
+def init_svn_repo_from_archive_dump(archive_path, root_temp_dir='/tmp'):
+    """Given a path to an archive containing an svn dump.
+    Initialize an svn repository with the content of said dump.
+
+    Returns:
+        A tuple:
+        - temporary folder: containing the mounted repository
+        - repo_path, path to the mounted repository inside the temporary folder
+
+    Raises:
+        ValueError in case of failure to run the command to uncompress
+        and load the dump.
+
+    """
+    project_name = os.path.basename(os.path.dirname(archive_path))
+    temp_dir = tempfile.mkdtemp(suffix='.swh.loader.svn',
+                                prefix='tmp.',
+                                dir=root_temp_dir)
+    repo_path = os.path.join(temp_dir, project_name)
+
+    # create the repository that will be loaded with the dump
+    cmd = ['svnadmin', 'create', repo_path]
+    check_call(cmd)
+
+    with Popen(['pigz', '-dc', archive_path], stdout=PIPE) as dump:
+        cmd = ['svnadmin', 'load', '-q', repo_path]
+        r = check_call(cmd, stdin=dump.stdout)
+        if r == 0:
+            return temp_dir, repo_path
+        # failure, so we clean up
+        shutil.rmtree(temp_dir)
+        raise ValueError('Failed to mount the svn dump for project %s' %
+                         project_name)

@@ -24,6 +24,6 @@ Package: python3-swh.loader.svn
 Architecture: all
 Depends: python3-swh.core (>= 0.0.19~), python3-swh.storage (>= 0.0.50~), python3-swh.model (>= 0.0.11~), 
          python3-swh.scheduler (>= 0.0.7~), python3-swh.loader.core (>= 0.0.11~),
-         ${misc:Depends}, ${python3:Depends}
+         subversion, pigz, ${misc:Depends}, ${python3:Depends}
 Description: Software Heritage Loader Svn
  Module in charge of loading svn repositories into swh storage.

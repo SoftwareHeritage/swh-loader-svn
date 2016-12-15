@@ -1,3 +1,17 @@
+swh-loader-svn (0.0.18-1~swh1) unstable-swh; urgency=medium
+
+  * v0.0.18
+  * Add check revision hash computation divergence during loading
+  * Add task to load a svn repository from an archive dump and load the
+  * repository
+  * Raise error when svn:externals keyword is encountered (T610) since
+  * it's not dealt with yet.
+  * Revert modifications related to svn:eol-style since no good policy
+    has
+  * been found yet to deal with it
+
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Thu, 15 Dec 2016 10:57:26 +0100
+
 swh-loader-svn (0.0.17-1~swh1) unstable-swh; urgency=medium
 
   * v0.0.17

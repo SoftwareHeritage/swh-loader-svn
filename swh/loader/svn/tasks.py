@@ -3,9 +3,14 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import shutil
+
+from os.path import basename
+
 from swh.scheduler.task import Task
 
 from .loader import SWHSvnLoader
+from . import utils
 
 
 class LoadSWHSvnRepositoryTsk(Task):
@@ -29,3 +34,26 @@ class LoadSWHSvnRepositoryTsk(Task):
 
         """
         SWHSvnLoader().load(*args, **kwargs)
+
+
+class MountAndLoadSvnRepositoryTsk(Task):
+    task_queue = 'swh_mount_and_load_loader_svn'
+
+    def run(self, archive_path):
+        """1. Mount an svn dump from archive as a local svn repository.
+           2. Load it through the svn loader.
+           3. Clean up mounted svn repository archive.
+        """
+        self.log.info('Archive to mount and load %s' % archive_path)
+        temp_dir, repo_path = utils.init_svn_repo_from_archive_dump(
+            archive_path)
+        self.log.debug('Mounted svn repository to %s' % repo_path)
+        try:
+            SWHSvnLoader().load(svn_url='file://%s' % repo_path,
+                                destination_path=None)
+        except Exception as e:
+            raise e
+        finally:
+            self.log.debug('Clean up temp directory %s for project %s' % (
+                temp_dir, basename(repo_path)))
+            shutil.rmtree(temp_dir)

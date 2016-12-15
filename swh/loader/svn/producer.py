@@ -7,16 +7,27 @@ import click
 import sys
 
 
-task_name = 'swh.loader.svn.tasks.LoadSWHSvnRepositoryTsk'
+def get_task(task_name):
+    """Retrieve task object in the application by its fully qualified name.
 
-
-def libproduce(svn_url, original_svn_url, original_svn_uuid,
-               destination_path=None, synchroneous=False):
+    """
     from swh.scheduler.celery_backend.config import app
     for module in app.conf.CELERY_IMPORTS:
         __import__(module)
 
-    task = app.tasks[task_name]
+    return app.tasks[task_name]
+
+
+def _produce_svn_to_load(
+        svn_url, original_svn_url, original_svn_uuid,
+        destination_path=None, synchroneous=False,
+        task_name='swh.loader.svn.tasks.LoadSWHSvnRepositoryTsk'):
+    """Produce svn urls on the message queue.
+
+    Those urls can either be read from stdin or directly passed as argument.
+
+    """
+    task = get_task(task_name)
     if not synchroneous and svn_url:
         task.delay(svn_url=svn_url,
                    original_svn_url=original_svn_url,
@@ -38,25 +49,51 @@ def libproduce(svn_url, original_svn_url, original_svn_uuid,
                            destination_path=destination_path)
 
 
-@click.command()
-@click.option('--svn-url',
+def _produce_archive_to_mount_and_load(
+        archive_path,
+        task_name='swh.loader.svn.tasks.MountAndLoadSvnRepositoryTsk'):
+    task = get_task(task_name)
+    if archive_path:
+        task.delay(archive_path)
+    else:
+        for archive_path in sys.stdin:
+            archive_path = archive_path.rstrip()
+            if archive_path:
+                print(archive_path)
+                task.delay(archive_path)
+
+
+@click.group()
+def cli():
+    pass
+
+
+@cli.command('svn', help='Default svn urls producer')
+@click.option('--url',
               help="svn repository's mirror url.")
-@click.option('--original-svn-url', default=None,
+@click.option('--original-url', default=None,
               help='svn repository\'s original remote url '
                    '(if different than --svn-url).')
-@click.option('--original-svn-uuid', default=None,
+@click.option('--original-uuid', default=None,
               help='svn repository\'s original uuid '
-                   '(to provide when using --original-svn-url)')
+                   '(to provide when using --original-url)')
 @click.option('--destination-path',
               help="(optional) svn checkout destination.")
 @click.option('--synchroneous',
               is_flag=True,
               help="To execute directly the svn loading.")
-def produce(svn_url, original_svn_url, original_svn_uuid, destination_path,
-            synchroneous):
-    libproduce(svn_url, original_svn_url, original_svn_uuid, destination_path,
-               synchroneous)
+def produce_svn_to_load(url, original_url, original_uuid, destination_path,
+                        synchroneous):
+    _produce_svn_to_load(url, original_url, original_uuid,
+                         destination_path=destination_path,
+                         synchroneous=synchroneous)
+
+
+@cli.command('svn-archive', help='Default svndump archive producer')
+@click.option('--path', help="Archive's Path to load and mount")
+def produce_archive_to_mount_and_load(path):
+    _produce_archive_to_mount_and_load(path)
 
 
 if __name__ == '__main__':
-    produce()
+    cli()

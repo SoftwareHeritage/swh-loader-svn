@@ -15,7 +15,6 @@ import tempfile
 from subvertpy import delta, properties
 from subvertpy.ra import RemoteAccess, Auth, get_username_provider
 
-from swh.core.hashutil import hex_to_hash
 from swh.model import git, hashutil
 
 
@@ -78,32 +77,8 @@ def apply_txdelta_handler(sbuf, target_stream):
         if window is None:
             target_stream.close()
             return  # Last call
-        target_stream.write(delta.apply_txdelta_window(sbuf, window))
-    return apply_window
-
-
-def apply_txdelta_handler_with_line_ending_conversion(sbuf, target_stream):
-    """Return a function that can be called repeatedly with txdelta windows.
-    When done, closes the target_stream.
-
-    Adapted from subvertpy.delta.apply_txdelta_handler to:
-    - close the stream when done.
-    - remove carriage return character
-
-    Args
-        sbuf: Source buffer
-        target_stream: Target stream to write to.
-
-    Returns
-         Function to be called to apply txdelta windows
-
-    """
-    def apply_window(window):
-        if window is None:
-            target_stream.close()
-            return  # Last call
         patch = delta.apply_txdelta_window(sbuf, window)
-        target_stream.write(patch.replace(b'\r', b''))
+        target_stream.write(patch)
     return apply_window
 
 
@@ -111,8 +86,7 @@ class SWHFileEditor:
     """File Editor in charge of updating file on disk and memory objects.
 
     """
-    __slots__ = ['objects', 'path', 'fullpath', 'executable', 'link',
-                 'convert_line_ending']
+    __slots__ = ['objects', 'path', 'fullpath', 'executable', 'link']
 
     def __init__(self, objects, rootpath, path):
         self.objects = objects
@@ -121,7 +95,6 @@ class SWHFileEditor:
         self.executable = 0
         self.link = None
         self.fullpath = os.path.join(rootpath, path)
-        self.convert_line_ending = False
 
     def change_prop(self, key, value):
         if key == properties.PROP_EXECUTABLE:
@@ -131,8 +104,6 @@ class SWHFileEditor:
                 self.executable = 1
         elif key == properties.PROP_SPECIAL:
             self.link = True
-        elif key == 'svn:eol-style' and (value == 'native' or value == 'LF'):
-            self.convert_line_ending = True
 
     def __make_symlink(self):
         """Convert the svnlink to a symlink on disk.
@@ -180,9 +151,6 @@ class SWHFileEditor:
             sbuf = b''
 
         t = open(self.fullpath, 'wb')
-        if self.convert_line_ending:
-            return apply_txdelta_handler_with_line_ending_conversion(
-                sbuf, target_stream=t)
         return apply_txdelta_handler(sbuf, target_stream=t)
 
     def close(self):
@@ -228,7 +196,7 @@ class BaseDirSWHEditor:
     cf. SWHDirEditorNoEmptyFolder for an implementation that deletes
     empty folder
 
-    Instantiate a new class inheriting frmo this class and define the
+    Instantiate a new class inheriting from this class and define the
     following function:
 
     - def update_checksum(self):
@@ -317,7 +285,12 @@ class BaseDirSWHEditor:
         return SWHFileEditor(self.objects, rootpath=self.rootpath, path=path)
 
     def change_prop(self, key, value):
-        pass
+        """Change property callback on directory.
+
+        """
+        if key == properties.PROP_EXTERNALS:
+            raise ValueError(
+                "Property '%s' detected. Not implemented yet." % key)
 
     def delete_entry(self, path, revision):
         """Remove a path.
@@ -370,49 +343,6 @@ class SWHDirEditor(BaseDirSWHEditor):
         return SWHDirEditor(self.objects, rootpath=self.rootpath, path=path)
 
 
-class SWHDirEditorNoEmptyFolder(BaseDirSWHEditor):
-    """Directory Editor in charge of updating directory objects computation.
-
-    """
-    def update_checksum(self):
-        """Update the root path self.path's checksums according to the
-        children's objects.
-
-        This function is expected to be called when the folder has
-        been completely 'walked'.
-
-        """
-        d = self.objects.get(self.path, default_dictionary())
-        # Retrieve the list of the current folder's children objects
-        ls_hashes = list(git.children_hashes(d['children'],
-                                             objects=self.objects))
-        if ls_hashes:
-            d['checksums'] = git._compute_tree_metadata(self.path, ls_hashes)
-            self.objects[self.path] = d
-        else:   # To compute with empty directories, remove the else
-            # and use ls_hashes even if empty
-            self.remove_child(self.path)
-
-    def open_directory(self, *args):
-        """Updating existing directory.
-
-        """
-        path = args[0].encode('utf-8')
-        self.add_child(path)
-        return SWHDirEditorNoEmptyFolder(self.objects, self.rootpath,
-                                         path=path)
-
-    def add_directory(self, path, copyfrom_path=None, copyfrom_rev=-1):
-        """Adding a new directory.
-
-        """
-        path = path.encode('utf-8')
-        self.add_child(path)
-        return SWHDirEditorNoEmptyFolder(self.objects,
-                                         rootpath=self.rootpath,
-                                         path=path)
-
-
 class BaseSWHEditor:
     """SWH Base class editor in charge of receiving events.
 
@@ -434,20 +364,6 @@ class BaseSWHEditor:
         raise NotImplementedError('Instantiate an swh dir editor of your '
                                   ' choice depending of the hash computation '
                                   ' policy you want')
-
-
-class SWHEditorNoEmptyFolder(BaseSWHEditor):
-    """SWH Editor in charge of replaying svn events and computing objects
-    hashes along.
-
-    This implementation removes empty folders and do not account for
-    them when computing objects hashes.
-
-    """
-    def open_root(self, base_revnum):
-        return SWHDirEditorNoEmptyFolder(self.objects,
-                                         rootpath=self.rootpath,
-                                         path=b'')
 
 
 class SWHEditor(BaseSWHEditor):
@@ -503,53 +419,6 @@ class BaseSWHReplay:
         raise NotImplementedError('This should be overridden by subclass')
 
 
-class SWHReplayNoEmptyFolder(BaseSWHReplay):
-    """Replay class.
-
-    This class computes objects hashes for all files and folders as
-    long as those folders are not empty ones.
-
-    If empty folder are discovered, they are removed from the
-    filesystem and their hashes are not computed.
-
-    """
-    def __init__(self, conn, rootpath, objects=None):
-        self.conn = conn
-        self.rootpath = rootpath
-        self.editor = SWHEditorNoEmptyFolder(
-            rootpath=rootpath,
-            objects=objects if objects else {})
-
-    def compute_hashes(self, rev):
-        """Compute hashes at revisions rev.
-        Expects the state to be at previous revision's objects.
-
-        Args:
-            rev: The revision to start the replay from.
-
-        Returns:
-            The updated objects between rev and rev+1.
-            Beware that this mutates the filesystem at rootpath accordingly.
-
-        """
-        objects = self.replay(rev)
-        if not objects:  # dangling tree at root
-            # hack: empty tree at level 1: `git hash-object -t tree /dev/null`
-            objects[b''] = {
-                'checksums': {
-                    'sha1_git': hex_to_hash(
-                        '4b825dc642cb6eb9a060e54bf8d69288fbee4904'),
-                    'path': self.rootpath,
-                    'type': git.GitType.TREE,
-                    'perms': git.GitPerm.TREE
-                },
-                'children': set()
-            }
-            self.editor.objects = objects
-
-        return objects
-
-
 class SWHReplay(BaseSWHReplay):
     """Replay class.
 
@@ -590,10 +459,7 @@ class SWHReplay(BaseSWHReplay):
               help="Indicates if the server should run in debug mode.")
 @click.option('--cleanup/--nocleanup', default=True,
               help="Indicates whether to cleanup disk when done or not.")
-@click.option('--empty-folder/--noempty-folder', default=True,
-              help="Do not account empty folder during hash computation.")
-def main(local_url, svn_url, revision_start, revision_end, debug, cleanup,
-         empty_folder):
+def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
     """Script to present how to use SWHReplay class.
 
     """
@@ -615,10 +481,7 @@ def main(local_url, svn_url, revision_start, revision_end, debug, cleanup,
     revision_end = min(revision_end, revision_end_max)
 
     try:
-        if empty_folder:
-            replay = SWHReplay(conn, rootpath)
-        else:
-            replay = SWHReplayNoEmptyFolder(conn, rootpath)
+        replay = SWHReplay(conn, rootpath)
 
         for rev in range(revision_start, revision_end+1):
             objects = replay.compute_hashes(rev)

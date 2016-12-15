@@ -51,36 +51,33 @@ class BaseSvnRepo():
 
         if destination_path:
             os.makedirs(destination_path, exist_ok=True)
-            root_dir = destination_path
+            self.root_dir = destination_path
         else:
-            root_dir = '/tmp'
-
-        self.local_dirname = tempfile.mkdtemp(suffix='.swh.loader',
-                                              prefix='tmp.',
-                                              dir=root_dir)
-
-        local_name = os.path.basename(self.remote_url)
+            self.root_dir = '/tmp'
 
         auth = Auth([get_username_provider()])
         # one connection for log iteration
-        self.conn_log = RemoteAccess(self.remote_url,
-                                     auth=auth)
+        self.conn_log = RemoteAccess(self.remote_url, auth=auth)
         # another for replay
-        self.conn = RemoteAccess(self.remote_url,
-                                 auth=auth)
+        self.conn = RemoteAccess(self.remote_url, auth=auth)
         # one client for update operation
         self.client = client.Client(auth=auth)
 
+        self.local_dirname = tempfile.mkdtemp(
+            suffix='.swh.loader', prefix='tmp.', dir=self.root_dir)
+        local_name = os.path.basename(self.remote_url)
         self.local_url = os.path.join(self.local_dirname, local_name).encode(
             'utf-8')
 
         self.uuid = self.conn.get_uuid().encode('utf-8')
 
     def __str__(self):
-        return str({'remote_url': self.remote_url,
-                    'local_url': self.local_url,
-                    'uuid': self.uuid,
-                    'swh-origin': self.origin_id})
+        return str({
+            'remote_url': self.remote_url,
+            'local_url': self.local_url,
+            'uuid': self.uuid,
+            'swh-origin': self.origin_id
+        })
 
     def head_revision(self):
         """Retrieve current revision of the repository's working copy.
@@ -192,6 +189,28 @@ class BaseSvnRepo():
                            rev=revision,
                            ignore_keywords=True)
 
+    def export_temporary(self, revision):
+        """Export the repository to a given revision in a temporary location.
+        This is up to the caller of this function to clean up the
+        temporary location when done (cf. self.clean_fs method)
+
+        Args:
+            revision: Revision to export at
+
+        Returns:
+            The tuple local_dirname the temporary location root
+            folder, local_url where the repository was exported.
+
+        """
+        local_dirname = tempfile.mkdtemp(
+            prefix='check-revision-%s.' % revision,
+            dir=self.root_dir)
+        local_name = os.path.basename(self.remote_url)
+        local_url = os.path.join(local_dirname, local_name)
+        self.client.export(
+            self.remote_url, to=local_url, rev=revision, ignore_keywords=True)
+        return local_dirname, local_url
+
     def swh_previous_revision(self, previous_swh_revision=None):
         """Look for possible existing revision in swh.
 
@@ -277,83 +296,19 @@ class BaseSvnRepo():
 
         yield revision, revision + 1, commit, hashes
 
-    def clean_fs(self):
+    def clean_fs(self, local_dirname=None):
         """Clean up the local working copy.
 
-        """
-        shutil.rmtree(self.local_dirname)
-
-
-class GitSvnSvnRepo(BaseSvnRepo):
-    """Svn repository mapping a-la git-svn.
-
-    This class does exactly as BaseSvnRepo except for:
-    - the commit message which is extended with a new line and then encoded
-    - the commit author is converted using the repository's uuid for his/her
-    email
-    - the commit date is transformed into timestamp and truncated
-
-    - Extra commit line in commit message.
-    - user@<uuid> in raw commit message
-    - truncated timestamp in raw commit message
-
-    """
-    def __init__(self, remote_url, origin_id, storage,
-                 destination_path=None,
-                 svn_uuid=None):
-        super().__init__(remote_url, origin_id, storage,
-                         destination_path=destination_path)
-        self.swhreplay = ra.SWHReplayNoEmptyFolder(
-            conn=self.conn,
-            rootpath=self.local_url)
-        self.with_empty_folder = False
-
-    def convert_commit_message(self, msg):
-        """Add an extra line to the commit message and encode it in utf-8.
-
         Args:
-            msg (str): the commit message to convert.
-
-        Returns:
-            The transformed message as bytes.
-
-        """
-        return ('%s\n' % msg).encode('utf-8')
-
-    def convert_commit_date(self, date):
-        """Convert the commit message date into truncated timestamp in swh
-        format.
-
-        Args:
-            date (str): the commit date to convert.
-
-        Returns:
-            The transformed date.
+            local_dirname (str): Path to remove recursively if
+            provided. Otherwise, remove the temporary upper root tree
+            used for svn repository loading.
 
         """
-        return converters.svn_date_to_gitsvn_date(date)
-
-    def convert_commit_author(self, author):
-        """Convert the commit author into an swh person.
-
-        The user becomes a dictionary of the form:
-        {
-          name: author,
-          email: author@repo-uuid,
-          fullname: author <author@repo-uuid>
-        }
-
-        If the user is already some kind of fullname, this is what is
-        used as fullname.
-
-        Args:
-            author (str): the commit author to convert.
-
-        Returns:
-            The transformed author as dict.
-
-        """
-        return converters.svn_author_to_gitsvn_person(author, self.uuid)
+        if local_dirname:
+            shutil.rmtree(local_dirname)
+        else:
+            shutil.rmtree(self.local_dirname)
 
 
 class SWHSvnRepo(BaseSvnRepo):

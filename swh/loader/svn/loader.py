@@ -17,6 +17,7 @@ from swh.model.git import GitType
 
 from swh.loader.core.loader import SWHLoader
 from . import svn, converters
+from .utils import hashtree
 
 
 class SvnLoaderEventful(ValueError):
@@ -38,11 +39,8 @@ class SvnLoaderHistoryAltered(ValueError):
 
 
 class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
-    """Base Svn loader to load one svn repository.
-
-    There exists 2 different policies:
-    - git-svn one (not for production): cf. GitSvnSvnLoader
-    - SWH one: cf. SWHSvnLoader
+    """Base Svn loader to load one svn repository according to specific
+    policies (only swh one now).
 
     The main entry point of this is (no need to override it)
     - def load(self, origin_visit, last_known_swh_revision=None): pass
@@ -57,10 +55,28 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         store the result to swh storage.
 
     """
-    CONFIG_BASE_FILENAME = 'loader/svn.ini'
+    CONFIG_BASE_FILENAME = 'loader/svn'
+
+    ADDITIONAL_CONFIG = {
+        'check_revision': ('int', 1000),
+    }
 
     def __init__(self):
         super().__init__(logging_class='swh.loader.svn.SvnLoader')
+        self.check_revision = self.config['check_revision']
+
+    @abc.abstractmethod
+    def swh_revision_hash_tree_at_svn_revision(self, revision):
+        """Compute and return the hash tree at a given svn revision.
+
+        Args:
+            rev (int): the svn revision we want to check
+
+        Returns:
+            The hash tree directory as bytes.
+
+        """
+        pass
 
     @abc.abstractmethod
     def get_svn_repo(self, svn_url, destination_path, origin):
@@ -119,15 +135,21 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         tree hash and blobs and send for swh storage to store.
         Then computes and yields the swh revision.
 
+        Note that at every self.check_revision, an svn export is done
+        and a hash tree is computed to check that no divergence
+        occurred.
+
         Yields:
-            swh revision
+            swh revision as a dictionary with keys, sha1_git, sha1, etc...
 
         """
         gen_revs = svnrepo.swh_hash_data_per_revision(
             revision_start,
             revision_end)
         swh_revision = None
+        count = 0
         for rev, nextrev, commit, objects_per_path in gen_revs:
+            count += 1
             # Send the associated contents/directories
             self.maybe_load_contents(
                 git.objects_per_type(GitType.BLOB, objects_per_path))
@@ -146,6 +168,18 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
                 rev,
                 hashutil.hash_to_hex(swh_revision['id']),
                 hashutil.hash_to_hex(dir_id)))
+
+            if (count % self.check_revision) == 0:  # hash computation check
+                self.log.info('Checking hash computations on revision %s...' %
+                              rev)
+                checked_dir_id = self.swh_revision_hash_tree_at_svn_revision(
+                    rev)
+                if checked_dir_id != dir_id:
+                    err = 'Hash tree computation divergence detected (%s != %s), stopping!' % (  # noqa
+                        hashutil.hash_to_hex(dir_id),
+                        hashutil.hash_to_hex(checked_dir_id)
+                    )
+                    raise ValueError(err)
 
             if nextrev:
                 revision_parents[nextrev] = [swh_revision['id']]
@@ -251,7 +285,8 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
             }
         except (SvnLoaderHistoryAltered, SvnLoaderUneventful) as e:
             self.log.error('Uneventful visit. Detail: %s' % e)
-            self.process_swh_occurrence(latest_rev, self.origin_visit)
+            # FIXME: This fails because latest_rev is not bound
+            # self.process_swh_occurrence(latest_rev, self.origin_visit)
             self.close_failure()
             return {
                 'eventful': False,
@@ -267,8 +302,14 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
                 'completion': 'full',
             }
         finally:
-            self.flush()
-            self.svnrepo.clean_fs()
+            self.clean()
+
+    @abc.abstractmethod
+    def clean(self):
+        """Clean up after working.
+
+        """
+        pass
 
     def prepare(self, *args, **kwargs):
         """
@@ -318,109 +359,37 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
             self.origin_id, date_visit)
 
 
-class GitSvnSvnLoader(BaseSvnLoader):
-    """Git-svn like loader (compute hashes a-la git-svn)
-
-    Notes:
-        This implementation is:
-        - NOT for production
-        - NOT able to deal with update.
-
-    Default policy:
-        Its default policy is to enrich (or even alter) information at
-        each svn revision. It will:
-
-        - truncate the timestamp of the svn commit date
-        - alter the user to be an email using the repository's uuid as
-          mailserver (user -> user@<repo-uuid>)
-        - fills in the gap for empty author with '(no author)' name
-        - remove empty folder (thus not counting them during hash computation)
-
-        The equivalent git command is: `git svn clone <repo-url> -q
-        --no-metadata`
-
-    """
-    def __init__(self):
-        super().__init__()
-        # We don't want to persist result in git-svn policy
-        self.config['send_contents'] = False
-        self.config['send_directories'] = False
-        self.config['send_revisions'] = False
-        self.config['send_releases'] = False
-        self.config['send_occurrences'] = False
-
-    def get_svn_repo(self, svn_url, destination_path, origin):
-        return svn.GitSvnSvnRepo(
-            svn_url, origin['id'], self.storage,
-            destination_path=destination_path)
-
-    def build_swh_revision(self, rev, commit, dir_id, parents):
-        """Build the swh revision a-la git-svn.
-
-        Args:
-            rev: the svn revision
-            commit: the commit metadata
-            dir_id: the upper tree's hash identifier
-            parents: the parents' identifiers
-
-        Returns:
-            The swh revision corresponding to the svn revision
-            without any extra headers.
-
-        """
-        return converters.build_gitsvn_swh_revision(rev,
-                                                    commit,
-                                                    dir_id,
-                                                    parents)
-
-    def process_repository(self, origin_visit, last_known_swh_revision=None):
-        """Load the repository's svn commits and process them as swh hashes.
-
-        This does not:
-        - deal with update
-        - nor with the potential known state.
-
-        """
-        svnrepo = self.svnrepo
-
-        # default configuration
-        revision_start = 1
-        revision_parents = {
-            revision_start: []
-        }
-
-        revision_end = svnrepo.head_revision()
-
-        self.log.info('[revision_start-revision_end]: [%s-%s]' % (
-            revision_start, revision_end))
-
-        if revision_start > revision_end and revision_start is not 1:
-            self.log.info('%s@%s already injected.' % (
-                svnrepo.remote_url, revision_end))
-            raise SvnLoaderUneventful
-
-        self.log.info('Processing %s.' % svnrepo)
-
-        # process and store revision to swh (sent by by blocks of
-        # 'revision_packet_size')
-        return self.process_swh_revisions(
-            svnrepo, revision_start, revision_end, revision_parents)
-
-
 class SWHSvnLoader(BaseSvnLoader):
     """Swh svn loader is the main implementation destined for production.
     This implementation is able to deal with update on known svn repository.
 
     Default policy:
-        It's to not add any information and be as close as possible
-        from the svn data the server sent its way.
-
-        The only thing that are added are the swh's revision
-        'extra_header' to be able to deal with update.
+        Keep data as close as possible from the original svn data.  We
+        only add information that are needed for update or continuing
+        from last known revision (svn revision and svn repository's
+        uuid).
 
     """
     def __init__(self):
         super().__init__()
+
+    def clean(self):
+        """Clean after oneself.
+
+        This is in charge to flush the remaining data to write in swh storage.
+        And to clean up the svn repository's working representation on disk.
+        """
+        self.flush()
+        self.svnrepo.clean_fs()
+
+    def swh_revision_hash_tree_at_svn_revision(self, revision):
+        """Compute a given hash tree at specific revision.
+
+        """
+        local_dirname, local_url = self.svnrepo.export_temporary(revision)
+        h = hashtree(local_url)['sha1_git']
+        self.svnrepo.clean_fs(local_dirname)
+        return h
 
     def get_svn_repo(self, svn_url, destination_path, origin):
         return svn.SWHSvnRepo(

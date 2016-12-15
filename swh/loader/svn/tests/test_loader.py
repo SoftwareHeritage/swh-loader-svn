@@ -6,7 +6,7 @@
 from nose.tools import istest
 
 from swh.core import hashutil
-from swh.loader.svn.loader import GitSvnSvnLoader, SWHSvnLoader
+from swh.loader.svn.loader import SWHSvnLoader
 from swh.loader.svn.loader import SvnLoaderHistoryAltered, SvnLoaderUneventful
 
 from test_base import BaseTestSvnLoader
@@ -20,7 +20,7 @@ class TestSvnLoader:
     """Mixin class to inhibit the persistence and keep in memory the data
     sent for storage.
 
-    cf. GitSvnLoaderNoStorage, SWHSvnLoaderNoStorage
+    cf. SWHSvnLoaderNoStorage
 
     """
     def __init__(self):
@@ -37,6 +37,9 @@ class TestSvnLoader:
         self.all_revisions = []
         self.all_releases = []
         self.all_occurrences = []
+        # Check at each svn revision that the hash tree computation
+        # does not diverge
+        self.check_revision = 1
 
     def maybe_load_contents(self, all_contents):
         self.all_contents.extend(all_contents)
@@ -63,17 +66,6 @@ class TestSvnLoader:
     # Override to only prepare the svn repository
     def prepare(self, *args, **kwargs):
         self.svnrepo = self.get_svn_repo(*args)
-
-
-class GitSvnLoaderNoStorage(TestSvnLoader, GitSvnSvnLoader):
-    """A GitSvnLoader with no persistence.
-
-    Context:
-        Load an svn repository using the git-svn policy.
-
-    """
-    def __init__(self):
-        super().__init__()
 
 
 class SWHSvnLoaderNoStorage(TestSvnLoader, SWHSvnLoader):
@@ -160,52 +152,6 @@ class SWHSvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
                 ]
             }
         }
-
-
-class GitSvnLoaderITTest(BaseTestSvnLoader):
-    def setUp(self):
-        super().setUp()
-
-        self.origin = {'id': 1, 'type': 'svn', 'url': 'file:///dev/null'}
-
-        self.origin_visit = {
-            'origin': self.origin['id'],
-            'visit': 1,
-        }
-
-        # prepare the loader
-        self.loader = GitSvnLoaderNoStorage()
-        self.loader.prepare(
-            self.svn_mirror_url, self.destination_path, self.origin)
-
-    @istest
-    def process_repository(self):
-        """Process a repository with gitsvn policy should be ok."""
-        # when
-        self.loader.process_repository(self.origin_visit)
-
-        # then
-        self.assertEquals(len(self.loader.all_revisions), 6)
-        self.assertEquals(len(self.loader.all_releases), 0)
-
-        last_revision = 'bad4a83737f337d47e0ba681478214b07a707218'
-        # cf. test_loader.org for explaining from where those hashes
-        # come from
-        expected_revisions = {
-            # revision hash | directory hash  # noqa
-            '22c0fa5195a53f2e733ec75a9b6e9d1624a8b771': '4b825dc642cb6eb9a060e54bf8d69288fbee4904',  # noqa
-            '17a631d474f49bbebfdf3d885dcde470d7faafd7': '4b825dc642cb6eb9a060e54bf8d69288fbee4904',  # noqa
-            'c8a9172b2a615d461154f61158180de53edc6070': '4b825dc642cb6eb9a060e54bf8d69288fbee4904',  # noqa
-            '7c8f83394b6e8966eb46f0d3416c717612198a4b': '4b825dc642cb6eb9a060e54bf8d69288fbee4904',  # noqa
-            '852547b3b2bb76c8582cee963e8aa180d552a15c': 'ab047e38d1532f61ff5c3621202afc3e763e9945',  # noqa
-            last_revision:                              '9bcfc25001b71c333b4b5a89224217de81c56e2e',  # noqa
-        }
-
-        for rev in self.loader.all_revisions:
-            rev_id = hashutil.hash_to_hex(rev['id'])
-            directory_id = hashutil.hash_to_hex(rev['directory'])
-
-            self.assertEquals(expected_revisions[rev_id], directory_id)
 
 
 class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
@@ -595,6 +541,75 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
             '99c27ebbd43feca179ac0e895af131d8314cafe1': '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
             '902f29b4323a9b9de3af6d28e72dd581e76d9397': 'c4e12483f0a13e6851459295a4ae735eb4e4b5c4',  # noqa
             last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
+        }
+
+        for rev in self.loader.all_revisions:
+            rev_id = hashutil.hash_to_hex(rev['id'])
+            directory_id = hashutil.hash_to_hex(rev['directory'])
+
+            self.assertEquals(expected_revisions[rev_id], directory_id)
+
+
+class SWHSvnLoaderUpdateAndTestCornerCasesAboutEolITTest(BaseTestSvnLoader):
+    def setUp(self):
+        super().setUp(archive_name='pkg-gourmet-with-eol-corner-cases.tgz')
+
+        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
+
+        self.origin_visit = {
+            'origin': self.origin['id'],
+            'visit': 1,
+        }
+
+        self.loader = SWHSvnLoaderUpdateLessRecentNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
+
+    @istest
+    def process_repository(self):
+        """EOL corner cases and update.
+
+        """
+        previous_unfinished_revision = {
+            'id': hashutil.hex_to_hash(
+                '171dc35522bfd17dda4e90a542a0377fb2fc707a'),
+            'parents': [hashutil.hex_to_hash(
+                '902f29b4323a9b9de3af6d28e72dd581e76d9397')],
+            'directory': hashutil.hex_to_hash(
+                'fd24a76c87a3207428e06612b49860fc78e9f6dc'),
+            'target_type': 'revision',
+            'metadata': {
+                'extra_headers': [
+                    ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
+                    ['svn_revision', '11']
+                ]
+            }
+        }
+        # when
+        self.loader.process_repository(
+            self.origin_visit,
+            last_known_swh_revision=previous_unfinished_revision)
+
+        # then
+        # we got the previous run's last revision (rev 11)
+        # so 8 new
+        self.assertEquals(len(self.loader.all_revisions), 8)
+        self.assertEquals(len(self.loader.all_releases), 0)
+
+        last_revision = '0148ae3eaa520b73a50802c59f3f416b7a36cf8c'
+
+        # cf. test_loader.org for explaining from where those hashes
+        # come from
+        expected_revisions = {
+            # revision hash | directory hash
+            '027e8769f4786597436ab94a91f85527d04a6cbb': '2d9ca72c6afec6284fb01e459588cbb007017c8c',  # noqa
+            '4474d96018877742d9697d5c76666c9693353bfc': 'ab111577e0ab39e4a157c476072af48f2641d93f',  # noqa
+            '97ad21eab92961e2a22ca0285f09c6d1e9a7ffbc': 'ab111577e0ab39e4a157c476072af48f2641d93f',  # noqa
+            'd04ea8afcee6205cc8384c091bfc578931c169fd': 'b0a648b02e55a4dce356ac35187a058f89694ec7',  # noqa
+            'ded78810401fd354ffe894aa4a1e5c7d30a645d1': 'b0a648b02e55a4dce356ac35187a058f89694ec7',  # noqa
+            '4ee95e39358712f53c4fc720da3fafee9249ed19': 'c3c98df624733fef4e592bef983f93e2ed02b179',  # noqa
+            'ffa901b69ca0f46a2261f42948838d19709cb9f8': 'c3c98df624733fef4e592bef983f93e2ed02b179',  # noqa
+            last_revision:                              '844d4646d6c2b4f3a3b2b22ab0ee38c7df07bab2',  # noqa
         }
 
         for rev in self.loader.all_revisions:

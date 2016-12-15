@@ -386,9 +386,9 @@ class SWHSvnLoader(BaseSvnLoader):
         """Compute a given hash tree at specific revision.
 
         """
-        local_url = self.svnrepo.export_temporary(revision)
+        local_dirname, local_url = self.svnrepo.export_temporary(revision)
         h = hashtree(local_url)['sha1_git']
-        self.svnrepo.clean_fs(local_url)
+        self.svnrepo.clean_fs(local_dirname)
         return h
 
     def get_svn_repo(self, svn_url, destination_path, origin):

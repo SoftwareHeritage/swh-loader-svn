@@ -198,7 +198,8 @@ class BaseSvnRepo():
             revision: Revision to export at
 
         Returns:
-            The local_url where the repository was exported.
+            The tuple local_dirname the temporary location root
+            folder, local_url where the repository was exported.
 
         """
         local_dirname = tempfile.mkdtemp(
@@ -208,7 +209,7 @@ class BaseSvnRepo():
         local_url = os.path.join(local_dirname, local_name)
         self.client.export(
             self.remote_url, to=local_url, rev=revision, ignore_keywords=True)
-        return local_url
+        return local_dirname, local_url
 
     def swh_previous_revision(self, previous_swh_revision=None):
         """Look for possible existing revision in swh.

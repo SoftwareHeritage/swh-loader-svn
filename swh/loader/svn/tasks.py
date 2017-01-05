@@ -44,16 +44,18 @@ class MountAndLoadSvnRepositoryTsk(Task):
            2. Load it through the svn loader.
            3. Clean up mounted svn repository archive.
         """
-        self.log.info('Archive to mount and load %s' % archive_path)
-        temp_dir, repo_path = utils.init_svn_repo_from_archive_dump(
-            archive_path)
-        self.log.debug('Mounted svn repository to %s' % repo_path)
+        temp_dir = None
         try:
+            self.log.info('Archive to mount and load %s' % archive_path)
+            temp_dir, repo_path = utils.init_svn_repo_from_archive_dump(
+                archive_path)
+            self.log.debug('Mounted svn repository to %s' % repo_path)
             SWHSvnLoader().load(svn_url='file://%s' % repo_path,
                                 destination_path=None)
         except Exception as e:
             raise e
         finally:
-            self.log.debug('Clean up temp directory %s for project %s' % (
-                temp_dir, basename(repo_path)))
-            shutil.rmtree(temp_dir)
+            if temp_dir:
+                self.log.debug('Clean up temp directory %s for project %s' % (
+                    temp_dir, basename(repo_path)))
+                shutil.rmtree(temp_dir)

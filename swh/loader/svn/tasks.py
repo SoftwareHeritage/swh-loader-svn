@@ -37,7 +37,7 @@ class LoadSWHSvnRepositoryTsk(Task):
 
 
 class MountAndLoadSvnRepositoryTsk(Task):
-    task_queue = 'swh_mount_and_load_loader_svn'
+    task_queue = 'swh_loader_svn_mount_and_load'
 
     def run(self, archive_path):
         """1. Mount an svn dump from archive as a local svn repository.

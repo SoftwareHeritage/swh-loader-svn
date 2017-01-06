@@ -8,7 +8,7 @@ import tempfile
 import shutil
 
 from dateutil import parser
-from subprocess import PIPE, Popen, check_call
+from subprocess import PIPE, Popen, call
 
 from swh.model import git
 
@@ -156,21 +156,20 @@ def init_svn_repo_from_archive_dump(archive_path, root_temp_dir='/tmp'):
 
         # create the repository that will be loaded with the dump
         cmd = ['svnadmin', 'create', repo_path]
-        r = check_call(cmd)
+        r = call(cmd)
         if r != 0:
             raise ValueError(
-                'Failed to initialize an empty svn repository for project %s' %
+                'Failed to initialize empty svn repo for %s' %
                 project_name)
 
         with Popen(['pigz', '-dc', archive_path], stdout=PIPE) as dump:
             cmd = ['svnadmin', 'load', '-q', repo_path]
-            r = check_call(cmd, stdin=dump.stdout)
+            r = call(cmd, stdin=dump.stdout)
             if r != 0:
                 raise ValueError(
                     'Failed to mount the svn dump for project %s' %
                     project_name)
             return temp_dir, repo_path
     except Exception as e:
-        # failure, so we clean up
         shutil.rmtree(temp_dir)
         raise e

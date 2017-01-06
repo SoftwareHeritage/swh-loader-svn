@@ -230,15 +230,15 @@ class BaseSvnRepo():
         # got no previous revision, will check if some occurrence
         # already exists for that origin
         if not previous_swh_revision:
-            occ = storage.occurrence_get(self.origin_id)
+            occ = list(storage.occurrence_get(self.origin_id))
             if occ:
                 revision_id = occ[0]['target']
-                revisions = storage.revision_get([revision_id])
+                revisions = list(storage.revision_get([revision_id]))
 
                 if revisions:
                     return revisions[0]
         else:
-            revs = storage.revision_get([previous_swh_revision])
+            revs = list(storage.revision_get([previous_swh_revision]))
             if revs:
                 return revs[0]
 

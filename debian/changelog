@@ -1,8 +1,9 @@
-swh-loader-svn (0.0.19-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.20-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.20
+  * Fix function call
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 06 Jan 2017 14:10:18 +0100
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 06 Jan 2017 15:38:14 +0100
 
 swh-loader-svn (0.0.19-1~swh1) unstable-swh; urgency=medium
 

@@ -19,7 +19,7 @@ def get_task(task_name):
 
 
 def _produce_svn_to_load(
-        svn_url, original_svn_url, original_svn_uuid,
+        svn_url, origin_url,
         destination_path=None, synchroneous=False,
         task_name='swh.loader.svn.tasks.LoadSWHSvnRepositoryTsk'):
     """Produce svn urls on the message queue.
@@ -30,13 +30,11 @@ def _produce_svn_to_load(
     task = get_task(task_name)
     if not synchroneous and svn_url:
         task.delay(svn_url=svn_url,
-                   original_svn_url=original_svn_url,
-                   original_svn_uuid=original_svn_uuid,
+                   origin_url=origin_url,
                    destination_path=destination_path)
     elif synchroneous and svn_url:  # for debug purpose
         task(svn_url=svn_url,
-             original_svn_url=original_svn_url,
-             original_svn_uuid=original_svn_uuid,
+             origin_url=origin_url,
              destination_path=destination_path)
     else:  # synchroneous flag is ignored in that case
         for svn_url in sys.stdin:
@@ -44,8 +42,7 @@ def _produce_svn_to_load(
             if svn_url:
                 print(svn_url)
                 task.delay(svn_url=svn_url,
-                           original_svn_url=original_svn_url,
-                           original_svn_uuid=original_svn_uuid,
+                           origin_url=origin_url,
                            destination_path=destination_path)
 
 
@@ -71,20 +68,17 @@ def cli():
 @cli.command('svn', help='Default svn urls producer')
 @click.option('--url',
               help="svn repository's mirror url.")
-@click.option('--original-url', default=None,
+@click.option('--origin-url', default=None,
               help='svn repository\'s original remote url '
                    '(if different than --svn-url).')
-@click.option('--original-uuid', default=None,
-              help='svn repository\'s original uuid '
-                   '(to provide when using --original-url)')
 @click.option('--destination-path',
               help="(optional) svn checkout destination.")
 @click.option('--synchroneous',
               is_flag=True,
               help="To execute directly the svn loading.")
-def produce_svn_to_load(url, original_url, original_uuid, destination_path,
-                        synchroneous):
-    _produce_svn_to_load(url, original_url, original_uuid,
+def produce_svn_to_load(url, origin_url, destination_path, synchroneous):
+    _produce_svn_to_load(svn_url=url,
+                         origin_url=origin_url,
                          destination_path=destination_path,
                          synchroneous=synchroneous)
 

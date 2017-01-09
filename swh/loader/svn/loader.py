@@ -507,7 +507,7 @@ class SWHSvnLoader(BaseSvnLoader):
                     svnrepo,
                     revision_start,
                     swh_rev):
-                msg = 'History of svn %s@%s history modified. Skipping...' % (  # noqa
+                msg = 'History of svn %s@%s history modified. Skipping...' % (
                     svnrepo.remote_url, revision_start)
                 self.log.warn(msg)
                 raise SvnLoaderHistoryAltered

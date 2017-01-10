@@ -329,19 +329,20 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         destination_path = kwargs['destination_path']
         # local svn url
         svn_url = kwargs['svn_url']
+        origin_url = kwargs.get('origin_url')
+        visit_date = kwargs.get('visit_date')
+
+        origin = {
+            'url': origin_url if origin_url else svn_url,
+            'type': 'svn',
+        }
 
         if 'origin' not in kwargs:  # first time, we'll create the origin
-            origin = {
-                'url': svn_url,
-                'type': 'svn',
-            }
             origin['id'] = self.storage.origin_add_one(origin)
         else:
-            origin = {
-                'id': kwargs['origin'],
-                'url': svn_url,
-                'type': 'svn'
-            }
+            origin['id'] = kwargs['origin']
+
+        self.origin_id = origin['id']
 
         if 'swh_revision' in kwargs:
             self.last_known_swh_revision = hashutil.hex_to_hash(
@@ -350,13 +351,14 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
             self.last_known_swh_revision = None
 
         self.svnrepo = self.get_svn_repo(svn_url, destination_path, origin)
-        self.origin_id = origin['id']
 
         self.fetch_history_id = self.open_fetch_history()
 
-        date_visit = datetime.datetime.now(tz=datetime.timezone.utc)
+        if not visit_date:
+            visit_date = datetime.datetime.now(tz=datetime.timezone.utc)
+
         self.origin_visit = self.storage.origin_visit_add(
-            self.origin_id, date_visit)
+            self.origin_id, visit_date)
 
 
 class SWHSvnLoader(BaseSvnLoader):
@@ -508,7 +510,7 @@ class SWHSvnLoader(BaseSvnLoader):
                     svnrepo,
                     revision_start,
                     swh_rev):
-                msg = 'History of svn %s@%s history modified. Skipping...' % (  # noqa
+                msg = 'History of svn %s@%s history modified. Skipping...' % (
                     svnrepo.remote_url, revision_start)
                 self.log.warn(msg)
                 raise SvnLoaderHistoryAltered

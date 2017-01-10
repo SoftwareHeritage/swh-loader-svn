@@ -330,6 +330,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         # local svn url
         svn_url = kwargs['svn_url']
         origin_url = kwargs.get('origin_url')
+        visit_date = kwargs.get('visit_date')
 
         origin = {
             'url': origin_url if origin_url else svn_url,
@@ -353,9 +354,11 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
 
         self.fetch_history_id = self.open_fetch_history()
 
-        date_visit = datetime.datetime.now(tz=datetime.timezone.utc)
+        if not visit_date:
+            visit_date = datetime.datetime.now(tz=datetime.timezone.utc)
+
         self.origin_visit = self.storage.origin_visit_add(
-            self.origin_id, date_visit)
+            self.origin_id, visit_date)
 
 
 class SWHSvnLoader(BaseSvnLoader):

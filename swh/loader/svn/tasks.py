@@ -5,6 +5,8 @@
 
 import shutil
 
+from datetime import datetime
+from os import stat
 from os.path import basename
 
 from swh.scheduler.task import Task
@@ -50,8 +52,10 @@ class MountAndLoadSvnRepositoryTsk(Task):
             temp_dir, repo_path = utils.init_svn_repo_from_archive_dump(
                 archive_path)
             self.log.debug('Mounted svn repository to %s' % repo_path)
+            mtime = stat(archive_path).st_mtime
             SWHSvnLoader().load(svn_url='file://%s' % repo_path,
                                 origin_url=origin_url,
+                                visit_date=datetime.utcfromtimestamp(mtime),
                                 destination_path=None)
         except Exception as e:
             raise e

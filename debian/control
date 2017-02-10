@@ -10,7 +10,7 @@ Build-Depends: debhelper (>= 9),
                python3-swh.core (>= 0.0.19~),
                python3-swh.storage (>= 0.0.76~),
                python3-swh.model (>= 0.0.11~),
-               python3-swh.scheduler (>= 0.0.7~),
+               python3-swh.scheduler (>= 0.0.11~),
                python3-swh.loader.core (>= 0.0.12~),
                python3-subvertpy (>= 0.9.4~),
                python3-dateutil,
@@ -23,7 +23,7 @@ Homepage: https://forge.softwareheritage.org/diffusion/DLDSVN/
 Package: python3-swh.loader.svn
 Architecture: all
 Depends: python3-swh.core (>= 0.0.19~), python3-swh.storage (>= 0.0.76~), python3-swh.model (>= 0.0.11~), 
-         python3-swh.scheduler (>= 0.0.7~), python3-swh.loader.core (>= 0.0.12~),
+         python3-swh.scheduler (>= 0.0.11~), python3-swh.loader.core (>= 0.0.12~),
          subversion, pigz, ${misc:Depends}, ${python3:Depends}
 Description: Software Heritage Loader Svn
  Module in charge of loading svn repositories into swh storage.

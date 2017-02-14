@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2016  The Software Heritage developers
+# Copyright (C) 2015-2017  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -6,16 +6,7 @@
 import click
 import sys
 
-
-def get_task(task_name):
-    """Retrieve task object in the application by its fully qualified name.
-
-    """
-    from swh.scheduler.celery_backend.config import app
-    for module in app.conf.CELERY_IMPORTS:
-        __import__(module)
-
-    return app.tasks[task_name]
+from swh.scheduler.utils import get_task
 
 
 def _produce_svn_to_load(

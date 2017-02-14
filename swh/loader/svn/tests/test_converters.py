@@ -112,14 +112,23 @@ class TestSWHRevisionConverters(unittest.TestCase):
                 },
                 'message': b'commit message',
                 'author_date': {
-                    'timestamp': 1088108379,
+                    'timestamp': {
+                        'seconds': 1088108379,
+                        'microseconds': 0,
+                    },
                     'offset': 0
                 }
             },
             rev=10,
             parents=['123'])
 
-        date = {'timestamp': 1088108379, 'offset': 0}
+        date = {
+            'timestamp': {
+                'seconds': 1088108379,
+                'microseconds': 0,
+            },
+            'offset': 0,
+        }
 
         self.assertEquals(actual_swh_revision, {
             'date': date,
@@ -165,14 +174,23 @@ class TestGitSvnRevisionConverters(unittest.TestCase):
                 },
                 'message': b'commit message',
                 'author_date': {
-                    'timestamp': 1088108379,
+                    'timestamp': {
+                        'seconds': 1088108379,
+                        'microseconds': 0,
+                    },
                     'offset': 0
                 }
             },
             rev=10,
             parents=['123'])
 
-        date = {'timestamp': 1088108379, 'offset': 0}
+        date = {
+            'timestamp': {
+                'seconds': 1088108379,
+                'microseconds': 0,
+            },
+            'offset': 0,
+        }
 
         self.assertEquals(actual_swh_revision, {
             'date': date,
@@ -220,16 +238,21 @@ class ConvertSWHDate(unittest.TestCase):
 
         """
         self.assertEquals(
-            converters.svn_date_to_swh_date('2011-05-31T06:04:39.500900Z'),
-            {
-                'timestamp': 1306821879.5009,
+            converters.svn_date_to_swh_date('2011-05-31T06:04:39.500900Z'), {
+                'timestamp': {
+                    'seconds': 1306821879,
+                    'microseconds': 500900,
+                },
                 'offset': 0
             })
 
         self.assertEquals(
             converters.svn_date_to_swh_date('2011-05-31T06:04:39.800722Z'),
             {
-                'timestamp': 1306821879.800722,
+                'timestamp': {
+                    'seconds': 1306821879,
+                    'microseconds': 800722,
+                },
                 'offset': 0
             })
 
@@ -237,10 +260,19 @@ class ConvertSWHDate(unittest.TestCase):
     def svn_date_to_swh_date_epoch(self):
         """Empty date should be EPOCH (timestamp and offset at 0)."""
         # It should return 0, epoch
-        self.assertEquals({'timestamp': 0, 'offset': 0},
-                          converters.svn_date_to_swh_date(''))
-        self.assertEquals({'timestamp': 0, 'offset': 0},
-                          converters.svn_date_to_swh_date(None))
+        self.assertEquals({
+            'timestamp': {
+                'seconds': 0,
+                'microseconds': 0,
+            },
+            'offset': 0,
+        }, converters.svn_date_to_swh_date(''))
+        self.assertEquals({
+            'timestamp': {
+                'seconds': 0,
+                'microseconds': 0,
+            }, 'offset': 0,
+        }, converters.svn_date_to_swh_date(None))
 
 
 class ConvertGitSvnDate(unittest.TestCase):
@@ -250,17 +282,32 @@ class ConvertGitSvnDate(unittest.TestCase):
         actual_ts = converters.svn_date_to_gitsvn_date(
             '2011-05-31T06:04:39.800722Z')
 
-        self.assertEquals(actual_ts,
-                          {'timestamp': 1306821879, 'offset': 0})
+        self.assertEquals(actual_ts, {
+            'timestamp': {
+                'seconds': 1306821879,
+                'microseconds': 0,
+            },
+            'offset': 0,
+        })
 
     @istest
     def svn_date_to_gitsvn_date_epoch(self):
         """Empty date should be EPOCH (timestamp and offset at 0)."""
         # It should return 0, epoch
-        self.assertEquals({'timestamp': 0, 'offset': 0},
-                          converters.svn_date_to_gitsvn_date(''))
-        self.assertEquals({'timestamp': 0, 'offset': 0},
-                          converters.svn_date_to_gitsvn_date(None))
+        self.assertEquals({
+            'timestamp': {
+                'seconds': 0,
+                'microseconds': 0,
+            },
+            'offset': 0,
+        }, converters.svn_date_to_gitsvn_date(''))
+        self.assertEquals({
+            'timestamp': {
+                'seconds': 0,
+                'microseconds': 0,
+            },
+            'offset': 0,
+        }, converters.svn_date_to_gitsvn_date(None))
 
 
 class ConvertSWHRevision(unittest.TestCase):

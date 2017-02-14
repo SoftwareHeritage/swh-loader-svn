@@ -1,3 +1,9 @@
+swh-loader-svn (0.0.23-1~swh1~bpo9+1) stretch-swh; urgency=medium
+
+  * Rebuild for stretch-backports.
+
+ -- Nicolas Dandrimont <nicolas@dandrimont.eu>  Tue, 14 Feb 2017 19:40:28 +0100
+
 swh-loader-svn (0.0.23-1~swh1) unstable-swh; urgency=medium
 
   * Release swh.loader.svn v0.0.23

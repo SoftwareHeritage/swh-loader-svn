@@ -21,8 +21,12 @@ def svn_date_to_gitsvn_date(strdate):
         An swh date format with an integer timestamp.
 
     """
+    ts = strdate_to_timestamp(strdate)
     return {
-        'timestamp': int(strdate_to_timestamp(strdate)),
+        'timestamp': {
+            'seconds': ts['seconds'],
+            'microseconds': 0,
+        },
         'offset': 0
     }
 

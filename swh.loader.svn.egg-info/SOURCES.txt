@@ -6,6 +6,7 @@ Makefile
 README
 README-dev.org
 errors.org
+requirements-swh.txt
 requirements.txt
 setup.py
 svn-lib-client-analysis.org

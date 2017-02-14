@@ -21,15 +21,18 @@ def strdate_to_timestamp(strdate):
         'YYYY-mm-DDTHH:MM:SS.800722Z'
 
     Returns:
-        A timestamp in float
+        A couple of integers: seconds, microseconds
 
     """
     if strdate:
         dt = parser.parse(strdate)
-        ts_float = dt.timestamp()
+        ts = {
+            'seconds': int(dt.timestamp()),
+            'microseconds': dt.microsecond,
+        }
     else:  # epoch
-        ts_float = 0
-    return ts_float
+        ts = {'seconds': 0, 'microseconds': 0}
+    return ts
 
 
 def convert_hashes_with_relative_path(hashes, rootpath):

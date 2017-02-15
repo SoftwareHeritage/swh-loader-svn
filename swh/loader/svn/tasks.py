@@ -33,7 +33,9 @@ class LoadSWHSvnRepositoryTsk(Task):
                 docstring
 
         """
-        SWHSvnLoader().load(*args, **kwargs)
+        loader = SWHSvnLoader()
+        loader.log = self.log
+        loader.load(*args, **kwargs)
 
 
 class MountAndLoadSvnRepositoryTsk(Task):

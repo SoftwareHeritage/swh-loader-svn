@@ -10,6 +10,8 @@ swh-storage.
 
 import abc
 import datetime
+import os
+import shutil
 
 from swh.core import utils, hashutil
 from swh.model import git
@@ -17,7 +19,7 @@ from swh.model.git import GitType
 
 from swh.loader.core.loader import SWHLoader
 from . import svn, converters
-from .utils import hashtree
+from .utils import hashtree, init_svn_repo_from_archive_dump
 
 
 class SvnLoaderEventful(ValueError):
@@ -537,3 +539,22 @@ class SWHSvnLoader(BaseSvnLoader):
         # 'revision_packet_size')
         return self.process_swh_revisions(
             svnrepo, revision_start, revision_end, revision_parents)
+
+
+class SWHSvnLoaderFromDumpArchive(SWHSvnLoader):
+    """Load a svn repository from an archive (containing a dump).
+
+    """
+    def __init__(self, archive_path):
+        super().__init__()
+        self.log.info('Archive to mount and load %s' % archive_path)
+        self.temp_dir, self.repo_path = init_svn_repo_from_archive_dump(
+            archive_path)
+
+    def clean(self):
+        super().clean()
+
+        if self.temp_dir and os.path.exists(self.temp_dir):
+            self.log.debug('Clean up temp directory %s for project %s' % (
+                self.temp_dir, os.path.basename(self.repo_path)))
+            shutil.rmtree(self.temp_dir)

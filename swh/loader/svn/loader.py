@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2016  The Software Heritage developers
+# Copyright (C) 2015-2017  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -9,7 +9,8 @@ swh-storage.
 """
 
 import abc
-import datetime
+import os
+import shutil
 
 from swh.core import utils, hashutil
 from swh.model import git
@@ -17,7 +18,7 @@ from swh.model.git import GitType
 
 from swh.loader.core.loader import SWHLoader
 from . import svn, converters
-from .utils import hashtree
+from .utils import hashtree, init_svn_repo_from_archive_dump
 
 
 class SvnLoaderEventful(ValueError):
@@ -230,119 +231,26 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         """Process and load the occurrence pointing to the latest revision.
 
         """
-        occ = converters.build_swh_occurrence(revision['id'],
-                                              origin_visit['origin'],
-                                              origin_visit['visit'])
+        occ = converters.build_swh_occurrence(
+            revision['id'], origin_visit['origin'], origin_visit['visit'])
         self.log.debug('occ: %s' % occ)
         self.maybe_load_occurrences([occ])
 
-    def close_success(self):
-        self.close_fetch_history_success(self.fetch_history_id)
-        self.storage.origin_visit_update(self.origin_visit['origin'],
-                                         self.origin_visit['visit'],
-                                         status='full')
-
-    def close_failure(self):
-        self.close_fetch_history_failure(self.fetch_history_id)
-        self.storage.origin_visit_update(self.origin_visit['origin'],
-                                         self.origin_visit['visit'],
-                                         status='partial')
-
-    def load(self, *args, **kwargs):
-        """Load a svn repository in swh.
-
-        Checkout the svn repository locally in destination_path.
-
-        Args:
-            - origin_visit: (mandatory) The current origin visit
-            - last_known_swh_revision: (Optional) Hash id of known swh revision
-              already visited in a previous visit
-
-        Returns:
-            Dictionary with the following keys:
-            - eventful: (mandatory) is the loading being eventful or not
-            - completion: (mandatory) 'full' if complete, 'partial' otherwise
-            - state: (optional) if the completion was partial, this
-              gives the state to pass along for the next schedule
-
-        """
-        self.prepare(*args, **kwargs)
-        try:
-            latest_rev = self.process_repository(
-                self.origin_visit, self.last_known_swh_revision)
-        except SvnLoaderEventful as e:
-            self.log.error('Eventful partial visit. Detail: %s' % e)
-            latest_rev = e.swh_revision
-            self.process_swh_occurrence(latest_rev, self.origin_visit)
-            self.close_failure()
-            return {
-                'eventful': True,
-                'completion': 'partial',
-                'state': {
-                    'origin': self.origin_visit['origin'],
-                    'revision': hashutil.hash_to_hex(latest_rev['id'])
-                }
-            }
-        except (SvnLoaderHistoryAltered, SvnLoaderUneventful) as e:
-            self.log.error('Uneventful visit. Detail: %s' % e)
-            # FIXME: This fails because latest_rev is not bound
-            # self.process_swh_occurrence(latest_rev, self.origin_visit)
-            self.close_failure()
-            return {
-                'eventful': False,
-            }
-        except Exception as e:
-            self.close_failure()
-            raise e
-        else:
-            self.process_swh_occurrence(latest_rev, self.origin_visit)
-            self.close_success()
-            return {
-                'eventful': True,
-                'completion': 'full',
-            }
-        finally:
-            self.clean()
-
-    @abc.abstractmethod
-    def clean(self):
-        """Clean up after working.
-
-        """
-        pass
-
     def prepare(self, *args, **kwargs):
-        """
-        Prepare origin, fetch_origin, origin_visit
-        Then load a svn repository.
-
-        Then close origin_visit, fetch_history according to status success or
-        failure.
-
-        First:
-        - creates an origin if it does not exist
-        - creates a fetch_history entry
-        - creates an origin_visit
-        - Then loads the svn repository
-
-        """
         destination_path = kwargs['destination_path']
         # local svn url
         svn_url = kwargs['svn_url']
         origin_url = kwargs.get('origin_url')
-        visit_date = kwargs.get('visit_date')
+        self.visit_date = kwargs.get('visit_date')
 
         origin = {
             'url': origin_url if origin_url else svn_url,
             'type': 'svn',
         }
 
-        if 'origin' not in kwargs:  # first time, we'll create the origin
-            origin['id'] = self.storage.origin_add_one(origin)
-        else:
-            origin['id'] = kwargs['origin']
-
-        self.origin_id = origin['id']
+        self.origin_id = self.send_origin(origin)
+        origin['id'] = self.origin_id
+        self.origin = origin
 
         if 'swh_revision' in kwargs:
             self.last_known_swh_revision = hashutil.hex_to_hash(
@@ -354,11 +262,48 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
 
         self.fetch_history_id = self.open_fetch_history()
 
-        if not visit_date:
-            visit_date = datetime.datetime.now(tz=datetime.timezone.utc)
+    def get_origin(self):
+        """Retrieve the origin we are working with.
 
-        self.origin_visit = self.storage.origin_visit_add(
-            self.origin_id, visit_date)
+        """
+        return self.origin  # set in prepare method
+
+    def fetch_data(self):
+        """We need to fetch and stream the data to store directly.  So
+        fetch_data do actually nothing.  The method `store_data` below
+        is in charge to do everything, fetch and store.
+
+        """
+        pass
+
+    def store_data(self):
+        """We need to fetch and stream the data to store directly because
+        there is too much data and state changes. Everything is
+        intertwined together (We receive patch and apply on disk and
+        compute at the hashes at the same time)
+
+        So every data to fetch and store is done here.
+
+        Requisite: origin_visit and last_known_swh_revision must have
+        been set in the prepare method.
+
+        """
+        origin_visit = {'origin': self.origin_id, 'visit': self.visit}
+        try:
+            latest_rev = self.process_repository(origin_visit,
+                                                 self.last_known_swh_revision)
+        except SvnLoaderEventful as e:
+            self.log.error('Eventful partial visit. Detail: %s' % e)
+            latest_rev = e.swh_revision
+            self.process_swh_occurrence(latest_rev, origin_visit)
+            raise
+        except (SvnLoaderHistoryAltered, SvnLoaderUneventful) as e:
+            self.log.error('Uneventful visit. Detail: %s' % e)
+            raise
+        except Exception as e:
+            raise
+        else:
+            self.process_swh_occurrence(latest_rev, origin_visit)
 
 
 class SWHSvnLoader(BaseSvnLoader):
@@ -375,13 +320,12 @@ class SWHSvnLoader(BaseSvnLoader):
     def __init__(self):
         super().__init__()
 
-    def clean(self):
+    def cleanup(self):
         """Clean after oneself.
 
         This is in charge to flush the remaining data to write in swh storage.
         And to clean up the svn repository's working representation on disk.
         """
-        self.flush()
         self.svnrepo.clean_fs()
 
     def swh_revision_hash_tree_at_svn_revision(self, revision):
@@ -537,3 +481,22 @@ class SWHSvnLoader(BaseSvnLoader):
         # 'revision_packet_size')
         return self.process_swh_revisions(
             svnrepo, revision_start, revision_end, revision_parents)
+
+
+class SWHSvnLoaderFromDumpArchive(SWHSvnLoader):
+    """Load a svn repository from an archive (containing a dump).
+
+    """
+    def __init__(self, archive_path):
+        super().__init__()
+        self.log.info('Archive to mount and load %s' % archive_path)
+        self.temp_dir, self.repo_path = init_svn_repo_from_archive_dump(
+            archive_path)
+
+    def cleanup(self):
+        super().cleanup()
+
+        if self.temp_dir and os.path.exists(self.temp_dir):
+            self.log.debug('Clean up temp directory %s for project %s' % (
+                self.temp_dir, os.path.basename(self.repo_path)))
+            shutil.rmtree(self.temp_dir)

@@ -1,3 +1,10 @@
+swh-loader-svn (0.0.24-1~swh1) unstable-swh; urgency=medium
+
+  * v0.0.24
+  * Simplify loader's logic
+
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 22 Feb 2017 14:09:15 +0100
+
 swh-loader-svn (0.0.23-1~swh1) unstable-swh; urgency=medium
 
   * Release swh.loader.svn v0.0.23

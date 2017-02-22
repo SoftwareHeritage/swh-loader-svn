@@ -43,6 +43,7 @@ def _produce_svn_to_load(
                 print(svn_url, origin_url)
                 task.delay(svn_url=svn_url,
                            origin_url=origin_url,
+                           visit_date=visit_date,
                            destination_path=destination_path)
 
 
@@ -90,6 +91,7 @@ def produce_svn_to_load(url, origin_url,
                         destination_path, visit_date, synchroneous):
     _produce_svn_to_load(svn_url=url,
                          origin_url=origin_url,
+                         visit_date=visit_date,
                          destination_path=destination_path,
                          synchroneous=synchroneous)
 

@@ -22,7 +22,7 @@ Homepage: https://forge.softwareheritage.org/diffusion/DLDSVN/
 
 Package: python3-swh.loader.svn
 Architecture: all
-Depends: pigz,
+Depends: gzip,
          python3-swh.core (>= 0.0.19~),
          python3-swh.loader.core (>= 0.0.13~),
          python3-swh.model (>= 0.0.11~),

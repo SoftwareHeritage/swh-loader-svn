@@ -165,7 +165,7 @@ def init_svn_repo_from_archive_dump(archive_path, root_temp_dir='/tmp'):
                 'Failed to initialize empty svn repo for %s' %
                 project_name)
 
-        with Popen(['pigz', '-dc', archive_path], stdout=PIPE) as dump:
+        with Popen(['gzip', '-dc', archive_path], stdout=PIPE) as dump:
             cmd = ['svnadmin', 'load', '-q', repo_path]
             r = call(cmd, stdin=dump.stdout)
             if r != 0:

@@ -12,8 +12,8 @@ import abc
 import os
 import shutil
 
-from swh.core import utils, hashutil
-from swh.model import git
+from swh.core import utils
+from swh.model import git, hashutil
 from swh.model.git import GitType
 
 from swh.loader.core.loader import SWHLoader
@@ -253,7 +253,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         self.origin = origin
 
         if 'swh_revision' in kwargs:
-            self.last_known_swh_revision = hashutil.hex_to_hash(
+            self.last_known_swh_revision = hashutil.hash_to_bytes(
                 kwargs['swh_revision'])
         else:
             self.last_known_swh_revision = None

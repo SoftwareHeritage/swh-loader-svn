@@ -1,11 +1,11 @@
-# Copyright (C) 2016  The Software Heritage developers
+# Copyright (C) 2016-2017  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
 from nose.tools import istest
 
-from swh.core import hashutil
+from swh.model import hashutil
 from swh.loader.svn.loader import SWHSvnLoader
 from swh.loader.svn.loader import SvnLoaderHistoryAltered, SvnLoaderUneventful
 
@@ -104,11 +104,11 @@ class SWHSvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
 
         """
         return {
-            'id': hashutil.hex_to_hash(
+            'id': hashutil.hash_to_bytes(
                 '4876cb10aec6f708f7466dddf547567b65f6c39c'),
-            'parents': [hashutil.hex_to_hash(
+            'parents': [hashutil.hash_to_bytes(
                 'a3a577948fdbda9d1061913b77a1588695eadb41')],
-            'directory': hashutil.hex_to_hash(
+            'directory': hashutil.hash_to_bytes(
                 '0deab3023ac59398ae467fc4bff5583008af1ee2'),
             'target_type': 'revision',
             'metadata': {
@@ -138,11 +138,11 @@ class SWHSvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
         """
         return {
             # Changed the revision id's hash to simulate history altered
-            'id': hashutil.hex_to_hash(
+            'id': hashutil.hash_to_bytes(
                 'badbadbadbadf708f7466dddf547567b65f6c39d'),
-            'parents': [hashutil.hex_to_hash(
+            'parents': [hashutil.hash_to_bytes(
                 'a3a577948fdbda9d1061913b77a1588695eadb41')],
-            'directory': hashutil.hex_to_hash(
+            'directory': hashutil.hash_to_bytes(
                 '0deab3023ac59398ae467fc4bff5583008af1ee2'),
             'target_type': 'revision',
             'metadata': {
@@ -336,11 +336,11 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
 
         """
         previous_unfinished_revision = {
-            'id': hashutil.hex_to_hash(
+            'id': hashutil.hash_to_bytes(
                 '4876cb10aec6f708f7466dddf547567b65f6c39c'),
-            'parents': [hashutil.hex_to_hash(
+            'parents': [hashutil.hash_to_bytes(
                 'a3a577948fdbda9d1061913b77a1588695eadb41')],
-            'directory': hashutil.hex_to_hash(
+            'directory': hashutil.hash_to_bytes(
                 '0deab3023ac59398ae467fc4bff5583008af1ee2'),
             'target_type': 'revision',
             'metadata': {
@@ -403,11 +403,11 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
 
         """
         previous_unfinished_revision = {
-            'id': hashutil.hex_to_hash(
+            'id': hashutil.hash_to_bytes(
                 'a3a577948fdbda9d1061913b77a1588695eadb41'),
-            'parents': [hashutil.hex_to_hash(
+            'parents': [hashutil.hash_to_bytes(
                 '3f51abf3b3d466571be0855dfa67e094f9ceff1b')],
-            'directory': hashutil.hex_to_hash(
+            'directory': hashutil.hash_to_bytes(
                 '7dc52cc04c3b8bd7c085900d60c159f7b846f866'),
             'target_type': 'revision',
             'metadata': {
@@ -467,11 +467,11 @@ class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
 
         """
         return {
-            'id': hashutil.hex_to_hash(
+            'id': hashutil.hash_to_bytes(
                 'a3a577948fdbda9d1061913b77a1588695eadb41'),
-            'parents': [hashutil.hex_to_hash(
+            'parents': [hashutil.hash_to_bytes(
                 '3f51abf3b3d466571be0855dfa67e094f9ceff1b')],
-            'directory': hashutil.hex_to_hash(
+            'directory': hashutil.hash_to_bytes(
                 '7dc52cc04c3b8bd7c085900d60c159f7b846f866'),
             'target_type': 'revision',
             'metadata': {
@@ -506,11 +506,11 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
 
         """
         previous_unfinished_revision = {
-            'id': hashutil.hex_to_hash(
+            'id': hashutil.hash_to_bytes(
                 '4876cb10aec6f708f7466dddf547567b65f6c39c'),
-            'parents': [hashutil.hex_to_hash(
+            'parents': [hashutil.hash_to_bytes(
                 'a3a577948fdbda9d1061913b77a1588695eadb41')],
-            'directory': hashutil.hex_to_hash(
+            'directory': hashutil.hash_to_bytes(
                 '0deab3023ac59398ae467fc4bff5583008af1ee2'),
             'target_type': 'revision',
             'metadata': {
@@ -571,11 +571,11 @@ class SWHSvnLoaderUpdateAndTestCornerCasesAboutEolITTest(BaseTestSvnLoader):
 
         """
         previous_unfinished_revision = {
-            'id': hashutil.hex_to_hash(
+            'id': hashutil.hash_to_bytes(
                 '171dc35522bfd17dda4e90a542a0377fb2fc707a'),
-            'parents': [hashutil.hex_to_hash(
+            'parents': [hashutil.hash_to_bytes(
                 '902f29b4323a9b9de3af6d28e72dd581e76d9397')],
-            'directory': hashutil.hex_to_hash(
+            'directory': hashutil.hash_to_bytes(
                 'fd24a76c87a3207428e06612b49860fc78e9f6dc'),
             'target_type': 'revision',
             'metadata': {

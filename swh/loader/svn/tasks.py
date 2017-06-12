@@ -14,7 +14,7 @@ class LoadSWHSvnRepositoryTsk(Task):
     """
     task_queue = 'swh_loader_svn'
 
-    def run(self, *args, **kwargs):
+    def run_task(self, *args, **kwargs):
         """Import a svn repository with swh policy.
 
         Args:
@@ -36,7 +36,7 @@ class LoadSWHSvnRepositoryTsk(Task):
 class MountAndLoadSvnRepositoryTsk(Task):
     task_queue = 'swh_loader_svn_mount_and_load'
 
-    def run(self, archive_path, origin_url=None, visit_date=None):
+    def run_task(self, archive_path, origin_url=None, visit_date=None):
         """1. Mount an svn dump from archive as a local svn repository.
            2. Load it through the svn loader.
            3. Clean up mounted svn repository archive.

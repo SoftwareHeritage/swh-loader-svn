@@ -28,13 +28,14 @@ def compute_svn_link_metadata(linkpath, filetype, data):
         data: the link's content a.k.a the link's source file
 
     Returns:
-        Dictionary of values:
-            - data: link's content
-            - length: link's content length
-            - name: basename of the link
-            - perms: git permission for link
-            - type: git type for link
-            - path: absolute path to the link on filesystem
+        dict: a dictionary with the following keys:
+
+          - data: link's content
+          - length: link's content length
+          - name: basename of the link
+          - perms: git permission for link
+          - type: git type for link
+          - path: absolute path to the link on filesystem
 
     Raises:
         ValueError if the filetype does not match 'link'.
@@ -65,12 +66,12 @@ def apply_txdelta_handler(sbuf, target_stream):
     Adapted from subvertpy.delta.apply_txdelta_handler to close the
     stream when done.
 
-    Args
+    Args:
         sbuf: Source buffer
         target_stream: Target stream to write to.
 
-    Returns
-         Function to be called to apply txdelta windows
+    Returns:
+        Function to be called to apply txdelta windows
 
     """
     def apply_window(window):
@@ -111,9 +112,10 @@ class SWHFileEditor:
         This function expects self.fullpath to be a svn link.
 
         Return:
-            The svnlink's data tuple:
-            - type (should be only 'link')
-            - <path-to-src>
+            tuple: The svnlink's data tuple:
+
+                - type (should be only 'link')
+                - <path-to-src>
 
         """
         with open(self.fullpath, 'rb') as f:
@@ -127,7 +129,7 @@ class SWHFileEditor:
         """Convert the symlink to a svnlink on disk.
 
         Return:
-            The symlink's svnlink data (b'type <path-to-src>')
+            The symlink's svnlink data (``b'type <path-to-src>'``)
 
         """
         # we replace the symlink by a svnlink
@@ -155,7 +157,9 @@ class SWHFileEditor:
 
     def close(self):
         """When done with the file, this is called.
+
         So the file exists and is updated, we can:
+
         - adapt accordingly its execution flag if any
         - compute the objects' checksums
 
@@ -190,21 +194,23 @@ def default_dictionary():
 class BaseDirSWHEditor:
     """Base class implementation of dir editor.
 
-    cf. SWHDirEditor for an implementation that hashes every directory
-    encountered.
+    see :py:class:`SWHDirEditor` for an implementation that hashes every
+    directory encountered.
 
-    cf. SWHDirEditorNoEmptyFolder for an implementation that deletes
-    empty folder
+    cf. :py:class:`SWHDirEditorNoEmptyFolder` for an implementation that
+    deletes empty folder
 
-    Instantiate a new class inheriting from this class and define the
-    following function:
+    Instantiate a new class inheriting from this class and define the following
+    functions::
 
-    - def update_checksum(self):
-        Compute the checksums at current state
-    - def open_directory(self, *args):
-        Update an existing folder.
-    - def add_directory(self, *args):
-        Add a new one.
+        def update_checksum(self):
+            # Compute the checksums at current state
+
+        def open_directory(self, *args):
+            # Update an existing folder.
+
+        def add_directory(self, *args):
+            # Add a new one.
 
     """
     __slots__ = ['objects', 'rootpath', 'path']
@@ -383,19 +389,20 @@ class BaseSWHReplay:
     Their role is to compute objects for a particular revision.
 
     This class is intended to be inherited to:
+
     - initialize the editor (global loading policy depends on this editor)
-
     - override the compute_hashes function in charge of computing
-    hashes between rev and rev+1
+      hashes between rev and rev+1
 
-    cf. SWHReplayNoEmptyFolder and SWHReplay for instanciated classes.
+    cf. :py:class:`SWHReplayNoEmptyFolder` and :py:class:`SWHReplay` for
+    instanciated classes.
 
     """
     def replay(self, rev):
         """Replay svn actions between rev and rev+1.
 
-           This method updates in place the self.editor.objects's reference.
-           This also updates in place the filesystem.
+        This method updates in place the self.editor.objects's reference. This
+        also updates in place the filesystem.
 
         Returns:
            The updated objects
@@ -412,8 +419,8 @@ class BaseSWHReplay:
             rev: The revision to start the replay from.
 
         Returns:
-            The updated objects between rev and rev+1.
-            Beware that this mutates the filesystem at rootpath accordingly.
+            The updated objects between rev and rev+1. Beware that this mutates
+            the filesystem at rootpath accordingly.
 
         """
         raise NotImplementedError('This should be overridden by subclass')
@@ -439,8 +446,8 @@ class SWHReplay(BaseSWHReplay):
             rev: The revision to start the replay from.
 
         Returns:
-            The updated objects between rev and rev+1.
-            Beware that this mutates the filesystem at rootpath accordingly.
+            The updated objects between rev and rev+1. Beware that this
+            mutates the filesystem at rootpath accordingly.
 
         """
         return self.replay(rev)

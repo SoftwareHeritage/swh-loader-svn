@@ -20,11 +20,12 @@ class LoadSWHSvnRepositoryTsk(Task):
         Args:
             args: ordered arguments (expected None)
             kwargs: Dictionary with the following expected keys:
+
               - svn_url: (mandatory) svn's repository url
               - destination_path: (mandatory) root directory to
                 locally retrieve svn's data
               - swh_revision: (optional) extra SWH revision hex to
-                start from.  cf. swh.loader.svn.SvnLoader.process
+                start from.  see swh.loader.svn.SvnLoader.process
                 docstring
 
         """

@@ -33,14 +33,15 @@ class SvnRepoException(ValueError):
 class BaseSvnRepo():
     """Base svn repository representation for swh.
 
-    To override some of the behavior regarding the message log
-    properties, you can instantiate a subclass of this class and
-    override:
-    - def convert_commit_author(self, author)
-    - def convert_commit_message(self, msg)
-    - def convert_commit_date(self, date)
+    To override some of the behavior regarding the message log properties, you
+    can instantiate a subclass of this class and override::
 
-    cf. GitSvnSvnRepo, SwhSvnRepo for instanciation example.
+        def convert_commit_author(self, author)
+        def convert_commit_message(self, msg)
+        def convert_commit_date(self, date)
+
+    see :py:class:`GitSvnSvnRepo`, :py:class:`SwhSvnRepo` for instanciation
+    example.
 
     """
     def __init__(self, remote_url, origin_id, storage,
@@ -165,13 +166,15 @@ class BaseSvnRepo():
             revision_end: the svn revision ending bound
 
         Yields:
-            tuple of revisions and logs.
-            revisions: list of revisions in order
-            logs: Dictionary with key revision number and value the log entry.
-                  The log entry is a dictionary with the following keys:
-                     - author_date: date of the commit
-                     - author_name: name of the author
-                     - message: commit message
+            tuple: tuple of revisions and logs:
+
+                - revisions: list of revisions in order
+                - logs: Dictionary with key revision number and value the log
+                  entry. The log entry is a dictionary with the following keys:
+
+                    - author_date: date of the commit
+                    - author_name: name of the author
+                    - message: commit message
 
         """
         for log_entry in self.conn_log.iter_log(paths=None,
@@ -312,7 +315,8 @@ class BaseSvnRepo():
 
 
 class SWHSvnRepo(BaseSvnRepo):
-    """This class does exactly as BaseSvnRepo except for:
+    """Same as :py:class:`BaseSvnRepo` except for:
+
     - the commit message which is simply encoded
     - the commit author is left as is.
     - the commit timestamp is left as is.
@@ -353,12 +357,14 @@ class SWHSvnRepo(BaseSvnRepo):
 
     def convert_commit_author(self, author):
         """Convert the commit author into an swh person.
-        The user becomes a dictionary of the form:
-        {
-          name: author,
-          email: '',
-          fullname: author
-        }
+
+        The user becomes a dictionary of the form::
+
+            {
+              name: author,
+              email: '',
+              fullname: author
+            }
 
         Args:
             author (str): the commit author to convert.

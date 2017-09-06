@@ -194,10 +194,10 @@ def default_dictionary():
 class BaseDirSWHEditor:
     """Base class implementation of dir editor.
 
-    see :py:class:`SWHDirEditor` for an implementation that hashes every
+    see :class:`SWHDirEditor` for an implementation that hashes every
     directory encountered.
 
-    cf. :py:class:`SWHDirEditorNoEmptyFolder` for an implementation that
+    cf. :class:`SWHDirEditorNoEmptyFolder` for an implementation that
     deletes empty folder
 
     Instantiate a new class inheriting from this class and define the following
@@ -394,7 +394,7 @@ class BaseSWHReplay:
     - override the compute_hashes function in charge of computing
       hashes between rev and rev+1
 
-    cf. :py:class:`SWHReplayNoEmptyFolder` and :py:class:`SWHReplay` for
+    cf. :class:`SWHReplayNoEmptyFolder` and :class:`SWHReplay` for
     instanciated classes.
 
     """

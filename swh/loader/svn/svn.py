@@ -40,7 +40,7 @@ class BaseSvnRepo():
         def convert_commit_message(self, msg)
         def convert_commit_date(self, date)
 
-    see :py:class:`GitSvnSvnRepo`, :py:class:`SwhSvnRepo` for instanciation
+    see :class:`GitSvnSvnRepo`, :class:`SwhSvnRepo` for instanciation
     example.
 
     """
@@ -315,7 +315,7 @@ class BaseSvnRepo():
 
 
 class SWHSvnRepo(BaseSvnRepo):
-    """Same as :py:class:`BaseSvnRepo` except for:
+    """Same as :class:`BaseSvnRepo` except for:
 
     - the commit message which is simply encoded
     - the commit author is left as is.

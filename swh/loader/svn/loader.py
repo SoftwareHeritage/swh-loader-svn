@@ -92,7 +92,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
             origin: the corresponding origin
 
         Returns:
-            Instance of :py:mod:`swh.loader.svn.svn` clients
+            Instance of :mod:`swh.loader.svn.svn` clients
         """
         raise NotImplementedError
 

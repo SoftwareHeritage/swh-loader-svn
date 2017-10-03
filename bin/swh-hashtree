@@ -7,7 +7,7 @@
 
 import click
 
-from swh.core import hashutil
+from swh.model import hashutil
 
 from swh.loader.svn.utils import hashtree
 

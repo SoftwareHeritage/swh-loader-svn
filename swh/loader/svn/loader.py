@@ -32,28 +32,32 @@ class SvnLoaderEventful(ValueError):
 
 
 class SvnLoaderUneventful(ValueError):
-    pass
+    def __init__(self, e, *args):
+        super().__init__(e, *args)
 
 
 class SvnLoaderHistoryAltered(ValueError):
-    pass
+    def __init__(self, e, *args):
+        super().__init__(e, *args)
 
 
 class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
     """Base Svn loader to load one svn repository according to specific
     policies (only swh one now).
 
-    The main entry point of this is (no need to override it)
-    - def load(self, origin_visit, last_known_swh_revision=None): pass
+    The main entry point of this is (no need to override it)::
 
-    Inherit this class and then override the following functions:
-    - def build_swh_revision(self, rev, commit, dir_id, parents)
-        This is in charge of converting an svn revision to a compliant
-        swh revision
+        def load(self, origin_visit, last_known_swh_revision=None): pass
 
-    - def process_repository(self)
-        This is in charge of processing the actual svn repository and
-        store the result to swh storage.
+    Inherit this class and then override the following functions::
+
+        def build_swh_revision(self, rev, commit, dir_id, parents):
+            # This is in charge of converting an svn revision to a compliant
+            # swh revision
+
+        def process_repository(self):
+            # This is in charge of processing the actual svn repository and
+            # store the result to swh storage.
 
     """
     CONFIG_BASE_FILENAME = 'loader/svn'
@@ -90,7 +94,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
             origin: the corresponding origin
 
         Returns:
-            Instance of swh.loader.svn.svn clients
+            Instance of :mod:`swh.loader.svn.svn` clients
         """
         raise NotImplementedError
 
@@ -101,8 +105,8 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
 
         Args:
             rev: the svn revision number
-            commit: dictionary with keys 'author_name', 'author_date', 'rev',
-            'message'
+            commit: dictionary with keys: author\_name, author\_date, rev,
+                message
             dir_id: the hash tree computation
             parents: the revision's parents
 
@@ -114,14 +118,13 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def process_repository(self, origin_visit, last_known_swh_revision=None):
         """The main idea of this function is to:
+
         - iterate over the svn commit logs
         - extract the svn commit log metadata
-        - compute the hashes from the current directory down to the
-          file
+        - compute the hashes from the current directory down to the file
         - compute the equivalent swh revision
         - send all those objects for storage
-        - create an swh occurrence pointing to the last swh revision
-          seen
+        - create an swh occurrence pointing to the last swh revision seen
         - send that occurrence for storage in swh-storage.
 
         """
@@ -193,10 +196,10 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
                               revision_end,
                               revision_parents):
         """Process and store revision to swh (sent by blocks of
-           'revision_packet_size')
+        revision_packet_size)
 
-           Returns:
-                The latest revision stored.
+        Returns:
+            The latest revision stored.
 
         """
         try:
@@ -237,6 +240,8 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         self.maybe_load_occurrences([occ])
 
     def prepare(self, *args, **kwargs):
+        self.args = args
+
         destination_path = kwargs['destination_path']
         # local svn url
         svn_url = kwargs['svn_url']
@@ -270,8 +275,8 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
 
     def fetch_data(self):
         """We need to fetch and stream the data to store directly.  So
-        fetch_data do actually nothing.  The method `store_data` below
-        is in charge to do everything, fetch and store.
+        fetch_data do actually nothing.  The method ``store_data`` below is in
+        charge to do everything, fetch and store.
 
         """
         pass
@@ -284,8 +289,9 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
 
         So every data to fetch and store is done here.
 
-        Requisite: origin_visit and last_known_swh_revision must have
-        been set in the prepare method.
+        Note:
+            origin_visit and last_known_swh_revision must have been set in the
+            prepare method.
 
         """
         origin_visit = {'origin': self.origin_id, 'visit': self.visit}
@@ -308,6 +314,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
 
 class SWHSvnLoader(BaseSvnLoader):
     """Swh svn loader is the main implementation destined for production.
+
     This implementation is able to deal with update on known svn repository.
 
     Default policy:
@@ -317,9 +324,6 @@ class SWHSvnLoader(BaseSvnLoader):
         uuid).
 
     """
-    def __init__(self):
-        super().__init__()
-
     def cleanup(self):
         """Clean after oneself.
 
@@ -372,8 +376,9 @@ class SWHSvnLoader(BaseSvnLoader):
         """Build the swh revision dictionary.
 
         This adds:
-        - the 'synthetic' flag to true
-        - the 'extra_headers' containing the repository's uuid and the
+
+        - the `'synthetic`' flag to true
+        - the '`extra_headers`' containing the repository's uuid and the
           svn revision number.
 
         Args:
@@ -396,10 +401,10 @@ class SWHSvnLoader(BaseSvnLoader):
         """Function to determine from where to start from.
 
         Args:
-            - partial_swh_revision: A known revision from which
-            the previous loading did not finish.
-            - known_previous_revision: A known revision from which the
-            previous loading did finish.
+            partial_swh_revision: A known revision from which
+                the previous loading did not finish.
+            known_previous_revision: A known revision from which the
+                previous loading did finish.
 
         Returns:
             The revision from which to start or None if nothing (fresh
@@ -457,7 +462,7 @@ class SWHSvnLoader(BaseSvnLoader):
                 msg = 'History of svn %s@%s history modified. Skipping...' % (
                     svnrepo.remote_url, revision_start)
                 self.log.warn(msg)
-                raise SvnLoaderHistoryAltered
+                raise SvnLoaderHistoryAltered(msg, *self.args)
             else:
                 # now we know history is ok, we start at next revision
                 revision_start = revision_start + 1
@@ -471,9 +476,10 @@ class SWHSvnLoader(BaseSvnLoader):
             revision_start, revision_end))
 
         if revision_start > revision_end and revision_start is not 1:
-            self.log.info('%s@%s already injected.' % (
-                svnrepo.remote_url, revision_end))
-            raise SvnLoaderUneventful
+            msg = '%s@%s already injected.' % (svnrepo.remote_url,
+                                               revision_end)
+            self.log.info(msg)
+            raise SvnLoaderUneventful(msg, *self.args)
 
         self.log.info('Processing %s.' % svnrepo)
 

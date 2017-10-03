@@ -1,8 +1,12 @@
-swh-loader-svn (0.0.26-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.27-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.27
+  * d/control: Bump dependency to latest swh.loader.core
+  * swh.loader.svn: Add args to raised exception in edge cases
+  * swh-hashtree: Fix no longer existing swh.core.hashutil import
+  * docs/: add sphinx apidoc generation skeleton
 
- -- Nicolas Dandrimont <nicolas@dandrimont.eu>  Mon, 12 Jun 2017 18:25:40 +0200
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Tue, 03 Oct 2017 19:01:26 +0200
 
 swh-loader-svn (0.0.26-1~swh1) unstable-swh; urgency=medium
 

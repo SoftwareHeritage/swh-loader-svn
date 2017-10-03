@@ -32,11 +32,13 @@ class SvnLoaderEventful(ValueError):
 
 
 class SvnLoaderUneventful(ValueError):
-    pass
+    def __init__(self, e, *args):
+        super().__init__(e, *args)
 
 
 class SvnLoaderHistoryAltered(ValueError):
-    pass
+    def __init__(self, e, *args):
+        super().__init__(e, *args)
 
 
 class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
@@ -238,6 +240,8 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         self.maybe_load_occurrences([occ])
 
     def prepare(self, *args, **kwargs):
+        self.args = args
+
         destination_path = kwargs['destination_path']
         # local svn url
         svn_url = kwargs['svn_url']
@@ -320,9 +324,6 @@ class SWHSvnLoader(BaseSvnLoader):
         uuid).
 
     """
-    def __init__(self):
-        super().__init__()
-
     def cleanup(self):
         """Clean after oneself.
 
@@ -461,7 +462,7 @@ class SWHSvnLoader(BaseSvnLoader):
                 msg = 'History of svn %s@%s history modified. Skipping...' % (
                     svnrepo.remote_url, revision_start)
                 self.log.warn(msg)
-                raise SvnLoaderHistoryAltered
+                raise SvnLoaderHistoryAltered(msg, *self.args)
             else:
                 # now we know history is ok, we start at next revision
                 revision_start = revision_start + 1
@@ -475,9 +476,10 @@ class SWHSvnLoader(BaseSvnLoader):
             revision_start, revision_end))
 
         if revision_start > revision_end and revision_start is not 1:
-            self.log.info('%s@%s already injected.' % (
-                svnrepo.remote_url, revision_end))
-            raise SvnLoaderUneventful
+            msg = '%s@%s already injected.' % (svnrepo.remote_url,
+                                               revision_end)
+            self.log.info(msg)
+            raise SvnLoaderUneventful(msg, *self.args)
 
         self.log.info('Processing %s.' % svnrepo)
 

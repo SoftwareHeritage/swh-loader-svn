@@ -224,6 +224,7 @@ class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestSvnLoader):
         """
         # when
         with self.assertRaises(SvnLoaderUneventful):
+            self.loader.args = (self.origin_visit,)
             self.loader.process_repository(self.origin_visit)
 
         # then
@@ -249,12 +250,13 @@ class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestSvnLoader):
 
     @istest
     def process_repository(self):
-        """Process a known repository with swh policy and history altered should
-        stop and do nothing.
+        """Process a known repository with swh policy and history altered
+        should stop and do nothing.
 
         """
         # when
         with self.assertRaises(SvnLoaderHistoryAltered):
+            self.loader.args = (self.origin_visit,)
             self.loader.process_repository(self.origin_visit)
 
         # then

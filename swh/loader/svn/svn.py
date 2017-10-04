@@ -340,6 +340,8 @@ class SWHSvnRepo(BaseSvnRepo):
             The transformed message as bytes.
 
         """
+        if isinstance(msg, bytes):
+            return msg
         return msg.encode('utf-8')
 
     def convert_commit_date(self, date):

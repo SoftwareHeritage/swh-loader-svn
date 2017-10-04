@@ -62,7 +62,9 @@ def svn_author_to_swh_person(author):
     if not author:
         return {'fullname': b'', 'name': None, 'email': None}
 
-    author = author.encode('utf-8')
+    if isinstance(author, str):
+        author = author.encode('utf-8')
+
     if b'<' in author and b'>' in author:
         name, email = utils.parseaddr(author.decode('utf-8'))
         return {

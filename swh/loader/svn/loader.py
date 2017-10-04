@@ -13,12 +13,12 @@ import os
 import shutil
 
 from swh.core import utils
-from swh.model import git, hashutil
+from swh.model import git, hashutil, from_disk
 from swh.model.git import GitType
 
 from swh.loader.core.loader import SWHLoader
 from . import svn, converters
-from .utils import hashtree, init_svn_repo_from_archive_dump
+from .utils import init_svn_repo_from_archive_dump
 
 
 class SvnLoaderEventful(ValueError):
@@ -337,7 +337,7 @@ class SWHSvnLoader(BaseSvnLoader):
 
         """
         local_dirname, local_url = self.svnrepo.export_temporary(revision)
-        h = hashtree(local_url)['sha1_git']
+        h = from_disk.Directory.from_disk(path=local_url).hash
         self.svnrepo.clean_fs(local_dirname)
         return h
 

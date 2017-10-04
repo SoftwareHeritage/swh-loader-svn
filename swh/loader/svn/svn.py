@@ -212,7 +212,7 @@ class BaseSvnRepo():
         local_url = os.path.join(local_dirname, local_name)
         self.client.export(
             self.remote_url, to=local_url, rev=revision, ignore_keywords=True)
-        return local_dirname, local_url
+        return local_dirname, os.fsencode(local_url)
 
     def swh_previous_revision(self, previous_swh_revision=None):
         """Look for possible existing revision in swh.

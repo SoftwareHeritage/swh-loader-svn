@@ -15,48 +15,8 @@ import tempfile
 from subvertpy import delta, properties
 from subvertpy.ra import RemoteAccess, Auth, get_username_provider
 
-from swh.model import git, hashutil
-
-
-def compute_svn_link_metadata(linkpath, filetype, data):
-    """Given a svn linkpath (raw file with format 'link <src-link>'),
-    compute the git metadata.
-
-    Args:
-        linkpath: absolute pathname of the svn link
-        filetype: the file's type according to svn, should only be 'link'
-        data: the link's content a.k.a the link's source file
-
-    Returns:
-        dict: a dictionary with the following keys:
-
-          - data: link's content
-          - length: link's content length
-          - name: basename of the link
-          - perms: git permission for link
-          - type: git type for link
-          - path: absolute path to the link on filesystem
-
-    Raises:
-        ValueError if the filetype does not match 'link'.
-
-    """
-    if filetype != b'link':
-        raise ValueError(
-            'Do not deal with other type (%s) than link.' % (
-                linkpath, type))
-
-    link_metadata = hashutil.hash_data(data)
-    link_metadata.update({
-        'data': data,
-        'length': len(data),
-        'name': os.path.basename(linkpath),
-        'perms': git.GitPerm.LINK,
-        'type': git.GitType.BLOB,
-        'path': linkpath
-    })
-
-    return link_metadata
+from swh.model import hashutil
+from swh.model.from_disk import Content, Directory
 
 
 def apply_txdelta_handler(sbuf, target_stream):
@@ -87,10 +47,10 @@ class SWHFileEditor:
     """File Editor in charge of updating file on disk and memory objects.
 
     """
-    __slots__ = ['objects', 'path', 'fullpath', 'executable', 'link']
+    __slots__ = ['directory', 'path', 'fullpath', 'executable', 'link']
 
-    def __init__(self, objects, rootpath, path):
-        self.objects = objects
+    def __init__(self, directory, rootpath, path):
+        self.directory = directory
         self.path = path
         # default value: 0, 1: set the flag, 2: remove the exec flag
         self.executable = 0
@@ -166,12 +126,6 @@ class SWHFileEditor:
         """
         if self.link:
             filetype, source_link = self.__make_symlink()
-            self.objects[self.path] = {
-                'checksums': compute_svn_link_metadata(self.fullpath,
-                                                       filetype=filetype,
-                                                       data=source_link)
-            }
-            return
 
         if self.executable == 1:
             os.chmod(self.fullpath, 0o755)
@@ -179,16 +133,8 @@ class SWHFileEditor:
             os.chmod(self.fullpath, 0o644)
 
         # And now compute file's checksums
-        self.objects[self.path] = {
-            'checksums': git.compute_blob_metadata(self.fullpath)
-        }
-
-
-def default_dictionary():
-    """Default dictionary.
-
-    """
-    return dict(checksums=None, children=set())
+        self.directory[self.path] = Content.from_file(path=self.fullpath,
+                                                      data=True)
 
 
 class BaseDirSWHEditor:
@@ -196,9 +142,6 @@ class BaseDirSWHEditor:
 
     see :class:`SWHDirEditor` for an implementation that hashes every
     directory encountered.
-
-    cf. :class:`SWHDirEditorNoEmptyFolder` for an implementation that
-    deletes empty folder
 
     Instantiate a new class inheriting from this class and define the following
     functions::
@@ -213,26 +156,13 @@ class BaseDirSWHEditor:
             # Add a new one.
 
     """
-    __slots__ = ['objects', 'rootpath', 'path']
+    __slots__ = ['directory', 'rootpath']
 
-    def __init__(self, objects, rootpath, path):
-        self.objects = objects
+    def __init__(self, directory, rootpath):
+        self.directory = directory
         self.rootpath = rootpath
-        self.path = path
         # build directory on init
-        os.makedirs(os.path.join(rootpath, path), exist_ok=True)
-
-    def add_child(self, path):
-        """Add a children path to the actual objects for the current directory
-        seen as the parent.
-
-        Args:
-            path: The child to add
-
-        """
-        d = self.objects.get(self.path, default_dictionary())
-        d['children'].add(path)
-        self.objects[self.path] = d
+        os.makedirs(rootpath, exist_ok=True)
 
     def remove_child(self, path):
         """Remove a path from the current objects.
@@ -246,24 +176,20 @@ class BaseDirSWHEditor:
             path: to remove from the current objects.
 
         """
-        entry_removed = self.objects.pop(path, None)
+
+        try:
+            entry_removed = self.directory[path]
+        except KeyError:
+            entry_removed = None
+        else:
+            del self.directory[path]
+
         fpath = os.path.join(self.rootpath, path)
         if entry_removed:
-            if 'children' in entry_removed:  # dir
-                for child_path in entry_removed['children']:
-                    self.remove_child(child_path)
-
-            parent = os.path.dirname(path)
-            if parent and parent in self.objects:
-                self.objects[parent]['children'].discard(path)
-
-        if os.path.lexists(fpath):  # we want to catch broken symlink too
-            if os.path.isfile(fpath):
-                os.remove(fpath)
-            elif os.path.islink(fpath):
-                os.remove(fpath)
-            else:
+            if isinstance(entry_removed, Directory):
                 shutil.rmtree(fpath)
+            else:
+                os.remove(fpath)
 
     def update_checksum(self):
         raise NotImplementedError('This should be implemented.')
@@ -278,17 +204,17 @@ class BaseDirSWHEditor:
         """Updating existing file.
 
         """
-        path = args[0].encode('utf-8')
-        self.add_child(path)
-        return SWHFileEditor(self.objects, rootpath=self.rootpath, path=path)
+        path = os.fsencode(args[0])
+        self.directory[path] = Content()
+        return SWHFileEditor(self.directory, rootpath=self.rootpath, path=path)
 
     def add_file(self, path, copyfrom_path=None, copyfrom_rev=-1):
         """Creating a new file.
 
         """
-        path = path.encode('utf-8')
-        self.add_child(path)
-        return SWHFileEditor(self.objects, rootpath=self.rootpath, path=path)
+        path = os.fsencode(path)
+        self.directory[path] = Content()
+        return SWHFileEditor(self.directory, self.rootpath, path)
 
     def change_prop(self, key, value):
         """Change property callback on directory.
@@ -325,37 +251,35 @@ class SWHDirEditor(BaseDirSWHEditor):
         been completely 'walked'.
 
         """
-        d = self.objects.get(self.path, default_dictionary())
-        # Retrieve the list of the current folder's children objects
-        ls_hashes = list(git.children_hashes(d['children'],
-                                             objects=self.objects))
-        d['checksums'] = git._compute_tree_metadata(self.path, ls_hashes)
-        self.objects[self.path] = d
+        pass
 
     def open_directory(self, *args):
         """Updating existing directory.
 
         """
-        path = args[0].encode('utf-8')
-        self.add_child(path)
-        return SWHDirEditor(self.objects, self.rootpath, path=path)
+        return self
 
     def add_directory(self, path, copyfrom_path=None, copyfrom_rev=-1):
         """Adding a new directory.
 
         """
-        path = path.encode('utf-8')
-        self.add_child(path)
-        return SWHDirEditor(self.objects, rootpath=self.rootpath, path=path)
+        path = os.fsencode(path)
+        os.makedirs(os.path.join(self.rootpath, path))
+        self.directory[path] = Directory()
+        return self
 
 
-class BaseSWHEditor:
-    """SWH Base class editor in charge of receiving events.
+class SWHEditor:
+    """SWH Editor in charge of replaying svn events and computing objects
+    along.
+
+    This implementation accounts for empty folder during hash
+    computations.
 
     """
-    def __init__(self, rootpath, objects):
+    def __init__(self, rootpath, directory):
         self.rootpath = rootpath
-        self.objects = objects
+        self.directory = directory
 
     def set_target_revision(self, revnum):
         pass
@@ -367,76 +291,32 @@ class BaseSWHEditor:
         pass
 
     def open_root(self, base_revnum):
-        raise NotImplementedError('Instantiate an swh dir editor of your '
-                                  ' choice depending of the hash computation '
-                                  ' policy you want')
+        return SWHDirEditor(self.directory, rootpath=self.rootpath)
 
 
-class SWHEditor(BaseSWHEditor):
-    """SWH Editor in charge of replaying svn events and computing objects
-    along.
-
-    This implementation accounts for empty folder during hash
-    computations.
-
+class SWHReplay:
+    """Replay class.
     """
-    def open_root(self, base_revnum):
-        return SWHDirEditor(self.objects, rootpath=self.rootpath, path=b'')
+    def __init__(self, conn, rootpath, directory=None):
+        self.conn = conn
+        self.rootpath = rootpath
+        if directory is None:
+            directory = Directory()
+        self.directory = directory
+        self.editor = SWHEditor(rootpath=rootpath, directory=directory)
 
-
-class BaseSWHReplay:
-    """Base replay class.
-    Their role is to compute objects for a particular revision.
-
-    This class is intended to be inherited to:
-
-    - initialize the editor (global loading policy depends on this editor)
-    - override the compute_hashes function in charge of computing
-      hashes between rev and rev+1
-
-    cf. :class:`SWHReplayNoEmptyFolder` and :class:`SWHReplay` for
-    instanciated classes.
-
-    """
     def replay(self, rev):
         """Replay svn actions between rev and rev+1.
 
-        This method updates in place the self.editor.objects's reference. This
-        also updates in place the filesystem.
+        This method updates in place the self.editor.directory, as well as the
+        filesystem.
 
         Returns:
-           The updated objects
+           The updated root directory
 
         """
         self.conn.replay(rev, rev+1, self.editor)
-        return self.editor.objects
-
-    def compute_hashes(self, rev):
-        """Compute hashes at revisions rev.
-        Expects the objects to be at previous revision's objects.
-
-        Args:
-            rev: The revision to start the replay from.
-
-        Returns:
-            The updated objects between rev and rev+1. Beware that this mutates
-            the filesystem at rootpath accordingly.
-
-        """
-        raise NotImplementedError('This should be overridden by subclass')
-
-
-class SWHReplay(BaseSWHReplay):
-    """Replay class.
-
-    All folders and files are considered for hash computations.
-
-    """
-    def __init__(self, conn, rootpath, objects=None):
-        self.conn = conn
-        self.rootpath = rootpath
-        self.editor = SWHEditor(rootpath=rootpath,
-                                objects=objects if objects else {})
+        return self.editor.directory
 
     def compute_hashes(self, rev):
         """Compute hashes at revisions rev.
@@ -450,7 +330,8 @@ class SWHReplay(BaseSWHReplay):
             mutates the filesystem at rootpath accordingly.
 
         """
-        return self.replay(rev)
+        self.replay(rev)
+        return self.directory.collect()
 
 
 @click.command()
@@ -478,7 +359,7 @@ def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
     rootpath = tempfile.mkdtemp(prefix=local_url,
                                 suffix='-'+os.path.basename(svn_url))
 
-    rootpath = rootpath.encode('utf-8')
+    rootpath = os.fsencode(rootpath)
 
     # Do not go beyond the repository's latest revision
     revision_end_max = conn.get_latest_revnum()
@@ -492,8 +373,12 @@ def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
 
         for rev in range(revision_start, revision_end+1):
             objects = replay.compute_hashes(rev)
-            print('r%s %s' % (rev, hashutil.hash_to_hex(
-                objects[b'']['checksums']['sha1_git'])))
+            print("r%s %s (%s new contents, %s new directories)" % (
+                rev,
+                hashutil.hash_to_hex(replay.directory.hash),
+                len(objects.get('content', {})),
+                len(objects.get('directory', {})),
+            ))
 
         if debug:
             print('%s' % rootpath.decode('utf-8'))

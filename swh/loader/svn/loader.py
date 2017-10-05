@@ -13,12 +13,17 @@ import os
 import shutil
 
 from swh.core import utils
-from swh.model import git, hashutil, from_disk
-from swh.model.git import GitType
+from swh.model import hashutil
+from swh.model.from_disk import Directory
+from swh.model.identifiers import identifier_to_bytes, revision_identifier
 
 from swh.loader.core.loader import SWHLoader
 from . import svn, converters
 from .utils import init_svn_repo_from_archive_dump
+
+
+def _revision_id(revision):
+    return identifier_to_bytes(revision_identifier(revision))
 
 
 class SvnLoaderEventful(ValueError):
@@ -152,21 +157,19 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
             revision_end)
         swh_revision = None
         count = 0
-        for rev, nextrev, commit, objects_per_path in gen_revs:
+        for rev, nextrev, commit, new_objects, root_directory in gen_revs:
             count += 1
             # Send the associated contents/directories
-            self.maybe_load_contents(
-                git.objects_per_type(GitType.BLOB, objects_per_path))
+            self.maybe_load_contents(new_objects.get('content', {}).values())
             self.maybe_load_directories(
-                git.objects_per_type(GitType.TREE, objects_per_path))
+                new_objects.get('directory', {}).values())
 
             # compute the fs tree's checksums
-            dir_id = objects_per_path[b'']['checksums']['sha1_git']
+            dir_id = root_directory.hash
             swh_revision = self.build_swh_revision(
                 rev, commit, dir_id, revision_parents[rev])
 
-            swh_revision['id'] = git.compute_revision_sha1_git(
-                swh_revision)
+            swh_revision['id'] = _revision_id(swh_revision)
 
             self.log.debug('rev: %s, swhrev: %s, dir: %s' % (
                 rev,
@@ -337,7 +340,7 @@ class SWHSvnLoader(BaseSvnLoader):
 
         """
         local_dirname, local_url = self.svnrepo.export_temporary(revision)
-        h = from_disk.Directory.from_disk(path=local_url).hash
+        h = Directory.from_disk(path=local_url).hash
         self.svnrepo.clean_fs(local_dirname)
         return h
 
@@ -361,14 +364,14 @@ class SWHSvnLoader(BaseSvnLoader):
         hash_data_per_revs = svnrepo.swh_hash_data_at_revision(revision_start)
 
         rev = revision_start
-        rev, _, commit, objects_per_path = list(hash_data_per_revs)[0]
+        rev, _, commit, _, root_dir = list(hash_data_per_revs)[0]
 
-        dir_id = objects_per_path[b'']['checksums']['sha1_git']
+        dir_id = root_dir.hash
         swh_revision = self.build_swh_revision(rev,
                                                commit,
                                                dir_id,
                                                parents)
-        swh_revision_id = git.compute_revision_sha1_git(swh_revision)
+        swh_revision_id = _revision_id(swh_revision)
 
         return swh_revision_id == revision_id
 

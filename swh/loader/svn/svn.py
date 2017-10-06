@@ -16,9 +16,9 @@ import shutil
 from subvertpy.ra import RemoteAccess, Auth, get_username_provider
 from subvertpy import client, properties
 
-from swh.model import git
+from swh.model.from_disk import Directory
 
-from . import ra, utils, converters
+from . import ra, converters
 
 # When log message contains empty data
 DEFAULT_AUTHOR_MESSAGE = ''
@@ -212,7 +212,7 @@ class BaseSvnRepo():
         local_url = os.path.join(local_dirname, local_name)
         self.client.export(
             self.remote_url, to=local_url, rev=revision, ignore_keywords=True)
-        return local_dirname, local_url
+        return local_dirname, os.fsencode(local_url)
 
     def swh_previous_revision(self, previous_swh_revision=None):
         """Look for possible existing revision in swh.
@@ -261,17 +261,16 @@ class BaseSvnRepo():
             - objects_per_path: dictionary of path, swh hash data with type
 
         """
-        hashes = {}
         for commit in self.logs(start_revision, end_revision):
             rev = commit['rev']
-            hashes = self.swhreplay.compute_hashes(rev)
+            objects = self.swhreplay.compute_hashes(rev)
 
             if rev == end_revision:
                 nextrev = None
             else:
                 nextrev = rev + 1
 
-            yield rev, nextrev, commit, hashes
+            yield rev, nextrev, commit, objects, self.swhreplay.directory
 
     def swh_hash_data_at_revision(self, revision):
         """Compute the hash data at revision.
@@ -282,22 +281,19 @@ class BaseSvnRepo():
         # Update the disk at revision
         self.export(revision)
         # Compute the current hashes on disk
-        hashes = git.compute_hashes_from_directory(self.local_url)
-
-        hashes = utils.convert_hashes_with_relative_path(
-            hashes,
-            rootpath=self.local_url)
+        directory = Directory.from_disk(path=os.fsencode(self.local_url),
+                                        save_path=True)
 
         # Update the replay collaborator with the right state
         self.swhreplay = ra.SWHReplay(
             conn=self.conn,
             rootpath=self.local_url,
-            objects=hashes)
+            directory=directory)
 
         # Retrieve the commit information for revision
         commit = list(self.logs(revision, revision))[0]
 
-        yield revision, revision + 1, commit, hashes
+        yield revision, revision + 1, commit, {}, directory
 
     def clean_fs(self, local_dirname=None):
         """Clean up the local working copy.
@@ -340,6 +336,8 @@ class SWHSvnRepo(BaseSvnRepo):
             The transformed message as bytes.
 
         """
+        if isinstance(msg, bytes):
+            return msg
         return msg.encode('utf-8')
 
     def convert_commit_date(self, date):

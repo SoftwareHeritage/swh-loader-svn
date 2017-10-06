@@ -9,10 +9,13 @@ import subprocess
 import tempfile
 import unittest
 
+from nose.plugins.attrib import attr
+
 
 PATH_TO_DATA = '../../../../..'
 
 
+@attr('fs')
 class BaseTestSvnLoader(unittest.TestCase):
     """Base test loader class.
 

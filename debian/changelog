@@ -1,8 +1,11 @@
-swh-loader-svn (0.0.28-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.29-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.29
+  * swh.loader.svn.loader: Fix missing revision id key (which can lead
+  * to an empty partial visit for example in the case of a repository
+  * holding an svn:externals property).
 
- -- Nicolas Dandrimont <nicolas@dandrimont.eu>  Fri, 06 Oct 2017 17:18:57 +0200
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Mon, 09 Oct 2017 16:02:23 +0200
 
 swh-loader-svn (0.0.28-1~swh1) unstable-swh; urgency=medium
 

@@ -6,7 +6,7 @@
 from nose.tools import istest
 
 from swh.model import hashutil
-from swh.loader.svn.loader import SWHSvnLoader
+from swh.loader.svn.loader import SWHSvnLoader, SvnLoaderEventful
 from swh.loader.svn.loader import SvnLoaderHistoryAltered, SvnLoaderUneventful
 
 from test_base import BaseTestSvnLoader
@@ -25,13 +25,6 @@ class TestSvnLoader:
     """
     def __init__(self):
         super().__init__()
-        # We don't want to persist any result in this test context
-        self.config['send_contents'] = False
-        self.config['send_directories'] = False
-        self.config['send_revisions'] = False
-        self.config['send_releases'] = False
-        self.config['send_occurrences'] = False
-        # Init the state
         self.all_contents = []
         self.all_directories = []
         self.all_revisions = []
@@ -39,22 +32,44 @@ class TestSvnLoader:
         self.all_occurrences = []
         # Check at each svn revision that the hash tree computation
         # does not diverge
-        self.check_revision = 1
+        self.check_revision = 10
+        # typed data
+        self.objects = {
+            'content': self.all_contents,
+            'directory': self.all_directories,
+            'revision': self.all_revisions,
+            'release': self.all_releases,
+            'occurrence': self.all_occurrences,
+        }
+
+    def _add(self, type, l):
+        """Add without duplicates and keeping the insertion order.
+
+        Args:
+            type (str): Type of objects concerned by the action
+            l ([object]): List of 'type' object
+
+        """
+        col = self.objects[type]
+        for o in l:
+            if o in col:
+                continue
+            col.extend([o])
 
     def maybe_load_contents(self, all_contents):
-        self.all_contents.extend(all_contents)
+        self._add('content', all_contents)
 
     def maybe_load_directories(self, all_directories):
-        self.all_directories.extend(all_directories)
+        self._add('directory', all_directories)
 
     def maybe_load_revisions(self, all_revisions):
-        self.all_revisions.extend(all_revisions)
+        self._add('revision', all_revisions)
 
     def maybe_load_releases(self, releases):
         raise ValueError('If called, the test must break.')
 
     def maybe_load_occurrences(self, all_occurrences):
-        self.all_occurrences.extend(all_occurrences)
+        self._add('occurrence', all_occurrences)
 
     # Override to do nothing at the end
     def close_failure(self):
@@ -613,6 +628,81 @@ class SWHSvnLoaderUpdateAndTestCornerCasesAboutEolITTest(BaseTestSvnLoader):
             'ffa901b69ca0f46a2261f42948838d19709cb9f8': 'c3c98df624733fef4e592bef983f93e2ed02b179',  # noqa
             last_revision:                              '844d4646d6c2b4f3a3b2b22ab0ee38c7df07bab2',  # noqa
         }
+
+        for rev in self.loader.all_revisions:
+            rev_id = hashutil.hash_to_hex(rev['id'])
+            directory_id = hashutil.hash_to_hex(rev['directory'])
+
+            self.assertEquals(expected_revisions[rev_id], directory_id)
+
+
+class SWHSvnLoaderExternalIdCornerCaseITTest(BaseTestSvnLoader):
+    def setUp(self):
+        super().setUp(archive_name='pkg-gourmet-with-external-id.tgz')
+
+        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
+
+        self.origin_visit = {
+            'origin': self.origin['id'],
+            'visit': 1,
+        }
+
+        self.loader = SWHSvnLoaderNoStorage()
+        # override revision-block size
+        self.loader.config['revision_packet_size'] = 3
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
+
+    @istest
+    def process_repository(self):
+        """Repository with svn:externals propery, will stop raising an error
+
+        """
+        previous_unfinished_revision = None
+
+        # when
+        with self.assertRaises(SvnLoaderEventful) as exc:
+            self.loader.process_repository(
+                self.origin_visit,
+                last_known_swh_revision=previous_unfinished_revision)
+
+        actual_raised_revision = exc.exception.swh_revision
+
+        # then repositories holds 21 revisions, but the last commit
+        # one holds an 'svn:externals' property which will make the
+        # loader-svn stops. This will then stop at the 6th iterations
+        # of 3-revision block size, so only 18 revisions will be
+        # flushed
+        self.assertEquals(len(self.loader.all_revisions), 18)
+        self.assertEquals(len(self.loader.all_releases), 0)
+
+        last_revision = 'ffa901b69ca0f46a2261f42948838d19709cb9f8'
+
+        expected_revisions = {
+            # revision hash | directory hash
+            '0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71': '669a71cce6c424a81ba42b7dc5d560d32252f0ca',  # noqa
+            '95edacc8848369d6fb1608e887d6d2474fd5224f': '008ac97a1118560797c50e3392fa1443acdaa349',  # noqa
+            'fef26ea45a520071711ba2b9d16a2985ee837021': '3780effbe846a26751a95a8c95c511fb72be15b4',  # noqa
+            '3f51abf3b3d466571be0855dfa67e094f9ceff1b': 'ffcca9b09c5827a6b8137322d4339c8055c3ee1e',  # noqa
+            'a3a577948fdbda9d1061913b77a1588695eadb41': '7dc52cc04c3b8bd7c085900d60c159f7b846f866',  # noqa
+            '4876cb10aec6f708f7466dddf547567b65f6c39c': '0deab3023ac59398ae467fc4bff5583008af1ee2',  # noqa
+            '7f5bc909c29d4e93d8ccfdda516e51ed44930ee1': '752c52134dcbf2fff13c7be1ce4e9e5dbf428a59',  # noqa
+            '38d81702cb28db4f1a6821e64321e5825d1f7fd6': '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
+            '99c27ebbd43feca179ac0e895af131d8314cafe1': '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
+            '902f29b4323a9b9de3af6d28e72dd581e76d9397': 'c4e12483f0a13e6851459295a4ae735eb4e4b5c4',  # noqa
+            '171dc35522bfd17dda4e90a542a0377fb2fc707a': 'fd24a76c87a3207428e06612b49860fc78e9f6dc',  # noqa
+            '027e8769f4786597436ab94a91f85527d04a6cbb': '2d9ca72c6afec6284fb01e459588cbb007017c8c',  # noqa
+            '4474d96018877742d9697d5c76666c9693353bfc': 'ab111577e0ab39e4a157c476072af48f2641d93f',  # noqa
+            '97ad21eab92961e2a22ca0285f09c6d1e9a7ffbc': 'ab111577e0ab39e4a157c476072af48f2641d93f',  # noqa
+            'd04ea8afcee6205cc8384c091bfc578931c169fd': 'b0a648b02e55a4dce356ac35187a058f89694ec7',  # noqa
+            'ded78810401fd354ffe894aa4a1e5c7d30a645d1': 'b0a648b02e55a4dce356ac35187a058f89694ec7',  # noqa
+            '4ee95e39358712f53c4fc720da3fafee9249ed19': 'c3c98df624733fef4e592bef983f93e2ed02b179',  # noqa
+            last_revision                             : 'c3c98df624733fef4e592bef983f93e2ed02b179',  # noqa
+        }
+
+        # The last revision being the one used later to start back from
+        self.assertEquals(hashutil.hash_to_hex(actual_raised_revision['id']),
+                          last_revision)
 
         for rev in self.loader.all_revisions:
             rev_id = hashutil.hash_to_hex(rev['id'])

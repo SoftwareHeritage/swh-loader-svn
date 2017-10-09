@@ -19,7 +19,7 @@ setup(
     author='Software Heritage developers',
     author_email='swh-devel@inria.fr',
     url='https://forge.softwareheritage.org/diffusion/DLDSVN',
-    packages=['swh.loader.svn'],  # packages's modules
+    packages=['swh.loader.svn', 'swh.loader.svn.tests'],  # packages's modules
     scripts=[],   # scripts to package
     install_requires=parse_requirements(),
     setup_requires=['vcversioner'],

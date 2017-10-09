@@ -225,9 +225,14 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
                 self.maybe_load_revisions(revs)
                 # Take the last one as the last known revisions
                 known_swh_rev = revs[-1]
+
+                _id = known_swh_rev.get('id')
+                if not _id:
+                    _id = _revision_id(known_swh_rev)
+
                 # Then notify something is wrong, and we stopped at that rev.
                 raise SvnLoaderEventful(e, swh_revision={
-                    'id': known_swh_rev['id'],
+                    'id': _id,
                 })
             raise e
 

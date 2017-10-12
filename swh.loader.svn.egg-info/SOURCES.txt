@@ -31,11 +31,13 @@ docs/_templates/.placeholder
 install/install-pysvn.sh
 install/install-subvertpy.sh
 resources/svn.ini
+swh/__init__.py
 swh.loader.svn.egg-info/PKG-INFO
 swh.loader.svn.egg-info/SOURCES.txt
 swh.loader.svn.egg-info/dependency_links.txt
 swh.loader.svn.egg-info/requires.txt
 swh.loader.svn.egg-info/top_level.txt
+swh/loader/__init__.py
 swh/loader/svn/__init__.py
 swh/loader/svn/converters.py
 swh/loader/svn/loader.py

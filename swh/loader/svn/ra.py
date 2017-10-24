@@ -264,7 +264,7 @@ class SWHDirEditor(BaseDirSWHEditor):
 
         """
         path = os.fsencode(path)
-        os.makedirs(os.path.join(self.rootpath, path))
+        os.makedirs(os.path.join(self.rootpath, path), exist_ok=True)
         self.directory[path] = Directory()
         return self
 

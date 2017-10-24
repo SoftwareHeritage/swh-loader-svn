@@ -282,8 +282,6 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
 
         self.svnrepo = self.get_svn_repo(svn_url, destination_path, origin)
 
-        self.fetch_history_id = self.open_fetch_history()
-
     def get_origin(self):
         """Retrieve the origin we are working with.
 

@@ -74,6 +74,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
     def __init__(self):
         super().__init__(logging_class='swh.loader.svn.SvnLoader')
         self.check_revision = self.config['check_revision']
+        self.origin_id = None
 
     @abc.abstractmethod
     def swh_revision_hash_tree_at_svn_revision(self, revision):
@@ -246,6 +247,14 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
             revision['id'], origin_visit['origin'], origin_visit['visit'])
         self.log.debug('occ: %s' % occ)
         self.maybe_load_occurrences([occ])
+
+    def send_origin(self, origin):
+        """Inhibit multiple calls to send_origin.
+
+        """
+        if self.origin_id:
+            return self.origin_id
+        return super().send_origin(origin)
 
     def prepare(self, *args, **kwargs):
         self.args = args

@@ -317,8 +317,6 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         except SvnLoaderHistoryAltered as e:
             self.log.error('History altered. Detail: %s' % e)
             raise
-        except Exception as e:
-            raise
         else:
             self.process_swh_occurrence(latest_rev, origin_visit)
 

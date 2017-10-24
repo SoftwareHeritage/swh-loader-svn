@@ -1,8 +1,16 @@
-swh-loader-svn (0.0.30-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.31-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.31
+  * swh.loader.svn.ra: Fix blank space in symlink path split problem
+  * swh.loader.svn.ra: Fix missing case about existing directory
+  * swh.loader.svn.ra: Explicit the closure
+  * swh.loader.svn: Deal with origin creation inhibition in base class
+  * swh.loader.svn: Remove unneeded instruction
+  * swh.loader.svn: Fix initializing the origin multiple times
+  * swh.loader.svn: Remove unneeded except clause
+  * swh.loader.svn: uneventful visit is not an error
 
- -- Nicolas Dandrimont <nicolas@dandrimont.eu>  Thu, 12 Oct 2017 18:07:57 +0200
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Tue, 24 Oct 2017 16:35:01 +0200
 
 swh-loader-svn (0.0.30-1~swh1) unstable-swh; urgency=medium
 

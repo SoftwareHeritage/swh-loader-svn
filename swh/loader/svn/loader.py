@@ -248,14 +248,6 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         self.log.debug('occ: %s' % occ)
         self.maybe_load_occurrences([occ])
 
-    def send_origin(self, origin):
-        """Inhibit multiple calls to send_origin.
-
-        """
-        if self.origin_id:
-            return self.origin_id
-        return super().send_origin(origin)
-
     def prepare(self, *args, **kwargs):
         self.args = args
 
@@ -283,7 +275,8 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         self.svnrepo = self.get_svn_repo(svn_url, destination_path, origin)
 
     def get_origin(self):
-        """Retrieve the origin we are working with.
+        """Retrieve the origin we are working with (setup-ed in the prepare
+           method)
 
         """
         return self.origin  # set in prepare method

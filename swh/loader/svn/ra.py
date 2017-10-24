@@ -78,8 +78,11 @@ class SWHFileEditor:
                 - <path-to-src>
 
         """
+        split_byte = b' '
         with open(self.fullpath, 'rb') as f:
-            filetype, src = f.read().split(b' ')
+            data = f.read()
+            filetype, *src = data.split(split_byte)
+            src = split_byte.join(src)
 
         os.remove(self.fullpath)
         os.symlink(src=src, dst=self.fullpath)

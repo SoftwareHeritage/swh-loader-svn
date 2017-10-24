@@ -74,6 +74,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
     def __init__(self):
         super().__init__(logging_class='swh.loader.svn.SvnLoader')
         self.check_revision = self.config['check_revision']
+        self.origin_id = None
 
     @abc.abstractmethod
     def swh_revision_hash_tree_at_svn_revision(self, revision):
@@ -273,10 +274,9 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
 
         self.svnrepo = self.get_svn_repo(svn_url, destination_path, origin)
 
-        self.fetch_history_id = self.open_fetch_history()
-
     def get_origin(self):
-        """Retrieve the origin we are working with.
+        """Retrieve the origin we are working with (setup-ed in the prepare
+           method)
 
         """
         return self.origin  # set in prepare method
@@ -306,15 +306,16 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         try:
             latest_rev = self.process_repository(origin_visit,
                                                  self.last_known_swh_revision)
+        except SvnLoaderUneventful as e:
+            # Nothing needed to be done, the visit is full nonetheless
+            self.log.info('Uneventful visit. Detail: %s' % e)
         except SvnLoaderEventful as e:
             self.log.error('Eventful partial visit. Detail: %s' % e)
             latest_rev = e.swh_revision
             self.process_swh_occurrence(latest_rev, origin_visit)
             raise
-        except (SvnLoaderHistoryAltered, SvnLoaderUneventful) as e:
-            self.log.error('Uneventful visit. Detail: %s' % e)
-            raise
-        except Exception as e:
+        except SvnLoaderHistoryAltered as e:
+            self.log.error('History altered. Detail: %s' % e)
             raise
         else:
             self.process_swh_occurrence(latest_rev, origin_visit)
@@ -452,7 +453,7 @@ class SWHSvnLoader(BaseSvnLoader):
         swh_rev = self.init_from(last_known_swh_revision,
                                  previous_swh_revision=swh_rev)
 
-        if swh_rev:  # Yes, we do. Try and update it.
+        if swh_rev:  # Yes, we know a previous revision. Try and update it.
             extra_headers = dict(swh_rev['metadata']['extra_headers'])
             revision_start = int(extra_headers['svn_revision'])
             revision_parents = {
@@ -469,14 +470,13 @@ class SWHSvnLoader(BaseSvnLoader):
                     swh_rev):
                 msg = 'History of svn %s@%s history modified. Skipping...' % (
                     svnrepo.remote_url, revision_start)
-                self.log.warn(msg)
                 raise SvnLoaderHistoryAltered(msg, *self.args)
-            else:
-                # now we know history is ok, we start at next revision
-                revision_start = revision_start + 1
-                # and the parent become the latest know revision for
-                # that repository
-                revision_parents[revision_start] = [swh_rev['id']]
+
+            # now we know history is ok, we start at next revision
+            revision_start = revision_start + 1
+            # and the parent become the latest know revision for
+            # that repository
+            revision_parents[revision_start] = [swh_rev['id']]
 
         revision_end = svnrepo.head_revision()
 
@@ -486,7 +486,6 @@ class SWHSvnLoader(BaseSvnLoader):
         if revision_start > revision_end and revision_start is not 1:
             msg = '%s@%s already injected.' % (svnrepo.remote_url,
                                                revision_end)
-            self.log.info(msg)
             raise SvnLoaderUneventful(msg, *self.args)
 
         self.log.info('Processing %s.' % svnrepo)

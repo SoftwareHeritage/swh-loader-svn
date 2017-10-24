@@ -34,7 +34,7 @@ def apply_txdelta_handler(sbuf, target_stream):
         Function to be called to apply txdelta windows
 
     """
-    def apply_window(window):
+    def apply_window(window, sbuf=sbuf, target_stream=target_stream):
         if window is None:
             target_stream.close()
             return  # Last call
@@ -78,8 +78,11 @@ class SWHFileEditor:
                 - <path-to-src>
 
         """
+        split_byte = b' '
         with open(self.fullpath, 'rb') as f:
-            filetype, src = f.read().split(b' ')
+            data = f.read()
+            filetype, *src = data.split(split_byte)
+            src = split_byte.join(src)
 
         os.remove(self.fullpath)
         os.symlink(src=src, dst=self.fullpath)
@@ -264,7 +267,7 @@ class SWHDirEditor(BaseDirSWHEditor):
 
         """
         path = os.fsencode(path)
-        os.makedirs(os.path.join(self.rootpath, path))
+        os.makedirs(os.path.join(self.rootpath, path), exist_ok=True)
         self.directory[path] = Directory()
         return self
 

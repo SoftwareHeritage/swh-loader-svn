@@ -34,7 +34,7 @@ def apply_txdelta_handler(sbuf, target_stream):
         Function to be called to apply txdelta windows
 
     """
-    def apply_window(window):
+    def apply_window(window, sbuf=sbuf, target_stream=target_stream):
         if window is None:
             target_stream.close()
             return  # Last call

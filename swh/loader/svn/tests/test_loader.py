@@ -209,11 +209,7 @@ class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
             last_revision:                              '0deab3023ac59398ae467fc4bff5583008af1ee2',  # noqa
         }
 
-        for rev in self.loader.all_revisions:
-            rev_id = hashutil.hash_to_hex(rev['id'])
-            directory_id = hashutil.hash_to_hex(rev['directory'])
-
-            self.assertEquals(expected_revisions[rev_id], directory_id)
+        self.assertRevisionsOk(expected_revisions)
 
 
 class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestSvnLoader):
@@ -324,11 +320,7 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
             last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
-        for rev in self.loader.all_revisions:
-            rev_id = hashutil.hash_to_hex(rev['id'])
-            directory_id = hashutil.hash_to_hex(rev['directory'])
-
-            self.assertEquals(expected_revisions[rev_id], directory_id)
+        self.assertRevisionsOk(expected_revisions)
 
 
 class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
@@ -390,11 +382,7 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
             last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
-        for rev in self.loader.all_revisions:
-            rev_id = hashutil.hash_to_hex(rev['id'])
-            directory_id = hashutil.hash_to_hex(rev['directory'])
-
-            self.assertEquals(expected_revisions[rev_id], directory_id)
+        self.assertRevisionsOk(expected_revisions)
 
 
 class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
@@ -458,11 +446,7 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
             last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
-        for rev in self.loader.all_revisions:
-            rev_id = hashutil.hash_to_hex(rev['id'])
-            directory_id = hashutil.hash_to_hex(rev['directory'])
-
-            self.assertEquals(expected_revisions[rev_id], directory_id)
+        self.assertRevisionsOk(expected_revisions)
 
 
 class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
@@ -560,11 +544,7 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
             last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
-        for rev in self.loader.all_revisions:
-            rev_id = hashutil.hash_to_hex(rev['id'])
-            directory_id = hashutil.hash_to_hex(rev['directory'])
-
-            self.assertEquals(expected_revisions[rev_id], directory_id)
+        self.assertRevisionsOk(expected_revisions)
 
 
 class SWHSvnLoaderUpdateAndTestCornerCasesAboutEolITTest(BaseTestSvnLoader):
@@ -629,11 +609,7 @@ class SWHSvnLoaderUpdateAndTestCornerCasesAboutEolITTest(BaseTestSvnLoader):
             last_revision:                              '844d4646d6c2b4f3a3b2b22ab0ee38c7df07bab2',  # noqa
         }
 
-        for rev in self.loader.all_revisions:
-            rev_id = hashutil.hash_to_hex(rev['id'])
-            directory_id = hashutil.hash_to_hex(rev['directory'])
-
-            self.assertEquals(expected_revisions[rev_id], directory_id)
+        self.assertRevisionsOk(expected_revisions)
 
 
 class SWHSvnLoaderExternalIdCornerCaseITTest(BaseTestSvnLoader):
@@ -704,11 +680,7 @@ class SWHSvnLoaderExternalIdCornerCaseITTest(BaseTestSvnLoader):
         self.assertEquals(hashutil.hash_to_hex(actual_raised_revision['id']),
                           last_revision)
 
-        for rev in self.loader.all_revisions:
-            rev_id = hashutil.hash_to_hex(rev['id'])
-            directory_id = hashutil.hash_to_hex(rev['directory'])
-
-            self.assertEquals(expected_revisions[rev_id], directory_id)
+        self.assertRevisionsOk(expected_revisions)
 
 
 class SWHSvnLoaderLinkFileAndFolderWithSameNameITTest(BaseTestSvnLoader):
@@ -773,12 +745,7 @@ class SWHSvnLoaderLinkFileAndFolderWithSameNameITTest(BaseTestSvnLoader):
             last_revision:                              '6b1e0243768ff9ac060064b2eeade77e764ffc82',  # noqa
         }
 
-        # The last revision being the one used later to start back from
-        for rev in self.loader.all_revisions:
-            rev_id = hashutil.hash_to_hex(rev['id'])
-            directory_id = hashutil.hash_to_hex(rev['directory'])
-
-            self.assertEquals(expected_revisions[rev_id], directory_id)
+        self.assertRevisionsOk(expected_revisions)
 
 
 class SWHSvnLoaderWrongLinkCasesITTest(BaseTestSvnLoader):
@@ -845,9 +812,4 @@ class SWHSvnLoaderWrongLinkCasesITTest(BaseTestSvnLoader):
             last_revision:                              'd853d9628f6f0008d324fed27dadad00ce48bc62',  # noqa
         }
 
-        # The last revision being the one used later to start back from
-        for rev in self.loader.all_revisions:
-            rev_id = hashutil.hash_to_hex(rev['id'])
-            directory_id = hashutil.hash_to_hex(rev['directory'])
-
-            self.assertEquals(expected_revisions[rev_id], directory_id)
+        self.assertRevisionsOk(expected_revisions)

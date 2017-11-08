@@ -1,8 +1,12 @@
-swh-loader-svn (0.0.31-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.32-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.32
+  * d/control: Bump dependency to latest swh-loader-core
+  * tests: Add commits with wrong symbolic links (broken, empty space)
+  * ra: Fix not cleaned up path leading to file exists error
+  * docs: add absolute anchor to documentation index
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Tue, 24 Oct 2017 16:35:01 +0200
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 08 Nov 2017 13:22:42 +0100
 
 swh-loader-svn (0.0.31-1~swh1) unstable-swh; urgency=medium
 

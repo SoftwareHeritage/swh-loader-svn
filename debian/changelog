@@ -1,3 +1,13 @@
+swh-loader-svn (0.0.32-1~swh1) unstable-swh; urgency=medium
+
+  * v0.0.32
+  * d/control: Bump dependency to latest swh-loader-core
+  * tests: Add commits with wrong symbolic links (broken, empty space)
+  * ra: Fix not cleaned up path leading to file exists error
+  * docs: add absolute anchor to documentation index
+
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 08 Nov 2017 13:22:42 +0100
+
 swh-loader-svn (0.0.31-1~swh1) unstable-swh; urgency=medium
 
   * v0.0.31

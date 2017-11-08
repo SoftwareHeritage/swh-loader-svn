@@ -1,3 +1,5 @@
+.. _swh-loader-svn:
+
 Software Heritage - Development Documentation
 =============================================
 

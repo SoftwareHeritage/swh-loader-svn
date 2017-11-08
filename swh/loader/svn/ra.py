@@ -179,16 +179,13 @@ class BaseDirSWHEditor:
             path: to remove from the current objects.
 
         """
-
         try:
             entry_removed = self.directory[path]
         except KeyError:
             entry_removed = None
         else:
             del self.directory[path]
-
-        fpath = os.path.join(self.rootpath, path)
-        if entry_removed:
+            fpath = os.path.join(self.rootpath, path)
             if isinstance(entry_removed, Directory):
                 shutil.rmtree(fpath)
             else:

@@ -631,7 +631,7 @@ class SWHSvnLoaderExternalIdCornerCaseITTest(BaseTestSvnLoader):
 
     @istest
     def process_repository(self):
-        """Repository with svn:externals propery, will stop raising an error
+        """Repository with svn:externals property, will stop raising an error
 
         """
         previous_unfinished_revision = None

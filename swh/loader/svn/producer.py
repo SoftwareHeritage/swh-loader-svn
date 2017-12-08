@@ -102,8 +102,10 @@ def cli():
               help="To execute directly the svn loading.")
 @click.option('--dry-run/--no-dry-run', default=False, is_flag=True,
               help="Dry run flag")
+@click.option('--start-from-scratch', default=False, is_flag=True,
+              help="Start from scratch option")
 def produce_svn_to_load(url, origin_url, destination_path, visit_date,
-                        synchroneous, dry_run):
+                        synchroneous, dry_run, start_from_scratch):
     """Produce svn urls to celery queue
 
     """
@@ -126,7 +128,8 @@ def produce_svn_to_load(url, origin_url, destination_path, visit_date,
         fn(svn_url=svn_url,
            origin_url=origin_url,
            visit_date=visit_date,
-           destination_path=destination_path)
+           destination_path=destination_path,
+           start_from_scratch=start_from_scratch)
 
 
 @cli.command('svn-archive', help='Default svndump archive producer')
@@ -138,7 +141,10 @@ def produce_svn_to_load(url, origin_url, destination_path, visit_date,
               help="To execute directly the svn loading.")
 @click.option('--dry-run/--no-dry-run', default=False, is_flag=True,
               help="Dry run flag")
-def produce_archive_to_mount_and_load(path, visit_date, synchroneous, dry_run):
+@click.option('--start-from-scratch', default=False, is_flag=True,
+              help="Start from scratch option")
+def produce_archive_to_mount_and_load(path, visit_date, synchroneous, dry_run,
+                                      start_from_scratch):
     """Produce svn dumps to celery queue
 
     """
@@ -156,7 +162,8 @@ def produce_archive_to_mount_and_load(path, visit_date, synchroneous, dry_run):
 
         archive_path, origin_url, visit_date = args
 
-        fn(archive_path, origin_url, visit_date)
+        fn(archive_path, origin_url, visit_date,
+           start_from_scratch=start_from_scratch)
 
 
 @cli.command('schedule-svn-archive',

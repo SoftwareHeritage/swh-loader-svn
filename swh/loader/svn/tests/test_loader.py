@@ -323,6 +323,56 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
         self.assertRevisionsOk(expected_revisions)
 
 
+class SWHSvnLoaderUpdateWithChangesStartFromScratchITTest(BaseTestSvnLoader):
+    def setUp(self):
+        # the svn repository pkg-gourmet has been updated with changes
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
+
+        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
+
+        self.origin_visit = {
+            'origin': self.origin['id'],
+            'visit': 5,
+        }
+
+        self.loader = SWHSvnLoaderUpdateNoStorage()
+        self.loader.prepare(
+            self.svn_mirror_url, self.destination_path, self.origin)
+
+    @istest
+    def process_repository(self):
+        """Process a known repository with swh policy and new data should
+        yield new revisions and occurrence.
+
+        """
+        # when
+        self.loader.process_repository(self.origin_visit,
+                                       start_from_scratch=True)
+
+        # then
+        # we got the previous run's last revision (rev 6)
+        # but we do not inspect that as we start from from scratch so
+        # we should have all revisions so 11
+        self.assertEquals(len(self.loader.all_revisions), 11)
+        self.assertEquals(len(self.loader.all_releases), 0)
+
+        expected_revisions = {
+            '0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71': '669a71cce6c424a81ba42b7dc5d560d32252f0ca',  # noqa
+            '95edacc8848369d6fb1608e887d6d2474fd5224f': '008ac97a1118560797c50e3392fa1443acdaa349',  # noqa
+            'fef26ea45a520071711ba2b9d16a2985ee837021': '3780effbe846a26751a95a8c95c511fb72be15b4',  # noqa
+            '3f51abf3b3d466571be0855dfa67e094f9ceff1b': 'ffcca9b09c5827a6b8137322d4339c8055c3ee1e',  # noqa
+            'a3a577948fdbda9d1061913b77a1588695eadb41': '7dc52cc04c3b8bd7c085900d60c159f7b846f866',  # noqa
+            '4876cb10aec6f708f7466dddf547567b65f6c39c': '0deab3023ac59398ae467fc4bff5583008af1ee2',  # noqa
+            '7f5bc909c29d4e93d8ccfdda516e51ed44930ee1': '752c52134dcbf2fff13c7be1ce4e9e5dbf428a59',  # noqa
+            '38d81702cb28db4f1a6821e64321e5825d1f7fd6': '39c813fb4717a4864bacefbd90b51a3241ae4140',  # noqa
+            '99c27ebbd43feca179ac0e895af131d8314cafe1': '3397ca7f709639cbd36b18a0d1b70bce80018c45',  # noqa
+            '902f29b4323a9b9de3af6d28e72dd581e76d9397': 'c4e12483f0a13e6851459295a4ae735eb4e4b5c4',  # noqa
+            '171dc35522bfd17dda4e90a542a0377fb2fc707a': 'fd24a76c87a3207428e06612b49860fc78e9f6dc',  # noqa
+        }
+
+        self.assertRevisionsOk(expected_revisions)
+
+
 class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
     def setUp(self):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
@@ -631,7 +681,7 @@ class SWHSvnLoaderExternalIdCornerCaseITTest(BaseTestSvnLoader):
 
     @istest
     def process_repository(self):
-        """Repository with svn:externals propery, will stop raising an error
+        """Repository with svn:externals property, will stop raising an error
 
         """
         previous_unfinished_revision = None

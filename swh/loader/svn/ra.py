@@ -43,6 +43,38 @@ def apply_txdelta_handler(sbuf, target_stream):
     return apply_window
 
 
+def read_svn_link(data):
+    """Read the svn link's content.
+
+    Args:
+        data (bytes): svn link's raw content
+
+    Returns:
+        The tuple of (filetype, destination path)
+
+    """
+    split_byte = b' '
+    filetype, *src = data.split(split_byte)
+    src = split_byte.join(src)
+    return filetype, src
+
+
+def is_file_an_svnlink_p(fullpath):
+    """Determine if a filepath is an svnlink or something else.
+
+    Args:
+        fullpath (str/bytes): Full path to the potential symlink to check
+
+    Return:
+        boolean value to determine if it's indeed a symlink (as per
+        svn) or not.
+
+    """
+    with open(fullpath, 'rb') as f:
+        filetype, src = read_svn_link(f.read())
+        return filetype == b'link', src
+
+
 class SWHFileEditor:
     """File Editor in charge of updating file on disk and memory objects.
 
@@ -64,12 +96,17 @@ class SWHFileEditor:
             else:
                 self.executable = 1
         elif key == properties.PROP_SPECIAL:
+            # Possibly a symbolic link. We cannot check further at
+            # that moment though since patch(s) are not applied yet
             self.link = True
 
-    def __make_symlink(self):
+    def __make_symlink(self, src):
         """Convert the svnlink to a symlink on disk.
 
         This function expects self.fullpath to be a svn link.
+
+        Args:
+            src (bytes): Path to the link's source
 
         Return:
             tuple: The svnlink's data tuple:
@@ -78,15 +115,8 @@ class SWHFileEditor:
                 - <path-to-src>
 
         """
-        split_byte = b' '
-        with open(self.fullpath, 'rb') as f:
-            data = f.read()
-            filetype, *src = data.split(split_byte)
-            src = split_byte.join(src)
-
         os.remove(self.fullpath)
         os.symlink(src=src, dst=self.fullpath)
-        return filetype, src
 
     def __make_svnlink(self):
         """Convert the symlink to a svnlink on disk.
@@ -96,9 +126,9 @@ class SWHFileEditor:
 
         """
         # we replace the symlink by a svnlink
+        # to be able to patch the file on future commits
         src = os.readlink(self.fullpath)
         os.remove(self.fullpath)
-        # to be able to patch the file
         sbuf = b'link ' + src
         with open(self.fullpath, 'wb') as f:
             f.write(sbuf)
@@ -107,6 +137,9 @@ class SWHFileEditor:
     def apply_textdelta(self, base_checksum):
         if os.path.lexists(self.fullpath):
             if os.path.islink(self.fullpath):
+                # svn does not deal with symlink so we tranform into
+                # real svn symlink for potential patching in later
+                # commits
                 sbuf = self.__make_svnlink()
                 self.link = True
             else:
@@ -125,10 +158,18 @@ class SWHFileEditor:
 
         - adapt accordingly its execution flag if any
         - compute the objects' checksums
+        - replace the svnlink with a real symlink (for disk
+          computation purposes)
 
         """
         if self.link:
-            filetype, source_link = self.__make_symlink()
+            # can only check now that the link is a real one
+            # since patch has been applied
+            is_link, src = is_file_an_svnlink_p(self.fullpath)
+            if is_link:
+                self.__make_symlink(src)
+            else:  # not a real link...
+                self.link = False
 
         if self.executable == 1:
             os.chmod(self.fullpath, 0o755)

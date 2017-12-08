@@ -122,7 +122,9 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def process_repository(self, origin_visit, last_known_swh_revision=None):
+    def process_repository(self, origin_visit,
+                           last_known_swh_revision=None,
+                           start_from_scratch=False):
         """The main idea of this function is to:
 
         - iterate over the svn commit logs
@@ -256,6 +258,7 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         svn_url = kwargs['svn_url']
         origin_url = kwargs.get('origin_url')
         self.visit_date = kwargs.get('visit_date')
+        self.start_from_scratch = kwargs.get('start_from_scratch', False)
 
         origin = {
             'url': origin_url if origin_url else svn_url,
@@ -304,8 +307,10 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         """
         origin_visit = {'origin': self.origin_id, 'visit': self.visit}
         try:
-            latest_rev = self.process_repository(origin_visit,
-                                                 self.last_known_swh_revision)
+            latest_rev = self.process_repository(
+                origin_visit,
+                last_known_swh_revision=self.last_known_swh_revision,
+                start_from_scratch=self.start_from_scratch)
         except SvnLoaderUneventful as e:
             # Nothing needed to be done, the visit is full nonetheless
             self.log.info('Uneventful visit. Detail: %s' % e)
@@ -438,7 +443,8 @@ class SWHSvnLoader(BaseSvnLoader):
 
         return None
 
-    def process_repository(self, origin_visit, last_known_swh_revision=None):
+    def process_repository(self, origin_visit, last_known_swh_revision=None,
+                           start_from_scratch=False):
         svnrepo = self.svnrepo
 
         # default configuration
@@ -447,36 +453,37 @@ class SWHSvnLoader(BaseSvnLoader):
             revision_start: []
         }
 
-        # Check if we already know a previous revision for that origin
-        swh_rev = self.swh_previous_revision()
-        # Determine from which known revision to start
-        swh_rev = self.init_from(last_known_swh_revision,
-                                 previous_swh_revision=swh_rev)
+        if not start_from_scratch:
+            # Check if we already know a previous revision for that origin
+            swh_rev = self.swh_previous_revision()
+            # Determine from which known revision to start
+            swh_rev = self.init_from(last_known_swh_revision,
+                                     previous_swh_revision=swh_rev)
 
-        if swh_rev:  # Yes, we know a previous revision. Try and update it.
-            extra_headers = dict(swh_rev['metadata']['extra_headers'])
-            revision_start = int(extra_headers['svn_revision'])
-            revision_parents = {
-                revision_start: swh_rev['parents'],
-            }
+            if swh_rev:  # Yes, we know a previous revision. Try and update it.
+                extra_headers = dict(swh_rev['metadata']['extra_headers'])
+                revision_start = int(extra_headers['svn_revision'])
+                revision_parents = {
+                    revision_start: swh_rev['parents'],
+                }
 
-            self.log.debug('svn export --ignore-keywords %s@%s' % (
-                svnrepo.remote_url,
-                revision_start))
+                self.log.debug('svn export --ignore-keywords %s@%s' % (
+                    svnrepo.remote_url,
+                    revision_start))
 
-            if swh_rev and not self.check_history_not_altered(
-                    svnrepo,
-                    revision_start,
-                    swh_rev):
-                msg = 'History of svn %s@%s history modified. Skipping...' % (
-                    svnrepo.remote_url, revision_start)
-                raise SvnLoaderHistoryAltered(msg, *self.args)
+                if swh_rev and not self.check_history_not_altered(
+                        svnrepo,
+                        revision_start,
+                        swh_rev):
+                    msg = 'History of svn %s@%s history modified. Skipping...' % (  # noqa
+                        svnrepo.remote_url, revision_start)
+                    raise SvnLoaderHistoryAltered(msg, *self.args)
 
-            # now we know history is ok, we start at next revision
-            revision_start = revision_start + 1
-            # and the parent become the latest know revision for
-            # that repository
-            revision_parents[revision_start] = [swh_rev['id']]
+                # now we know history is ok, we start at next revision
+                revision_start = revision_start + 1
+                # and the parent become the latest know revision for
+                # that repository
+                revision_parents[revision_start] = [swh_rev['id']]
 
         revision_end = svnrepo.head_revision()
 

@@ -1,3 +1,11 @@
+swh-loader-svn (0.0.33-1~swh1) unstable-swh; urgency=medium
+
+  * v0.0.33
+  * swh.loader.svn: Add option to load a repository from scratch
+  * swh.loader.svn.loader: Fix special symlink case
+
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 08 Dec 2017 17:38:37 +0100
+
 swh-loader-svn (0.0.32-1~swh1) unstable-swh; urgency=medium
 
   * v0.0.32

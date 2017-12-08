@@ -37,7 +37,8 @@ class LoadSWHSvnRepositoryTsk(Task):
 class MountAndLoadSvnRepositoryTsk(Task):
     task_queue = 'swh_loader_svn_mount_and_load'
 
-    def run_task(self, archive_path, origin_url=None, visit_date=None):
+    def run_task(self, archive_path, origin_url=None, visit_date=None,
+                 start_from_scratch=False):
         """1. Mount an svn dump from archive as a local svn repository.
            2. Load it through the svn loader.
            3. Clean up mounted svn repository archive.
@@ -49,4 +50,5 @@ class MountAndLoadSvnRepositoryTsk(Task):
         loader.load(svn_url='file://%s' % loader.repo_path,
                     origin_url=origin_url,
                     visit_date=visit_date,
-                    destination_path=None)
+                    destination_path=None,
+                    start_from_scratch=start_from_scratch)

@@ -48,8 +48,8 @@ def init_svn_repo_from_archive_dump(archive_path, root_temp_dir='/tmp'):
 
     """
     project_name = os.path.basename(os.path.dirname(archive_path))
-    temp_dir = tempfile.mkdtemp(suffix='.swh.loader.svn',
-                                prefix='tmp.',
+    temp_dir = tempfile.mkdtemp(suffix='.tmp',
+                                prefix='swh.loader.svn.',
                                 dir=root_temp_dir)
 
     try:

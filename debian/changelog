@@ -1,3 +1,10 @@
+swh-loader-svn (0.0.34-1~swh1) unstable-swh; urgency=medium
+
+  * v0.0.34
+  * Unify temporary directory naming
+
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 15 Dec 2017 12:26:50 +0100
+
 swh-loader-svn (0.0.33-1~swh1) unstable-swh; urgency=medium
 
   * v0.0.33

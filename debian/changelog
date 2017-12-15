@@ -1,8 +1,9 @@
-swh-loader-svn (0.0.33-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.34-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.34
+  * Unify temporary directory naming
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 08 Dec 2017 17:38:37 +0100
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 15 Dec 2017 12:26:50 +0100
 
 swh-loader-svn (0.0.33-1~swh1) unstable-swh; urgency=medium
 

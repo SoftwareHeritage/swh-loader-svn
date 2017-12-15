@@ -64,8 +64,9 @@ class BaseSvnRepo():
         # one client for update operation
         self.client = client.Client(auth=auth)
 
-        self.local_dirname = tempfile.mkdtemp(
-            suffix='.swh.loader', prefix='tmp.', dir=self.root_dir)
+        self.local_dirname = tempfile.mkdtemp(suffix='.tmp',
+                                              prefix='swh.loader.svn.',
+                                              dir=self.root_dir)
         local_name = os.path.basename(self.remote_url)
         self.local_url = os.path.join(self.local_dirname, local_name).encode(
             'utf-8')
@@ -207,7 +208,7 @@ class BaseSvnRepo():
         """
         local_dirname = tempfile.mkdtemp(
             prefix='check-revision-%s.' % revision,
-            dir=self.root_dir)
+            dir=self.local_dirname)
         local_name = os.path.basename(self.remote_url)
         local_url = os.path.join(local_dirname, local_name)
         self.client.export(

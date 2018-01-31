@@ -16,14 +16,33 @@ from swh.core import utils
 from swh.model import hashutil
 from swh.model.from_disk import Directory
 from swh.model.identifiers import identifier_to_bytes, revision_identifier
-
+from swh.model.identifiers import snapshot_identifier
 from swh.loader.core.loader import SWHLoader
+
 from . import svn, converters
+from .config import DEFAULT_BRANCH
 from .utils import init_svn_repo_from_archive_dump
 
 
 def _revision_id(revision):
     return identifier_to_bytes(revision_identifier(revision))
+
+
+def build_swh_snapshot(revision_id, origin_id, visit):
+    """Build a swh snapshot from the revision id, origin id, and visit.
+
+    """
+    return {
+        'id': None,
+        'branches': {
+            DEFAULT_BRANCH: {
+                'target': revision_id,
+                'target_type': 'revision',
+                'origin': origin_id,
+                'visit': visit,
+            }
+        }
+    }
 
 
 class SvnLoaderEventful(ValueError):
@@ -245,9 +264,12 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         """Process and load the occurrence pointing to the latest revision.
 
         """
-        snap = converters.build_swh_snapshot(
+        snap = build_swh_snapshot(
             revision['id'], origin_visit['origin'], origin_visit['visit'])
-        self.log.debug('snap: %s' % snap)
+        snap_id = snapshot_identifier(snap)
+        snap['id'] = identifier_to_bytes(snap_id)
+        self.log.debug('snapshot: %s, id: %s' % (snap, snap_id))
+        snap['id'] = identifier_to_bytes(snap_id)
         self.maybe_load_snapshot(snap)
 
     def prepare(self, *args, **kwargs):
@@ -364,6 +386,7 @@ class SWHSvnLoader(BaseSvnLoader):
         """Retrieve swh's previous revision if any.
 
         """
+        self.log.debug('#####: %s' % prev_swh_revision)
         return self.svnrepo.swh_previous_revision(prev_swh_revision)
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):

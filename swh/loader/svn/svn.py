@@ -18,6 +18,7 @@ from subvertpy import client, properties
 
 from swh.model.from_disk import Directory
 
+from .config import DEFAULT_BRANCH
 from . import ra, converters
 
 # When log message contains empty data
@@ -232,9 +233,17 @@ class BaseSvnRepo():
         storage = self.storage
         if not previous_swh_revision:  # check latest snapshot's revision
             latest_snap = storage.snapshot_get_latest(self.origin_id)
-            if not latest_snap or latest_snap['target_type'] != 'revision':
-                return None
-            previous_swh_revision = latest_snap['target']
+            if latest_snap:
+                branches = latest_snap.get('branches')
+                if not branches:
+                    return None
+                branch = branches.get(DEFAULT_BRANCH)
+                if not branch:
+                    return None
+                target_type = branch['target_type']
+                if target_type != 'revision':
+                    return None
+                previous_swh_revision = branch['target']
 
         revs = list(storage.revision_get([previous_swh_revision]))
         if revs:

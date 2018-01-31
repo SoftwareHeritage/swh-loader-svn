@@ -4,12 +4,34 @@
 # See top-level LICENSE file for more information
 
 from nose.tools import istest
+from test_base import BaseTestSvnLoader
+from unittest import TestCase
 
 from swh.model import hashutil
+
+from swh.loader.svn.config import DEFAULT_BRANCH
+from swh.loader.svn.loader import build_swh_snapshot
 from swh.loader.svn.loader import SWHSvnLoader, SvnLoaderEventful
 from swh.loader.svn.loader import SvnLoaderHistoryAltered, SvnLoaderUneventful
 
-from test_base import BaseTestSvnLoader
+
+class TestSWHSnapshot(TestCase):
+    @istest
+    def build_swh_snapshot(self):
+        actual_snap = build_swh_snapshot('revision-id', 'origin-id', visit=10)
+
+        self.assertEquals(actual_snap, {
+            'id': None,
+            'branches': {
+                DEFAULT_BRANCH: {
+                    'target': 'revision-id',
+                    'target_type': 'revision',
+                    'origin': 'origin-id',
+                    'visit': 10
+                }
+            }
+        })
+
 
 # Define loaders with no storage
 # They'll just accumulate the data in place

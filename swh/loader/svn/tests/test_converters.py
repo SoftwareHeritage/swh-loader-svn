@@ -214,26 +214,6 @@ class TestGitSvnRevisionConverters(unittest.TestCase):
         })
 
 
-class TestSWHOccurrence(unittest.TestCase):
-    @istest
-    def build_swh_snapshot(self):
-        actual_snap = converters.build_swh_snapshot('revision-id',
-                                                    'origin-id',
-                                                    visit=10)
-
-        self.assertEquals(actual_snap, {
-            'id': None,
-            'branches': {
-                b'master': {
-                    'target': 'revision-id',
-                    'target_type': 'revision',
-                    'origin': 'origin-id',
-                    'visit': 10
-                }
-            }
-        })
-
-
 class ConvertSWHDate(unittest.TestCase):
     @istest
     def svn_date_to_swh_date(self):

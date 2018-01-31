@@ -185,20 +185,3 @@ def build_gitsvn_swh_revision(rev, commit, dir_id, parents):
         'metadata': None,
         'parents': parents,
     }
-
-
-def build_swh_snapshot(revision_id, origin_id, visit):
-    """Build a swh snapshot from the revision id, origin id, and visit.
-
-    """
-    return {
-        'id': None,
-        'branches': {
-            b'master': {
-                'target': revision_id,
-                'target_type': 'revision',
-                'origin': origin_id,
-                'visit': visit,
-            }
-        }
-    }

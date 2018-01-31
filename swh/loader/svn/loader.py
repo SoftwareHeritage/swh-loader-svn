@@ -241,14 +241,14 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
 
         return revs[-1]
 
-    def process_swh_occurrence(self, revision, origin_visit):
+    def process_swh_snapshot(self, revision, origin_visit):
         """Process and load the occurrence pointing to the latest revision.
 
         """
-        occ = converters.build_swh_occurrence(
+        snap = converters.build_swh_snapshot(
             revision['id'], origin_visit['origin'], origin_visit['visit'])
-        self.log.debug('occ: %s' % occ)
-        self.maybe_load_occurrences([occ])
+        self.log.debug('snap: %s' % snap)
+        self.maybe_load_snapshot(snap)
 
     def prepare(self, *args, **kwargs):
         self.args = args
@@ -317,13 +317,13 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         except SvnLoaderEventful as e:
             self.log.error('Eventful partial visit. Detail: %s' % e)
             latest_rev = e.swh_revision
-            self.process_swh_occurrence(latest_rev, origin_visit)
+            self.process_swh_snapshot(latest_rev, origin_visit)
             raise
         except SvnLoaderHistoryAltered as e:
             self.log.error('History altered. Detail: %s' % e)
             raise
         else:
-            self.process_swh_occurrence(latest_rev, origin_visit)
+            self.process_swh_snapshot(latest_rev, origin_visit)
 
 
 class SWHSvnLoader(BaseSvnLoader):

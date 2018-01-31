@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2016  The Software Heritage developers
+# Copyright (C) 2015-2018  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -216,17 +216,21 @@ class TestGitSvnRevisionConverters(unittest.TestCase):
 
 class TestSWHOccurrence(unittest.TestCase):
     @istest
-    def build_swh_occurrence(self):
-        actual_occ = converters.build_swh_occurrence('revision-id',
-                                                     'origin-id',
-                                                     visit=10)
+    def build_swh_snapshot(self):
+        actual_snap = converters.build_swh_snapshot('revision-id',
+                                                    'origin-id',
+                                                    visit=10)
 
-        self.assertEquals(actual_occ, {
-            'branch': 'master',
-            'target': 'revision-id',
-            'target_type': 'revision',
-            'origin': 'origin-id',
-            'visit': 10
+        self.assertEquals(actual_snap, {
+            'id': None,
+            'branches': {
+                b'master': {
+                    'target': 'revision-id',
+                    'target_type': 'revision',
+                    'origin': 'origin-id',
+                    'visit': 10
+                }
+            }
         })
 
 

@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2017  The Software Heritage developers
+# Copyright (C) 2016-2018  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -29,7 +29,6 @@ class TestSvnLoader:
         self.all_directories = []
         self.all_revisions = []
         self.all_releases = []
-        self.all_occurrences = []
         # Check at each svn revision that the hash tree computation
         # does not diverge
         self.check_revision = 10
@@ -39,7 +38,6 @@ class TestSvnLoader:
             'directory': self.all_directories,
             'revision': self.all_revisions,
             'release': self.all_releases,
-            'occurrence': self.all_occurrences,
         }
 
     def _add(self, type, l):
@@ -67,9 +65,6 @@ class TestSvnLoader:
 
     def maybe_load_releases(self, releases):
         raise ValueError('If called, the test must break.')
-
-    def maybe_load_occurrences(self, all_occurrences):
-        self._add('occurrence', all_occurrences)
 
     # Override to do nothing at the end
     def close_failure(self):
@@ -295,8 +290,7 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
 
     @istest
     def process_repository(self):
-        """Process a known repository with swh policy and new data should
-        yield new revisions and occurrence.
+        """Process updated repository should yield new revisions
 
         """
         # when
@@ -341,8 +335,7 @@ class SWHSvnLoaderUpdateWithChangesStartFromScratchITTest(BaseTestSvnLoader):
 
     @istest
     def process_repository(self):
-        """Process a known repository with swh policy and new data should
-        yield new revisions and occurrence.
+        """Process known repository from scratch should yield revisions again
 
         """
         # when
@@ -390,8 +383,7 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
 
     @istest
     def process_repository(self):
-        """Process a known repository with swh policy, the previous run did
-        not finish, so this finishes the loading
+        """Process partially visited repository should finish loading
 
         """
         previous_unfinished_revision = {
@@ -435,7 +427,7 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
         self.assertRevisionsOk(expected_revisions)
 
 
-class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
+class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButVisitDoneITTest(
         BaseTestSvnLoader):
     def setUp(self):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
@@ -453,8 +445,7 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButOccurrenceDoneITTest(
 
     @istest
     def process_repository(self):
-        """known repository, swh policy, unfinished revision is less recent
-        than occurrence, we start from last occurrence.
+        """Process known and partial repository should start from last visit
 
         """
         previous_unfinished_revision = {
@@ -503,9 +494,8 @@ class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
     """An SWHSVNLoader with no persistence.
 
     Context:
-        Load a known svn repository using the swh policy.
-        The last occurrence seen is less recent than a previous
-        unfinished crawl.
+        Load a known svn repository using the swh policy.  The last
+        visit seen is less recent than a previous unfinished crawl.
 
     """
     def swh_previous_revision(self, prev_swh_revision=None):
@@ -534,7 +524,7 @@ class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
         }
 
 
-class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
+class SWHSvnLoaderUnfinishedLoadingChangesSinceLastVisitITTest(
         BaseTestSvnLoader):
     def setUp(self):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
@@ -552,8 +542,7 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastOccurrenceITTest(
 
     @istest
     def process_repository(self):
-        """known repository, swh policy, unfinished revision is less recent
-        than occurrence, we start from last occurrence.
+        """Process updated repository should yield revisions from last visit
 
         """
         previous_unfinished_revision = {

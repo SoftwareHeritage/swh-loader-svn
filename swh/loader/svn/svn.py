@@ -216,18 +216,20 @@ class BaseSvnRepo():
             self.remote_url, to=local_url, rev=revision, ignore_keywords=True)
         return local_dirname, os.fsencode(local_url)
 
-    def swh_previous_revision(self, previous_swh_revision=None):
-        """Look for possible existing revision in swh.
+    def swh_latest_snapshot_revision(self, previous_swh_revision=None):
+        """Look for latest snapshot revision and returns it if any.
 
         Args:
             previous_swh_revision: (optional) id of a possible
                                    previous swh revision
 
         Returns:
-            If previous_swh_revision is not None and exists, returns
-            the complete instance.  Otherwise, check for a possible
-            snapshot and returns the targeted revision if it exists.
-            Otherwise, returns None.
+            dict: The latest known point in time. Dict with keys:
+
+                'revision': latest visited revision
+                'snapshot': latest snapshot
+
+            If None is found, return an empty dict.
 
         """
         storage = self.storage
@@ -236,18 +238,24 @@ class BaseSvnRepo():
             if latest_snap:
                 branches = latest_snap.get('branches')
                 if not branches:
-                    return None
+                    return {}
                 branch = branches.get(DEFAULT_BRANCH)
                 if not branch:
-                    return None
+                    return {}
                 target_type = branch['target_type']
                 if target_type != 'revision':
-                    return None
+                    return {}
                 previous_swh_revision = branch['target']
+            else:
+                return {}
 
         revs = list(storage.revision_get([previous_swh_revision]))
         if revs:
-            return revs[0]
+            return {
+                'snapshot': latest_snap,
+                'revision': revs[0]
+            }
+        return {}
 
     def swh_hash_data_per_revision(self, start_revision, end_revision):
         """Compute swh hash data per each revision between start_revision and

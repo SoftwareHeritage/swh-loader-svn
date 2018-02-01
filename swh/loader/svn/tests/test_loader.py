@@ -18,7 +18,7 @@ from swh.loader.svn.loader import SvnLoaderHistoryAltered, SvnLoaderUneventful
 class TestSWHSnapshot(TestCase):
     @istest
     def build_swh_snapshot(self):
-        actual_snap = build_swh_snapshot('revision-id', 'origin-id', visit=10)
+        actual_snap = build_swh_snapshot('revision-id')
 
         self.assertEquals(actual_snap, {
             'id': None,
@@ -26,8 +26,6 @@ class TestSWHSnapshot(TestCase):
                 DEFAULT_BRANCH: {
                     'target': 'revision-id',
                     'target_type': 'revision',
-                    'origin': 'origin-id',
-                    'visit': 10
                 }
             }
         })
@@ -107,11 +105,11 @@ class SWHSvnLoaderNoStorage(TestSvnLoader, SWHSvnLoader):
         Load a new svn repository using the swh policy (so no update).
 
     """
-    def swh_previous_revision(self, prev_swh_revision=None):
+    def swh_latest_snapshot_revision(self, prev_swh_revision=None):
         """We do not know this repository so no revision.
 
         """
-        return None
+        return {}
 
 
 class SWHSvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
@@ -126,7 +124,7 @@ class SWHSvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
           consequence by loading the new revision
 
     """
-    def swh_previous_revision(self, prev_swh_revision=None):
+    def swh_latest_snapshot_revision(self, prev_swh_revision=None):
         """Avoid the storage persistence call and return the expected previous
         revision for that repository.
 
@@ -136,18 +134,22 @@ class SWHSvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
 
         """
         return {
-            'id': hashutil.hash_to_bytes(
-                '4876cb10aec6f708f7466dddf547567b65f6c39c'),
-            'parents': [hashutil.hash_to_bytes(
-                'a3a577948fdbda9d1061913b77a1588695eadb41')],
-            'directory': hashutil.hash_to_bytes(
-                '0deab3023ac59398ae467fc4bff5583008af1ee2'),
-            'target_type': 'revision',
-            'metadata': {
-                'extra_headers': [
-                    ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
-                    ['svn_revision', '6']
-                ]
+            'snapshot': None,
+            'revision': {
+                'id': hashutil.hash_to_bytes(
+                    '4876cb10aec6f708f7466dddf547567b65f6c39c'),
+                'parents': [hashutil.hash_to_bytes(
+                    'a3a577948fdbda9d1061913b77a1588695eadb41')],
+                'directory': hashutil.hash_to_bytes(
+                    '0deab3023ac59398ae467fc4bff5583008af1ee2'),
+                'target_type': 'revision',
+                'metadata': {
+                    'extra_headers': [
+                        ['svn_repo_uuid',
+                         '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
+                        ['svn_revision', '6']
+                    ]
+                }
             }
         }
 
@@ -159,7 +161,7 @@ class SWHSvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
     history altered so we do not update it.
 
     """
-    def swh_previous_revision(self, prev_swh_revision=None):
+    def swh_latest_snapshot_revision(self, prev_swh_revision=None):
         """Avoid the storage persistence call and return the expected previous
         revision for that repository.
 
@@ -169,19 +171,23 @@ class SWHSvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
 
         """
         return {
-            # Changed the revision id's hash to simulate history altered
-            'id': hashutil.hash_to_bytes(
-                'badbadbadbadf708f7466dddf547567b65f6c39d'),
-            'parents': [hashutil.hash_to_bytes(
-                'a3a577948fdbda9d1061913b77a1588695eadb41')],
-            'directory': hashutil.hash_to_bytes(
-                '0deab3023ac59398ae467fc4bff5583008af1ee2'),
-            'target_type': 'revision',
-            'metadata': {
-                'extra_headers': [
-                    ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
-                    ['svn_revision', b'6']
-                ]
+            'snapshot': None,
+            'revision': {
+                # Changed the revision id's hash to simulate history altered
+                'id': hashutil.hash_to_bytes(
+                    'badbadbadbadf708f7466dddf547567b65f6c39d'),
+                'parents': [hashutil.hash_to_bytes(
+                    'a3a577948fdbda9d1061913b77a1588695eadb41')],
+                'directory': hashutil.hash_to_bytes(
+                    '0deab3023ac59398ae467fc4bff5583008af1ee2'),
+                'target_type': 'revision',
+                'metadata': {
+                    'extra_headers': [
+                        ['svn_repo_uuid',
+                         '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
+                        ['svn_revision', b'6']
+                    ]
+                }
             }
         }
 
@@ -252,7 +258,6 @@ class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestSvnLoader):
         """
         # when
         with self.assertRaises(SvnLoaderUneventful):
-            self.loader.args = (self.origin_visit,)
             self.loader.process_repository(self.origin_visit)
 
         # then
@@ -520,7 +525,7 @@ class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
         visit seen is less recent than a previous unfinished crawl.
 
     """
-    def swh_previous_revision(self, prev_swh_revision=None):
+    def swh_latest_snapshot_revision(self, prev_swh_revision=None):
         """Avoid the storage persistence call and return the expected previous
         revision for that repository.
 
@@ -530,18 +535,22 @@ class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
 
         """
         return {
-            'id': hashutil.hash_to_bytes(
-                'a3a577948fdbda9d1061913b77a1588695eadb41'),
-            'parents': [hashutil.hash_to_bytes(
-                '3f51abf3b3d466571be0855dfa67e094f9ceff1b')],
-            'directory': hashutil.hash_to_bytes(
-                '7dc52cc04c3b8bd7c085900d60c159f7b846f866'),
-            'target_type': 'revision',
-            'metadata': {
-                'extra_headers': [
-                    ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
-                    ['svn_revision', '5']
-                ]
+            'snapshot': None,
+            'revision': {
+                'id': hashutil.hash_to_bytes(
+                    'a3a577948fdbda9d1061913b77a1588695eadb41'),
+                'parents': [hashutil.hash_to_bytes(
+                    '3f51abf3b3d466571be0855dfa67e094f9ceff1b')],
+                'directory': hashutil.hash_to_bytes(
+                    '7dc52cc04c3b8bd7c085900d60c159f7b846f866'),
+                'target_type': 'revision',
+                'metadata': {
+                    'extra_headers': [
+                        ['svn_repo_uuid',
+                         '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
+                        ['svn_revision', '5']
+                    ]
+                }
             }
         }
 

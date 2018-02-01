@@ -28,18 +28,16 @@ def _revision_id(revision):
     return identifier_to_bytes(revision_identifier(revision))
 
 
-def build_swh_snapshot(revision_id, origin_id, visit):
+def build_swh_snapshot(revision_id, branch=DEFAULT_BRANCH):
     """Build a swh snapshot from the revision id, origin id, and visit.
 
     """
     return {
         'id': None,
         'branches': {
-            DEFAULT_BRANCH: {
+            branch: {
                 'target': revision_id,
                 'target_type': 'revision',
-                'origin': origin_id,
-                'visit': visit,
             }
         }
     }
@@ -47,7 +45,7 @@ def build_swh_snapshot(revision_id, origin_id, visit):
 
 class SvnLoaderEventful(ValueError):
     """A wrapper exception to transit the swh_revision onto which the
-    loading failed.
+       loading failed.
 
     """
     def __init__(self, e, swh_revision):
@@ -56,8 +54,13 @@ class SvnLoaderEventful(ValueError):
 
 
 class SvnLoaderUneventful(ValueError):
-    def __init__(self, e, *args):
-        super().__init__(e, *args)
+    """'Loading did nothing' exception to transit the latest known
+        snapshot.
+
+    """
+    def __init__(self, e, snapshot):
+        super().__init__(e)
+        self.snapshot = snapshot
 
 
 class SvnLoaderHistoryAltered(ValueError):
@@ -204,10 +207,10 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
                 checked_dir_id = self.swh_revision_hash_tree_at_svn_revision(
                     rev)
                 if checked_dir_id != dir_id:
-                    err = 'Hash tree computation divergence detected (%s != %s), stopping!' % (  # noqa
-                        hashutil.hash_to_hex(dir_id),
-                        hashutil.hash_to_hex(checked_dir_id)
-                    )
+                    err = 'Hash tree computation divergence detected ' \
+                          '(%s != %s), stopping!' % (
+                              hashutil.hash_to_hex(dir_id),
+                              hashutil.hash_to_hex(checked_dir_id))
                     raise ValueError(err)
 
             if nextrev:
@@ -260,16 +263,19 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
 
         return revs[-1]
 
-    def process_swh_snapshot(self, revision, origin_visit):
-        """Process and load the occurrence pointing to the latest revision.
+    def process_swh_snapshot(self, revision=None, snapshot=None):
+        """Create the snapshot either from existing snapshot or revision.
 
         """
-        snap = build_swh_snapshot(
-            revision['id'], origin_visit['origin'], origin_visit['visit'])
-        snap_id = snapshot_identifier(snap)
-        snap['id'] = identifier_to_bytes(snap_id)
-        self.log.debug('snapshot: %s, id: %s' % (snap, snap_id))
-        snap['id'] = identifier_to_bytes(snap_id)
+        if snapshot:
+            snap = snapshot
+        elif revision:
+            snap = build_swh_snapshot(revision['id'])
+            snap['id'] = identifier_to_bytes(snapshot_identifier(snap))
+        else:
+            raise ValueError('Development error, revision or snapshot should '
+                             'be provided')
+        self.log.debug('snapshot: %s' % snap)
         self.maybe_load_snapshot(snap)
 
     def prepare(self, *args, **kwargs):
@@ -333,19 +339,20 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
                 origin_visit,
                 last_known_swh_revision=self.last_known_swh_revision,
                 start_from_scratch=self.start_from_scratch)
-        except SvnLoaderUneventful as e:
-            # Nothing needed to be done, the visit is full nonetheless
+        except SvnLoaderUneventful as e:  # uneventful visit
             self.log.info('Uneventful visit. Detail: %s' % e)
+            # still targets the latest snapshot
+            self.process_swh_snapshot(revision=None, snapshot=e.snapshot)
         except SvnLoaderEventful as e:
             self.log.error('Eventful partial visit. Detail: %s' % e)
             latest_rev = e.swh_revision
-            self.process_swh_snapshot(latest_rev, origin_visit)
+            self.process_swh_snapshot(revision=latest_rev)
             raise
         except SvnLoaderHistoryAltered as e:
             self.log.error('History altered. Detail: %s' % e)
             raise
         else:
-            self.process_swh_snapshot(latest_rev, origin_visit)
+            self.process_swh_snapshot(revision=latest_rev)
 
 
 class SWHSvnLoader(BaseSvnLoader):
@@ -382,12 +389,12 @@ class SWHSvnLoader(BaseSvnLoader):
             svn_url, origin['id'], self.storage,
             destination_path=destination_path)
 
-    def swh_previous_revision(self, prev_swh_revision=None):
+    def swh_latest_snapshot_revision(self, prev_swh_revision=None):
         """Retrieve swh's previous revision if any.
 
         """
         self.log.debug('#####: %s' % prev_swh_revision)
-        return self.svnrepo.swh_previous_revision(prev_swh_revision)
+        return self.svnrepo.swh_latest_snapshot_revision(prev_swh_revision)
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.
@@ -478,7 +485,12 @@ class SWHSvnLoader(BaseSvnLoader):
 
         if not start_from_scratch:
             # Check if we already know a previous revision for that origin
-            swh_rev = self.swh_previous_revision()
+            latest_snapshot = self.swh_latest_snapshot_revision()
+            if latest_snapshot:
+                swh_rev = latest_snapshot['revision']
+            else:
+                swh_rev = None
+
             # Determine from which known revision to start
             swh_rev = self.init_from(last_known_swh_revision,
                                      previous_swh_revision=swh_rev)
@@ -498,8 +510,9 @@ class SWHSvnLoader(BaseSvnLoader):
                         svnrepo,
                         revision_start,
                         swh_rev):
-                    msg = 'History of svn %s@%s history modified. Skipping...' % (  # noqa
-                        svnrepo.remote_url, revision_start)
+                    msg = 'History of svn %s@%s history modified. ' \
+                          'Skipping...' % (
+                              svnrepo.remote_url, revision_start)
                     raise SvnLoaderHistoryAltered(msg, *self.args)
 
                 # now we know history is ok, we start at next revision
@@ -516,7 +529,7 @@ class SWHSvnLoader(BaseSvnLoader):
         if revision_start > revision_end and revision_start is not 1:
             msg = '%s@%s already injected.' % (svnrepo.remote_url,
                                                revision_end)
-            raise SvnLoaderUneventful(msg, *self.args)
+            raise SvnLoaderUneventful(msg, latest_snapshot['snapshot'])
 
         self.log.info('Processing %s.' % svnrepo)
 

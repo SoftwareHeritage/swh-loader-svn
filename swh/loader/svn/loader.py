@@ -405,8 +405,7 @@ class SWHSvnLoader(SWHLoader):
             snap = build_swh_snapshot(revision['id'])
             snap['id'] = identifier_to_bytes(snapshot_identifier(snap))
         else:
-            raise ValueError('Development error, revision or snapshot should '
-                             'be provided')
+            return None
         self.log.debug('snapshot: %s' % snap)
         self.maybe_load_snapshot(snap)
 

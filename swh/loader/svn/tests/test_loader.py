@@ -9,8 +9,7 @@ from unittest import TestCase
 
 from swh.model import hashutil
 
-from swh.loader.svn.config import DEFAULT_BRANCH
-from swh.loader.svn.loader import build_swh_snapshot
+from swh.loader.svn.loader import build_swh_snapshot, DEFAULT_BRANCH
 from swh.loader.svn.loader import SWHSvnLoader, SvnLoaderEventful
 from swh.loader.svn.loader import SvnLoaderHistoryAltered, SvnLoaderUneventful
 
@@ -93,9 +92,12 @@ class TestSvnLoader:
     def close_success(self):
         pass
 
-    # Override to only prepare the svn repository
     def prepare(self, *args, **kwargs):
+        # Override to only prepare the svn repository
         self.svnrepo = self.get_svn_repo(*args)
+        origin_id = 10
+        self.latest_snapshot = self.swh_latest_snapshot_revision(
+            origin_id, None)
 
 
 class SWHSvnLoaderNoStorage(TestSvnLoader, SWHSvnLoader):
@@ -105,7 +107,7 @@ class SWHSvnLoaderNoStorage(TestSvnLoader, SWHSvnLoader):
         Load a new svn repository using the swh policy (so no update).
 
     """
-    def swh_latest_snapshot_revision(self, prev_swh_revision=None):
+    def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
         """We do not know this repository so no revision.
 
         """
@@ -124,7 +126,7 @@ class SWHSvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
           consequence by loading the new revision
 
     """
-    def swh_latest_snapshot_revision(self, prev_swh_revision=None):
+    def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
         """Avoid the storage persistence call and return the expected previous
         revision for that repository.
 
@@ -161,7 +163,7 @@ class SWHSvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
     history altered so we do not update it.
 
     """
-    def swh_latest_snapshot_revision(self, prev_swh_revision=None):
+    def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
         """Avoid the storage persistence call and return the expected previous
         revision for that repository.
 
@@ -525,7 +527,7 @@ class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
         visit seen is less recent than a previous unfinished crawl.
 
     """
-    def swh_latest_snapshot_revision(self, prev_swh_revision=None):
+    def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
         """Avoid the storage persistence call and return the expected previous
         revision for that repository.
 
@@ -652,6 +654,7 @@ class SWHSvnLoaderUpdateAndTestCornerCasesAboutEolITTest(BaseTestSvnLoader):
                 ]
             }
         }
+
         # when
         self.loader.process_repository(
             self.origin_visit,

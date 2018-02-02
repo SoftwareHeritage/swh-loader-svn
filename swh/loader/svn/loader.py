@@ -19,8 +19,10 @@ from swh.model.identifiers import snapshot_identifier
 from swh.loader.core.loader import SWHLoader
 
 from . import svn, converters
-from .config import DEFAULT_BRANCH
 from .utils import init_svn_repo_from_archive_dump
+
+
+DEFAULT_BRANCH = b'master'
 
 
 def _revision_id(revision):
@@ -57,14 +59,13 @@ class SvnLoaderUneventful(ValueError):
         snapshot.
 
     """
-    def __init__(self, e, snapshot):
+    def __init__(self, e):
         super().__init__(e)
-        self.snapshot = snapshot
 
 
 class SvnLoaderHistoryAltered(ValueError):
-    def __init__(self, e, *args):
-        super().__init__(e, *args)
+    def __init__(self, e):
+        super().__init__(e)
 
 
 class SWHSvnLoader(SWHLoader):
@@ -127,6 +128,49 @@ class SWHSvnLoader(SWHLoader):
             svn_url, origin['id'], self.storage,
             destination_path=destination_path)
 
+    def swh_latest_snapshot_revision(self, origin_id,
+                                     previous_swh_revision=None):
+        """Look for latest snapshot revision and returns it if any.
+
+        Args:
+            origin_id (int): Origin identifier
+            previous_swh_revision: (optional) id of a possible
+                                   previous swh revision
+
+        Returns:
+            dict: The latest known point in time. Dict with keys:
+
+                'revision': latest visited revision
+                'snapshot': latest snapshot
+
+            If None is found, return an empty dict.
+
+        """
+        storage = self.storage
+        if not previous_swh_revision:  # check latest snapshot's revision
+            latest_snap = storage.snapshot_get_latest(origin_id)
+            if latest_snap:
+                branches = latest_snap.get('branches')
+                if not branches:
+                    return {}
+                branch = branches.get(DEFAULT_BRANCH)
+                if not branch:
+                    return {}
+                target_type = branch['target_type']
+                if target_type != 'revision':
+                    return {}
+                previous_swh_revision = branch['target']
+            else:
+                return {}
+
+        revs = list(storage.revision_get([previous_swh_revision]))
+        if revs:
+            return {
+                'snapshot': latest_snap,
+                'revision': revs[0]
+            }
+        return {}
+
     def build_swh_revision(self, rev, commit, dir_id, parents):
         """Build the swh revision dictionary.
 
@@ -151,12 +195,6 @@ class SWHSvnLoader(SWHLoader):
                                              self.svnrepo.uuid,
                                              dir_id,
                                              parents)
-
-    def swh_latest_snapshot_revision(self, prev_swh_revision=None):
-        """Retrieve swh's previous revision if any.
-
-        """
-        return self.svnrepo.swh_latest_snapshot_revision(prev_swh_revision)
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.
@@ -202,9 +240,8 @@ class SWHSvnLoader(SWHLoader):
 
         if not start_from_scratch:
             # Check if we already know a previous revision for that origin
-            latest_snapshot = self.swh_latest_snapshot_revision()
-            if latest_snapshot:
-                swh_rev = latest_snapshot['revision']
+            if self.latest_snapshot:
+                swh_rev = self.latest_snapshot['revision']
             else:
                 swh_rev = None
 
@@ -227,10 +264,10 @@ class SWHSvnLoader(SWHLoader):
                         svnrepo,
                         revision_start,
                         swh_rev):
-                    msg = 'History of svn %s@%s history modified. ' \
+                    msg = 'History of svn %s@%s altered. ' \
                           'Skipping...' % (
                               svnrepo.remote_url, revision_start)
-                    raise SvnLoaderHistoryAltered(msg, *self.args)
+                    raise SvnLoaderHistoryAltered(msg)
 
                 # now we know history is ok, we start at next revision
                 revision_start = revision_start + 1
@@ -246,7 +283,7 @@ class SWHSvnLoader(SWHLoader):
         if revision_start > revision_end and revision_start is not 1:
             msg = '%s@%s already injected.' % (svnrepo.remote_url,
                                                revision_end)
-            raise SvnLoaderUneventful(msg, latest_snapshot['snapshot'])
+            raise SvnLoaderUneventful(msg)
 
         self.log.info('Processing %s.' % svnrepo)
 
@@ -398,6 +435,9 @@ class SWHSvnLoader(SWHLoader):
         else:
             self.last_known_swh_revision = None
 
+        self.latest_snapshot = self.swh_latest_snapshot_revision(
+            self.origin_id, self.last_known_swh_revision)
+
         self.svnrepo = self.get_svn_repo(svn_url, destination_path, origin)
 
     def get_origin(self):
@@ -436,15 +476,18 @@ class SWHSvnLoader(SWHLoader):
                 start_from_scratch=self.start_from_scratch)
         except SvnLoaderUneventful as e:  # uneventful visit
             self.log.info('Uneventful visit. Detail: %s' % e)
-            # still targets the latest snapshot
-            self.process_swh_snapshot(revision=None, snapshot=e.snapshot)
+            if self.latest_snapshot and 'snapshot' in self.latest_snapshot:
+                snapshot = self.latest_snapshot['snapshot']
+                self.process_swh_snapshot(snapshot=snapshot)
         except SvnLoaderEventful as e:
             self.log.error('Eventful partial visit. Detail: %s' % e)
             latest_rev = e.swh_revision
             self.process_swh_snapshot(revision=latest_rev)
             raise
-        except SvnLoaderHistoryAltered as e:
-            self.log.error('History altered. Detail: %s' % e)
+        except Exception as e:
+            if self.latest_snapshot and 'snapshot' in self.latest_snapshot:
+                snapshot = self.latest_snapshot['snapshot']
+                self.process_swh_snapshot(snapshot=snapshot)
             raise
         else:
             self.process_swh_snapshot(revision=latest_rev)

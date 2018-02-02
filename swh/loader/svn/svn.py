@@ -18,7 +18,6 @@ from subvertpy import client, properties
 
 from swh.model.from_disk import Directory
 
-from .config import DEFAULT_BRANCH
 from . import ra, converters
 
 # When log message contains empty data
@@ -215,47 +214,6 @@ class BaseSvnRepo():
         self.client.export(
             self.remote_url, to=local_url, rev=revision, ignore_keywords=True)
         return local_dirname, os.fsencode(local_url)
-
-    def swh_latest_snapshot_revision(self, previous_swh_revision=None):
-        """Look for latest snapshot revision and returns it if any.
-
-        Args:
-            previous_swh_revision: (optional) id of a possible
-                                   previous swh revision
-
-        Returns:
-            dict: The latest known point in time. Dict with keys:
-
-                'revision': latest visited revision
-                'snapshot': latest snapshot
-
-            If None is found, return an empty dict.
-
-        """
-        storage = self.storage
-        if not previous_swh_revision:  # check latest snapshot's revision
-            latest_snap = storage.snapshot_get_latest(self.origin_id)
-            if latest_snap:
-                branches = latest_snap.get('branches')
-                if not branches:
-                    return {}
-                branch = branches.get(DEFAULT_BRANCH)
-                if not branch:
-                    return {}
-                target_type = branch['target_type']
-                if target_type != 'revision':
-                    return {}
-                previous_swh_revision = branch['target']
-            else:
-                return {}
-
-        revs = list(storage.revision_get([previous_swh_revision]))
-        if revs:
-            return {
-                'snapshot': latest_snap,
-                'revision': revs[0]
-            }
-        return {}
 
     def swh_hash_data_per_revision(self, start_revision, end_revision):
         """Compute swh hash data per each revision between start_revision and

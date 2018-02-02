@@ -8,7 +8,6 @@ swh-storage.
 
 """
 
-import abc
 import os
 import shutil
 
@@ -68,23 +67,16 @@ class SvnLoaderHistoryAltered(ValueError):
         super().__init__(e, *args)
 
 
-class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
-    """Base Svn loader to load one svn repository according to specific
-    policies (only swh one now).
+class SWHSvnLoader(SWHLoader):
+    """Swh svn loader to load an svn repository The repository is either
+    remote or local.  The loader deals with update on an already
+    previously loaded repository.
 
-    The main entry point of this is (no need to override it)::
-
-        def load(self, origin_visit, last_known_swh_revision=None): pass
-
-    Inherit this class and then override the following functions::
-
-        def build_swh_revision(self, rev, commit, dir_id, parents):
-            # This is in charge of converting an svn revision to a compliant
-            # swh revision
-
-        def process_repository(self):
-            # This is in charge of processing the actual svn repository and
-            # store the result to swh storage.
+    Default policy:
+        Keep data as close as possible from the original svn data.  We
+        only add information that are needed for update or continuing
+        from last known revision (svn revision and svn repository's
+        uuid).
 
     """
     CONFIG_BASE_FILENAME = 'loader/svn'
@@ -98,7 +90,12 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         self.check_revision = self.config['check_revision']
         self.origin_id = None
 
-    @abc.abstractmethod
+    def cleanup(self):
+        """Clean up the svn repository's working representation on disk.
+
+        """
+        self.svnrepo.clean_fs()
+
     def swh_revision_hash_tree_at_svn_revision(self, revision):
         """Compute and return the hash tree at a given svn revision.
 
@@ -109,41 +106,78 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
             The hash tree directory as bytes.
 
         """
-        pass
+        local_dirname, local_url = self.svnrepo.export_temporary(revision)
+        h = Directory.from_disk(path=local_url).hash
+        self.svnrepo.clean_fs(local_dirname)
+        return h
 
-    @abc.abstractmethod
     def get_svn_repo(self, svn_url, destination_path, origin):
         """Instantiates the needed svnrepo collaborator to permit reading svn
         repository.
 
         Args:
-            svn_url: the svn repository url to read from
-            destination_path: the local path on disk to compute data
-            origin: the corresponding origin
+            svn_url (str): the svn repository url to read from
+            destination_path (str): the local path on disk to compute data
+            origin (int): the corresponding origin
 
         Returns:
             Instance of :mod:`swh.loader.svn.svn` clients
         """
-        raise NotImplementedError
+        return svn.SWHSvnRepo(
+            svn_url, origin['id'], self.storage,
+            destination_path=destination_path)
 
-    @abc.abstractmethod
     def build_swh_revision(self, rev, commit, dir_id, parents):
-        """Convert an svn revision to an swh one according to the loader's
-        policy (git-svn or swh).
+        """Build the swh revision dictionary.
+
+        This adds:
+
+        - the `'synthetic`' flag to true
+        - the '`extra_headers`' containing the repository's uuid and the
+          svn revision number.
 
         Args:
-            rev: the svn revision number
-            commit: dictionary with keys: author\_name, author\_date, rev,
-                message
-            dir_id: the hash tree computation
-            parents: the revision's parents
+            rev (dict): the svn revision
+            commit (dict): the commit metadata
+            dir_id (bytes): the upper tree's hash identifier
+            parents ([bytes]): the parents' identifiers
 
         Returns:
-            The swh revision
-        """
-        raise NotImplementedError
+            The swh revision corresponding to the svn revision.
 
-    @abc.abstractmethod
+        """
+        return converters.build_swh_revision(rev,
+                                             commit,
+                                             self.svnrepo.uuid,
+                                             dir_id,
+                                             parents)
+
+    def swh_latest_snapshot_revision(self, prev_swh_revision=None):
+        """Retrieve swh's previous revision if any.
+
+        """
+        return self.svnrepo.swh_latest_snapshot_revision(prev_swh_revision)
+
+    def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
+        """Given a svn repository, check if the history was not tampered with.
+
+        """
+        revision_id = swh_rev['id']
+        parents = swh_rev['parents']
+        hash_data_per_revs = svnrepo.swh_hash_data_at_revision(revision_start)
+
+        rev = revision_start
+        rev, _, commit, _, root_dir = list(hash_data_per_revs)[0]
+
+        dir_id = root_dir.hash
+        swh_revision = self.build_swh_revision(rev,
+                                               commit,
+                                               dir_id,
+                                               parents)
+        swh_revision_id = _revision_id(swh_revision)
+
+        return swh_revision_id == revision_id
+
     def process_repository(self, origin_visit,
                            last_known_swh_revision=None,
                            start_from_scratch=False):
@@ -158,7 +192,68 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         - send that occurrence for storage in swh-storage.
 
         """
-        raise NotImplementedError
+        svnrepo = self.svnrepo
+
+        # default configuration
+        revision_start = 1
+        revision_parents = {
+            revision_start: []
+        }
+
+        if not start_from_scratch:
+            # Check if we already know a previous revision for that origin
+            latest_snapshot = self.swh_latest_snapshot_revision()
+            if latest_snapshot:
+                swh_rev = latest_snapshot['revision']
+            else:
+                swh_rev = None
+
+            # Determine from which known revision to start
+            swh_rev = self.init_from(last_known_swh_revision,
+                                     previous_swh_revision=swh_rev)
+
+            if swh_rev:  # Yes, we know a previous revision. Try and update it.
+                extra_headers = dict(swh_rev['metadata']['extra_headers'])
+                revision_start = int(extra_headers['svn_revision'])
+                revision_parents = {
+                    revision_start: swh_rev['parents'],
+                }
+
+                self.log.debug('svn export --ignore-keywords %s@%s' % (
+                    svnrepo.remote_url,
+                    revision_start))
+
+                if swh_rev and not self.check_history_not_altered(
+                        svnrepo,
+                        revision_start,
+                        swh_rev):
+                    msg = 'History of svn %s@%s history modified. ' \
+                          'Skipping...' % (
+                              svnrepo.remote_url, revision_start)
+                    raise SvnLoaderHistoryAltered(msg, *self.args)
+
+                # now we know history is ok, we start at next revision
+                revision_start = revision_start + 1
+                # and the parent become the latest know revision for
+                # that repository
+                revision_parents[revision_start] = [swh_rev['id']]
+
+        revision_end = svnrepo.head_revision()
+
+        self.log.info('[revision_start-revision_end]: [%s-%s]' % (
+            revision_start, revision_end))
+
+        if revision_start > revision_end and revision_start is not 1:
+            msg = '%s@%s already injected.' % (svnrepo.remote_url,
+                                               revision_end)
+            raise SvnLoaderUneventful(msg, latest_snapshot['snapshot'])
+
+        self.log.info('Processing %s.' % svnrepo)
+
+        # process and store revision to swh (sent by by blocks of
+        # 'revision_packet_size')
+        return self.process_swh_revisions(
+            svnrepo, revision_start, revision_end, revision_parents)
 
     def process_svn_revisions(self, svnrepo, revision_start, revision_end,
                               revision_parents):
@@ -354,93 +449,6 @@ class BaseSvnLoader(SWHLoader, metaclass=abc.ABCMeta):
         else:
             self.process_swh_snapshot(revision=latest_rev)
 
-
-class SWHSvnLoader(BaseSvnLoader):
-    """Swh svn loader is the main implementation destined for production.
-
-    This implementation is able to deal with update on known svn repository.
-
-    Default policy:
-        Keep data as close as possible from the original svn data.  We
-        only add information that are needed for update or continuing
-        from last known revision (svn revision and svn repository's
-        uuid).
-
-    """
-    def cleanup(self):
-        """Clean after oneself.
-
-        This is in charge to flush the remaining data to write in swh storage.
-        And to clean up the svn repository's working representation on disk.
-        """
-        self.svnrepo.clean_fs()
-
-    def swh_revision_hash_tree_at_svn_revision(self, revision):
-        """Compute a given hash tree at specific revision.
-
-        """
-        local_dirname, local_url = self.svnrepo.export_temporary(revision)
-        h = Directory.from_disk(path=local_url).hash
-        self.svnrepo.clean_fs(local_dirname)
-        return h
-
-    def get_svn_repo(self, svn_url, destination_path, origin):
-        return svn.SWHSvnRepo(
-            svn_url, origin['id'], self.storage,
-            destination_path=destination_path)
-
-    def swh_latest_snapshot_revision(self, prev_swh_revision=None):
-        """Retrieve swh's previous revision if any.
-
-        """
-        self.log.debug('#####: %s' % prev_swh_revision)
-        return self.svnrepo.swh_latest_snapshot_revision(prev_swh_revision)
-
-    def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
-        """Given a svn repository, check if the history was not tampered with.
-
-        """
-        revision_id = swh_rev['id']
-        parents = swh_rev['parents']
-        hash_data_per_revs = svnrepo.swh_hash_data_at_revision(revision_start)
-
-        rev = revision_start
-        rev, _, commit, _, root_dir = list(hash_data_per_revs)[0]
-
-        dir_id = root_dir.hash
-        swh_revision = self.build_swh_revision(rev,
-                                               commit,
-                                               dir_id,
-                                               parents)
-        swh_revision_id = _revision_id(swh_revision)
-
-        return swh_revision_id == revision_id
-
-    def build_swh_revision(self, rev, commit, dir_id, parents):
-        """Build the swh revision dictionary.
-
-        This adds:
-
-        - the `'synthetic`' flag to true
-        - the '`extra_headers`' containing the repository's uuid and the
-          svn revision number.
-
-        Args:
-            rev: the svn revision
-            commit: the commit metadata
-            dir_id: the upper tree's hash identifier
-            parents: the parents' identifiers
-
-        Returns:
-            The swh revision corresponding to the svn revision.
-
-        """
-        return converters.build_swh_revision(rev,
-                                             commit,
-                                             self.svnrepo.uuid,
-                                             dir_id,
-                                             parents)
-
     def init_from(self, partial_swh_revision, previous_swh_revision):
         """Function to determine from where to start from.
 
@@ -473,74 +481,10 @@ class SWHSvnLoader(BaseSvnLoader):
 
         return None
 
-    def process_repository(self, origin_visit, last_known_swh_revision=None,
-                           start_from_scratch=False):
-        svnrepo = self.svnrepo
-
-        # default configuration
-        revision_start = 1
-        revision_parents = {
-            revision_start: []
-        }
-
-        if not start_from_scratch:
-            # Check if we already know a previous revision for that origin
-            latest_snapshot = self.swh_latest_snapshot_revision()
-            if latest_snapshot:
-                swh_rev = latest_snapshot['revision']
-            else:
-                swh_rev = None
-
-            # Determine from which known revision to start
-            swh_rev = self.init_from(last_known_swh_revision,
-                                     previous_swh_revision=swh_rev)
-
-            if swh_rev:  # Yes, we know a previous revision. Try and update it.
-                extra_headers = dict(swh_rev['metadata']['extra_headers'])
-                revision_start = int(extra_headers['svn_revision'])
-                revision_parents = {
-                    revision_start: swh_rev['parents'],
-                }
-
-                self.log.debug('svn export --ignore-keywords %s@%s' % (
-                    svnrepo.remote_url,
-                    revision_start))
-
-                if swh_rev and not self.check_history_not_altered(
-                        svnrepo,
-                        revision_start,
-                        swh_rev):
-                    msg = 'History of svn %s@%s history modified. ' \
-                          'Skipping...' % (
-                              svnrepo.remote_url, revision_start)
-                    raise SvnLoaderHistoryAltered(msg, *self.args)
-
-                # now we know history is ok, we start at next revision
-                revision_start = revision_start + 1
-                # and the parent become the latest know revision for
-                # that repository
-                revision_parents[revision_start] = [swh_rev['id']]
-
-        revision_end = svnrepo.head_revision()
-
-        self.log.info('[revision_start-revision_end]: [%s-%s]' % (
-            revision_start, revision_end))
-
-        if revision_start > revision_end and revision_start is not 1:
-            msg = '%s@%s already injected.' % (svnrepo.remote_url,
-                                               revision_end)
-            raise SvnLoaderUneventful(msg, latest_snapshot['snapshot'])
-
-        self.log.info('Processing %s.' % svnrepo)
-
-        # process and store revision to swh (sent by by blocks of
-        # 'revision_packet_size')
-        return self.process_swh_revisions(
-            svnrepo, revision_start, revision_end, revision_parents)
-
 
 class SWHSvnLoaderFromDumpArchive(SWHSvnLoader):
-    """Load a svn repository from an archive (containing a dump).
+    """Uncompress an archive containing an svn dump, mount the svn dump as
+       an svn repository and load said repository.
 
     """
     def __init__(self, archive_path):

@@ -4,8 +4,8 @@
 # See top-level LICENSE file for more information
 
 """SVN client in charge of iterating over svn logs and yield commit
-representations including the hash tree/content computations per
-svn commit.
+representations including the hash tree/content computations per svn
+commit.
 
 """
 
@@ -30,18 +30,8 @@ class SvnRepoException(ValueError):
         self.svnrepo = svnrepo
 
 
-class BaseSvnRepo():
-    """Base svn repository representation for swh.
-
-    To override some of the behavior regarding the message log properties, you
-    can instantiate a subclass of this class and override::
-
-        def convert_commit_author(self, author)
-        def convert_commit_message(self, msg)
-        def convert_commit_date(self, date)
-
-    see :class:`GitSvnSvnRepo`, :class:`SwhSvnRepo` for instanciation
-    example.
+class SWHSvnRepo:
+    """SWH's svn repository representation.
 
     """
     def __init__(self, remote_url, origin_id, storage,
@@ -72,6 +62,7 @@ class BaseSvnRepo():
             'utf-8')
 
         self.uuid = self.conn.get_uuid().encode('utf-8')
+        self.swhreplay = ra.SWHReplay(conn=self.conn, rootpath=self.local_url)
 
     def __str__(self):
         return str({
@@ -82,23 +73,19 @@ class BaseSvnRepo():
         })
 
     def head_revision(self):
-        """Retrieve current revision of the repository's working copy.
+        """Retrieve current head revision.
 
         """
         return self.conn.get_latest_revnum()
 
     def initial_revision(self):
         """Retrieve the initial revision from which the remote url appeared.
-        Note: This should always be 1 since we won't be dealing with in-depth
-        url.
 
         """
         return 1
 
     def convert_commit_message(self, msg):
-        """Do something with message (e.g add extra line, etc...)
-
-        cf. SvnRepo for a simple implementation.
+        """Simply encode the commit message.
 
         Args:
             msg (str): the commit message to convert.
@@ -107,24 +94,33 @@ class BaseSvnRepo():
             The transformed message as bytes.
 
         """
-        raise NotImplementedError('Should be overridden by subclass.')
+        if isinstance(msg, bytes):
+            return msg
+        return msg.encode('utf-8')
 
     def convert_commit_date(self, date):
-        """Convert the message date (e.g, convert into timestamp or whatever
-        makes sense to you.).
+        """Convert the message commit date into a timestamp in swh format.
+        The precision is kept.
 
-           Args:
-               date (str): the commit date to convert.
+        Args:
+            date (str): the commit date to convert.
 
-            Returns:
-               The transformed date.
+        Returns:
+            The transformed date.
 
         """
-        raise NotImplementedError('Should be overridden by subclass.')
+        return converters.svn_date_to_swh_date(date)
 
     def convert_commit_author(self, author):
-        """Convert the commit author (e.g, convert into dict or whatever
-        makes sense to you.).
+        """Convert the commit author into an swh person.
+
+        The user becomes a dictionary of the form::
+
+            {
+              name: author,
+              email: '',
+              fullname: author
+            }
 
         Args:
             author (str): the commit author to convert.
@@ -133,7 +129,7 @@ class BaseSvnRepo():
             The transformed author as dict.
 
         """
-        raise NotImplementedError('Should be overridden by subclass.')
+        return converters.svn_author_to_swh_person(author)
 
     def __to_entry(self, log_entry):
         changed_paths, rev, revprops, has_children = log_entry
@@ -278,67 +274,3 @@ class BaseSvnRepo():
             shutil.rmtree(local_dirname)
         else:
             shutil.rmtree(self.local_dirname)
-
-
-class SWHSvnRepo(BaseSvnRepo):
-    """Same as :class:`BaseSvnRepo` except for:
-
-    - the commit message which is simply encoded
-    - the commit author is left as is.
-    - the commit timestamp is left as is.
-
-    """
-    def __init__(self, remote_url, origin_id, storage,
-                 destination_path=None):
-        super().__init__(remote_url, origin_id, storage,
-                         destination_path=destination_path)
-        self.swhreplay = ra.SWHReplay(
-            conn=self.conn,
-            rootpath=self.local_url)
-
-    def convert_commit_message(self, msg):
-        """Simply encode the commit message.
-
-        Args:
-            msg (str): the commit message to convert.
-
-        Returns:
-            The transformed message as bytes.
-
-        """
-        if isinstance(msg, bytes):
-            return msg
-        return msg.encode('utf-8')
-
-    def convert_commit_date(self, date):
-        """Convert the message commit date into a timestamp in swh format.
-        The precision is kept.
-
-        Args:
-            date (str): the commit date to convert.
-
-        Returns:
-            The transformed date.
-
-        """
-        return converters.svn_date_to_swh_date(date)
-
-    def convert_commit_author(self, author):
-        """Convert the commit author into an swh person.
-
-        The user becomes a dictionary of the form::
-
-            {
-              name: author,
-              email: '',
-              fullname: author
-            }
-
-        Args:
-            author (str): the commit author to convert.
-
-        Returns:
-            The transformed author as dict.
-
-        """
-        return converters.svn_author_to_swh_person(author)

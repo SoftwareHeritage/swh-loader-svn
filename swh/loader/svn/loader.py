@@ -281,15 +281,13 @@ class SWHSvnLoader(SWHLoader):
                 # that repository
                 revision_parents[revision_start] = [swh_rev['id']]
 
-        self.log.info('[revision_start-revision_end]: [%s-%s]' % (
-            revision_start, revision_end))
-
         if revision_start > revision_end and revision_start is not 1:
             msg = '%s@%s already injected.' % (svnrepo.remote_url,
                                                revision_end)
             raise SvnLoaderUneventful(msg)
 
-        self.log.info('Processing %s.' % svnrepo)
+        self.log.info('Processing revisions [%s-%s] for %s' % (
+            revision_start, revision_end, svnrepo))
 
         # process and store revision to swh (sent by by blocks of
         # 'revision_packet_size')
@@ -376,10 +374,9 @@ class SWHSvnLoader(SWHLoader):
                     swh_revision_gen,
                     self.config['revision_packet_size']):
                 revs = list(revisions)
-
-                self.log.info('Processed %s revisions: [%s, ...]' % (
-                    len(revs), hashutil.hash_to_hex(revs[0]['id'])))
                 self.maybe_load_revisions(revs)
+                self.log.debug('Processed %s revisions: [%s, ...]' % (
+                    len(revs), hashutil.hash_to_hex(revs[0]['id'])))
         except Exception as e:
             if revs:
                 # flush remaining revisions

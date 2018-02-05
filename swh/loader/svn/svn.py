@@ -66,10 +66,10 @@ class SWHSvnRepo:
 
     def __str__(self):
         return str({
+            'swh-origin': self.origin_id,
             'remote_url': self.remote_url,
             'local_url': self.local_url,
             'uuid': self.uuid,
-            'swh-origin': self.origin_id
         })
 
     def head_revision(self):

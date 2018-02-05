@@ -1,4 +1,4 @@
-# Copyright (C) 2016  The Software Heritage developers
+# Copyright (C) 2016-2018  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -162,6 +162,8 @@ class SWHFileEditor:
           computation purposes)
 
         """
+        is_link = None
+
         if self.link:
             # can only check now that the link is a real one
             # since patch has been applied
@@ -171,10 +173,10 @@ class SWHFileEditor:
             else:  # not a real link...
                 self.link = False
 
-        if self.executable == 1:
-            os.chmod(self.fullpath, 0o755)
-        elif self.executable == 2:
-            os.chmod(self.fullpath, 0o644)
+        if not is_link:  # if a link, do nothing regarding flag
+                os.chmod(self.fullpath, 0o755)
+            elif self.executable == 2:
+                os.chmod(self.fullpath, 0o644)
 
         # And now compute file's checksums
         self.directory[self.path] = Content.from_file(path=self.fullpath,

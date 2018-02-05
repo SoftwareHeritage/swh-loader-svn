@@ -232,8 +232,14 @@ class SWHSvnLoader(SWHLoader):
         """
         svnrepo = self.svnrepo
 
-        # default configuration
-        revision_start = 1
+        revision_head = svnrepo.head_revision()
+        if revision_head == 0:  # empty repository case
+            revision_start = 0
+            revision_end = 0
+        else:  # default configuration
+            revision_start = svnrepo.initial_revision()
+            revision_end = revision_head
+
         revision_parents = {
             revision_start: []
         }
@@ -274,8 +280,6 @@ class SWHSvnLoader(SWHLoader):
                 # and the parent become the latest know revision for
                 # that repository
                 revision_parents[revision_start] = [swh_rev['id']]
-
-        revision_end = svnrepo.head_revision()
 
         self.log.info('[revision_start-revision_end]: [%s-%s]' % (
             revision_start, revision_end))

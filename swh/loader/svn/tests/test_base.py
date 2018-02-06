@@ -46,7 +46,7 @@ class BaseTestSvnLoader(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp_root_path)
 
-    def assertRevisionsOk(self, expected_revisions):
+    def assertRevisionsOk(self, expected_revisions):  # noqa: N802
         """Check the loader's revisions match the expected revisions.
 
         Expects self.loader to be instantiated and ready to be

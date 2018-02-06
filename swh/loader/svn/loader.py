@@ -84,17 +84,24 @@ class SWHSvnLoader(SWHLoader):
 
     ADDITIONAL_CONFIG = {
         'check_revision': ('int', 1000),
+        'debug': ('bool', False),  # NOT FOR PRODUCTION, False is mandatory
     }
 
     def __init__(self):
         super().__init__(logging_class='swh.loader.svn.SvnLoader')
         self.check_revision = self.config['check_revision']
         self.origin_id = None
+        self.debug = self.config['debug']
 
     def cleanup(self):
         """Clean up the svn repository's working representation on disk.
 
         """
+        if self.debug:
+            self.log.error('''NOT FOR PRODUCTION - debug flag activated
+Local repository not cleaned up for investigation: %s''' % (
+                self.svnrepo.local_url.decode('utf-8'), ))
+            return
         self.svnrepo.clean_fs()
 
     def swh_revision_hash_tree_at_svn_revision(self, revision):

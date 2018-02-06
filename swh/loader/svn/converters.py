@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2017  The Software Heritage developers
+# Copyright (C) 2015-2018  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -185,14 +185,3 @@ def build_gitsvn_swh_revision(rev, commit, dir_id, parents):
         'metadata': None,
         'parents': parents,
     }
-
-
-def build_swh_occurrence(revision_id, origin_id, visit):
-    """Build a swh occurrence from the revision id, origin id, and date.
-
-    """
-    return {'branch': 'master',
-            'target': revision_id,
-            'target_type': 'revision',
-            'origin': origin_id,
-            'visit': visit}

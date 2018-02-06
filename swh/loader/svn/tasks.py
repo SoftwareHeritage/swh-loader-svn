@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2017  The Software Heritage developers
+# Copyright (C) 2015-2018  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -31,7 +31,7 @@ class LoadSWHSvnRepositoryTsk(Task):
         """
         loader = SWHSvnLoader()
         loader.log = self.log
-        loader.load(*args, **kwargs)
+        return loader.load(*args, **kwargs)
 
 
 class MountAndLoadSvnRepositoryTsk(Task):
@@ -47,8 +47,8 @@ class MountAndLoadSvnRepositoryTsk(Task):
 
         loader = SWHSvnLoaderFromDumpArchive(archive_path)
         loader.log = self.log
-        loader.load(svn_url='file://%s' % loader.repo_path,
-                    origin_url=origin_url,
-                    visit_date=visit_date,
-                    destination_path=None,
-                    start_from_scratch=start_from_scratch)
+        return loader.load(svn_url='file://%s' % loader.repo_path,
+                           origin_url=origin_url,
+                           visit_date=visit_date,
+                           destination_path=None,
+                           start_from_scratch=start_from_scratch)

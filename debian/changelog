@@ -1,3 +1,11 @@
+swh-loader-svn (0.0.35-1~swh1) unstable-swh; urgency=medium
+
+  * Release swh.loader.svn v0.0.35
+  * Update to use snapshots instead of occurrences
+  * Properly return loader status to scheduler
+
+ -- Nicolas Dandrimont <nicolas@dandrimont.eu>  Tue, 06 Feb 2018 14:40:28 +0100
+
 swh-loader-svn (0.0.34-1~swh1) unstable-swh; urgency=medium
 
   * v0.0.34

@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2016  The Software Heritage developers
+# Copyright (C) 2015-2018  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -214,37 +214,6 @@ class BaseSvnRepo():
         self.client.export(
             self.remote_url, to=local_url, rev=revision, ignore_keywords=True)
         return local_dirname, os.fsencode(local_url)
-
-    def swh_previous_revision(self, previous_swh_revision=None):
-        """Look for possible existing revision in swh.
-
-        Args:
-            previous_swh_revision: (optional) id of a possible
-            previous swh revision
-
-        Returns:
-            If previous_swh_revision is not None and do exists,
-            returns the complete instance.
-            Otherwise, check for a possible occurrence and returns the
-            targeted complete revision if it does exists.
-            Otherwise, returns None.
-
-        """
-        storage = self.storage
-        # got no previous revision, will check if some occurrence
-        # already exists for that origin
-        if not previous_swh_revision:
-            occ = list(storage.occurrence_get(self.origin_id))
-            if occ:
-                revision_id = occ[0]['target']
-                revisions = list(storage.revision_get([revision_id]))
-
-                if revisions:
-                    return revisions[0]
-        else:
-            revs = list(storage.revision_get([previous_swh_revision]))
-            if revs:
-                return revs[0]
 
     def swh_hash_data_per_revision(self, start_revision, end_revision):
         """Compute swh hash data per each revision between start_revision and

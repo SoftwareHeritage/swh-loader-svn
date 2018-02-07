@@ -1,4 +1,4 @@
-# Copyright (C) 2016  The Software Heritage developers
+# Copyright (C) 2016-2018  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -75,6 +75,11 @@ def is_file_an_svnlink_p(fullpath):
         return filetype == b'link', src
 
 
+DEFAULT_FLAG = 0
+EXEC_FLAG = 1
+NOEXEC_FLAG = 2
+
+
 class SWHFileEditor:
     """File Editor in charge of updating file on disk and memory objects.
 
@@ -85,19 +90,19 @@ class SWHFileEditor:
         self.directory = directory
         self.path = path
         # default value: 0, 1: set the flag, 2: remove the exec flag
-        self.executable = 0
+        self.executable = DEFAULT_FLAG
         self.link = None
         self.fullpath = os.path.join(rootpath, path)
 
     def change_prop(self, key, value):
         if key == properties.PROP_EXECUTABLE:
             if value is None:  # bit flip off
-                self.executable = 2
+                self.executable = NOEXEC_FLAG
             else:
-                self.executable = 1
+                self.executable = EXEC_FLAG
         elif key == properties.PROP_SPECIAL:
             # Possibly a symbolic link. We cannot check further at
-            # that moment though since patch(s) are not applied yet
+            # that moment though, patch(s) not being applied yet
             self.link = True
 
     def __make_symlink(self, src):
@@ -162,6 +167,8 @@ class SWHFileEditor:
           computation purposes)
 
         """
+        is_link = None
+
         if self.link:
             # can only check now that the link is a real one
             # since patch has been applied
@@ -171,10 +178,11 @@ class SWHFileEditor:
             else:  # not a real link...
                 self.link = False
 
-        if self.executable == 1:
-            os.chmod(self.fullpath, 0o755)
-        elif self.executable == 2:
-            os.chmod(self.fullpath, 0o644)
+        if not is_link:  # if a link, do nothing regarding flag
+            if self.executable == EXEC_FLAG:
+                os.chmod(self.fullpath, 0o755)
+            elif self.executable == NOEXEC_FLAG:
+                os.chmod(self.fullpath, 0o644)
 
         # And now compute file's checksums
         self.directory[self.path] = Content.from_file(path=self.fullpath,

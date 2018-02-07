@@ -1,3 +1,11 @@
+swh-loader-svn (0.0.36-1~swh1) unstable-swh; urgency=medium
+
+  * v0.0.36
+  * swh.loader.svn: Fix corner edge case on symbolic link
+  * swh.loader.svn: Deal with empty svn repository edge case
+
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 07 Feb 2018 12:36:45 +0100
+
 swh-loader-svn (0.0.35-1~swh1) unstable-swh; urgency=medium
 
   * Release swh.loader.svn v0.0.35

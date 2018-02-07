@@ -1,8 +1,10 @@
-swh-loader-svn (0.0.35-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.36-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.36
+  * swh.loader.svn: Fix corner edge case on symbolic link
+  * swh.loader.svn: Deal with empty svn repository edge case
 
- -- Nicolas Dandrimont <nicolas@dandrimont.eu>  Tue, 06 Feb 2018 14:40:28 +0100
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 07 Feb 2018 12:36:45 +0100
 
 swh-loader-svn (0.0.35-1~swh1) unstable-swh; urgency=medium
 

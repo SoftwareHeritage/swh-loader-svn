@@ -321,8 +321,8 @@ Local repository not cleaned up for investigation: %s''' % (
                 hashutil.hash_to_hex(dir_id)))
 
             if (count % self.check_revision) == 0:  # hash computation check
-                self.log.info('Checking hash computations on revision %s...' %
-                              rev)
+                self.log.debug('Checking hash computations on revision %s...' %
+                               rev)
                 checked_dir_id = self.swh_revision_hash_tree_at_svn_revision(
                     rev)
                 if checked_dir_id != dir_id:
@@ -459,13 +459,7 @@ Local repository not cleaned up for investigation: %s''' % (
                 origin_visit,
                 last_known_swh_revision=self.last_known_swh_revision,
                 start_from_scratch=self.start_from_scratch)
-        except SvnLoaderUneventful as e:  # uneventful visit
-            self.log.info('Uneventful visit. Detail: %s' % e)
-            if self.latest_snapshot and 'snapshot' in self.latest_snapshot:
-                snapshot = self.latest_snapshot['snapshot']
-                self.process_swh_snapshot(snapshot=snapshot)
         except SvnLoaderEventful as e:
-            self.log.error('Eventful partial visit. Detail: %s' % e)
             latest_rev = e.swh_revision
             self.process_swh_snapshot(revision=latest_rev)
             raise

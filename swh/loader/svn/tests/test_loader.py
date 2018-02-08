@@ -10,8 +10,9 @@ from unittest import TestCase
 from swh.model import hashutil
 
 from swh.loader.svn.loader import build_swh_snapshot, DEFAULT_BRANCH
-from swh.loader.svn.loader import SWHSvnLoader, SvnLoaderEventful
-from swh.loader.svn.loader import SvnLoaderHistoryAltered, SvnLoaderUneventful
+from swh.loader.svn.loader import SWHSvnLoader
+from swh.loader.svn.exception import SvnLoaderEventful, SvnLoaderUneventful
+from swh.loader.svn.exception import SvnLoaderHistoryAltered
 
 
 class TestSWHSnapshot(TestCase):

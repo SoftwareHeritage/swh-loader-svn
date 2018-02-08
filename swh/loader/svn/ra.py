@@ -19,6 +19,9 @@ from swh.model import hashutil
 from swh.model.from_disk import Content, Directory
 
 
+CRLF = b'\r\n'
+
+
 def apply_txdelta_handler(sbuf, target_stream):
     """Return a function that can be called repeatedly with txdelta windows.
     When done, closes the target_stream.
@@ -79,6 +82,11 @@ DEFAULT_FLAG = 0
 EXEC_FLAG = 1
 NOEXEC_FLAG = 2
 
+SVN_PROPERTY_EOL = 'svn:eol-style'
+
+# EOL state check mess
+EOL_CHECK = {}
+
 
 class SWHFileEditor:
     """File Editor in charge of updating file on disk and memory objects.
@@ -104,6 +112,12 @@ class SWHFileEditor:
             # Possibly a symbolic link. We cannot check further at
             # that moment though, patch(s) not being applied yet
             self.link = True
+        elif key == SVN_PROPERTY_EOL:  # Detect inconsistent repositories
+            if value in ['LF', 'native']:
+                EOL_CHECK[self.fullpath] = value
+            else:
+                if self.fullpath in EOL_CHECK:
+                    del EOL_CHECK[self.fullpath]
 
     def __make_symlink(self, src):
         """Convert the svnlink to a symlink on disk.
@@ -184,6 +198,15 @@ class SWHFileEditor:
             elif self.executable == NOEXEC_FLAG:
                 os.chmod(self.fullpath, 0o644)
 
+            check_eol = EOL_CHECK.get(self.fullpath)
+            if check_eol:
+                raw_content = open(self.fullpath, 'rb').read()
+                if CRLF in raw_content:  # CRLF
+                    msg = 'Inconsistency. CRLF detected in a converted ' \
+                          'file %s (%s: %s)' % (
+                              self.fullpath, SVN_PROPERTY_EOL, check_eol)
+                    raise ValueError(msg)
+
         # And now compute file's checksums
         self.directory[self.path] = Content.from_file(path=self.fullpath,
                                                       data=True)
@@ -239,6 +262,8 @@ class BaseDirSWHEditor:
                 shutil.rmtree(fpath)
             else:
                 os.remove(fpath)
+        if path in EOL_CHECK:
+            del EOL_CHECK[path]
 
     def update_checksum(self):
         raise NotImplementedError('This should be implemented.')

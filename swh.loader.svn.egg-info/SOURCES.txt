@@ -40,6 +40,7 @@ swh.loader.svn.egg-info/top_level.txt
 swh/loader/__init__.py
 swh/loader/svn/__init__.py
 swh/loader/svn/converters.py
+swh/loader/svn/exception.py
 swh/loader/svn/loader.py
 swh/loader/svn/producer.py
 swh/loader/svn/ra.py

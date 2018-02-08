@@ -1,8 +1,11 @@
-swh-loader-svn (0.0.36-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.37-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.37
+  * swh.loader.svn: Detect eol inconsistency and make the loading fail
+  * swh.loader.svn: Reduce log verbosity
+  * swh.loader.svn: Migrate exception to their specific module
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 07 Feb 2018 12:36:45 +0100
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Thu, 08 Feb 2018 17:57:15 +0100
 
 swh-loader-svn (0.0.36-1~swh1) unstable-swh; urgency=medium
 

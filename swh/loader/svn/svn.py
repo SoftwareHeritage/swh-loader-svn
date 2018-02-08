@@ -24,12 +24,6 @@ from . import ra, converters
 DEFAULT_AUTHOR_MESSAGE = ''
 
 
-class SvnRepoException(ValueError):
-    def __init__(self, svnrepo, e):
-        super().__init__(e)
-        self.svnrepo = svnrepo
-
-
 class SWHSvnRepo:
     """SWH's svn repository representation.
 

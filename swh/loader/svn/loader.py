@@ -20,6 +20,8 @@ from swh.loader.core.loader import SWHLoader
 
 from . import svn, converters
 from .utils import init_svn_repo_from_archive_dump
+from .exception import SvnLoaderEventful, SvnLoaderUneventful
+from .exception import SvnLoaderHistoryAltered
 
 
 DEFAULT_BRANCH = b'master'
@@ -42,30 +44,6 @@ def build_swh_snapshot(revision_id, branch=DEFAULT_BRANCH):
             }
         }
     }
-
-
-class SvnLoaderEventful(ValueError):
-    """A wrapper exception to transit the swh_revision onto which the
-       loading failed.
-
-    """
-    def __init__(self, e, swh_revision):
-        super().__init__(e)
-        self.swh_revision = swh_revision
-
-
-class SvnLoaderUneventful(ValueError):
-    """'Loading did nothing' exception to transit the latest known
-        snapshot.
-
-    """
-    def __init__(self, e):
-        super().__init__(e)
-
-
-class SvnLoaderHistoryAltered(ValueError):
-    def __init__(self, e):
-        super().__init__(e)
 
 
 class SWHSvnLoader(SWHLoader):

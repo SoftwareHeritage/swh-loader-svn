@@ -1,8 +1,9 @@
-swh-loader-svn (0.0.37-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.38-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.38
+  * In failure mode, try harder to make snapshot
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Thu, 08 Feb 2018 17:57:15 +0100
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 09 Feb 2018 14:13:30 +0100
 
 swh-loader-svn (0.0.37-1~swh1) unstable-swh; urgency=medium
 

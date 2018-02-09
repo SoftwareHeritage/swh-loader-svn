@@ -70,6 +70,7 @@ class SWHSvnLoader(SWHLoader):
         self.check_revision = self.config['check_revision']
         self.origin_id = None
         self.debug = self.config['debug']
+        self.last_seen_revision = None
 
     def cleanup(self):
         """Clean up the svn repository's working representation on disk.
@@ -360,26 +361,31 @@ Local repository not cleaned up for investigation: %s''' % (
                     self.config['revision_packet_size']):
                 revs = list(revisions)
                 self.maybe_load_revisions(revs)
-                self.log.debug('Processed %s revisions: [%s, ...]' % (
-                    len(revs), hashutil.hash_to_hex(revs[0]['id'])))
+                last_revision = revs[-1]
+                self.log.debug('Processed %s revisions: [..., %s]' % (
+                    len(revs), hashutil.hash_to_hex(last_revision['id'])))
+                self.last_seen_revision = last_revision
         except Exception as e:
             if revs:
                 # flush remaining revisions
                 self.maybe_load_revisions(revs)
                 # Take the last one as the last known revisions
                 known_swh_rev = revs[-1]
+            elif self.last_seen_revision:  # We'll try to make a snapshot
+                known_swh_rev = self.last_seen_revision
+            else:
+                raise
 
-                _id = known_swh_rev.get('id')
-                if not _id:
-                    _id = _revision_id(known_swh_rev)
+            _id = known_swh_rev.get('id')
+            if not _id:
+                _id = _revision_id(known_swh_rev)
 
-                # Then notify something is wrong, and we stopped at that rev.
-                raise SvnLoaderEventful(e, swh_revision={
-                    'id': _id,
-                })
-            raise e
+            # Then notify something is wrong, and we stopped at that rev.
+            raise SvnLoaderEventful(e, swh_revision={
+                'id': _id,
+            })
 
-        return revs[-1]
+        return last_revision
 
     def process_swh_snapshot(self, revision=None, snapshot=None):
         """Create the snapshot either from existing snapshot or revision.

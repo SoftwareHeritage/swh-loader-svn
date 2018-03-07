@@ -1,3 +1,12 @@
+swh-loader-svn (0.0.39-1~swh1) unstable-swh; urgency=medium
+
+  * v0.0.39
+  * Improve origin_visit initialization step
+  * Properly sandbox the prepare statement so that if it breaks, we can
+  * update appropriately the visit with the correct status
+
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 07 Mar 2018 11:31:34 +0100
+
 swh-loader-svn (0.0.38-1~swh1) unstable-swh; urgency=medium
 
   * v0.0.38

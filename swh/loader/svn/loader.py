@@ -401,42 +401,27 @@ Local repository not cleaned up for investigation: %s''' % (
         self.log.debug('snapshot: %s' % snap)
         self.maybe_load_snapshot(snap)
 
-    def prepare(self, *args, **kwargs):
-        self.args = args
-
-        destination_path = kwargs['destination_path']
-        # local svn url
-        svn_url = kwargs['svn_url']
-        origin_url = kwargs.get('origin_url')
-        self.visit_date = kwargs.get('visit_date')
-        self.start_from_scratch = kwargs.get('start_from_scratch', False)
-
-        origin = {
+    def prepare_origin_visit(self, *, svn_url, visit_date=None,
+                             origin_url=None, **kwargs):
+        self.origin = {
             'url': origin_url if origin_url else svn_url,
             'type': 'svn',
         }
+        self.visit_date = visit_date
 
-        self.origin_id = self.send_origin(origin)
-        origin['id'] = self.origin_id
-        self.origin = origin
-
-        if 'swh_revision' in kwargs:
+    def prepare(self, *, destination_path, svn_url,
+                swh_revision=None, start_from_scratch=False, **kwargs):
+        self.start_from_scratch = start_from_scratch
+        if swh_revision:
             self.last_known_swh_revision = hashutil.hash_to_bytes(
-                kwargs['swh_revision'])
+                swh_revision)
         else:
             self.last_known_swh_revision = None
 
         self.latest_snapshot = self.swh_latest_snapshot_revision(
             self.origin_id, self.last_known_swh_revision)
-
-        self.svnrepo = self.get_svn_repo(svn_url, destination_path, origin)
-
-    def get_origin(self):
-        """Retrieve the origin we are working with (setup-ed in the prepare
-           method)
-
-        """
-        return self.origin  # set in prepare method
+        self.svnrepo = self.get_svn_repo(
+            svn_url, destination_path, self.origin)
 
     def fetch_data(self):
         """We need to fetch and stream the data to store directly.  So

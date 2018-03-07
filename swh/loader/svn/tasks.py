@@ -44,7 +44,6 @@ class MountAndLoadSvnRepositoryTsk(Task):
            3. Clean up mounted svn repository archive.
 
         """
-
         loader = SWHSvnLoaderFromDumpArchive(archive_path)
         loader.log = self.log
         return loader.load(svn_url='file://%s' % loader.repo_path,

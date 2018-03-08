@@ -49,5 +49,5 @@ class MountAndLoadSvnRepositoryTsk(Task):
         return loader.load(svn_url='file://%s' % loader.repo_path,
                            origin_url=origin_url,
                            visit_date=visit_date,
-                           destination_path=None,
+                           archive_path=archive_path,
                            start_from_scratch=start_from_scratch)

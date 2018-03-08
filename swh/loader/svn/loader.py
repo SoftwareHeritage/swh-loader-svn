@@ -9,7 +9,6 @@ swh-storage.
 """
 
 import os
-import psutil
 import shutil
 import tempfile
 
@@ -19,6 +18,7 @@ from swh.model.from_disk import Directory
 from swh.model.identifiers import identifier_to_bytes, revision_identifier
 from swh.model.identifiers import snapshot_identifier
 from swh.loader.core.loader import SWHLoader
+from swh.loader.core.utils import clean_dangling_folders
 
 from . import svn, converters
 from .utils import init_svn_repo_from_archive_dump
@@ -48,7 +48,7 @@ def build_swh_snapshot(revision_id, branch=DEFAULT_BRANCH):
     }
 
 
-TEMPORARY_DIR_PREFIX = 'swh.loader.svn.'
+TEMPORARY_DIR_PREFIX_PATTERN = 'swh.loader.svn.'
 
 
 class SWHSvnLoader(SWHLoader):
@@ -84,27 +84,9 @@ class SWHSvnLoader(SWHLoader):
            tasks)
 
         """
-        if not os.path.exists(self.temp_directory):
-            return
-        for filename in os.listdir(self.temp_directory):
-            try:
-                # pattern: `swh.loader.svn-pid.{noise}`
-                if TEMPORARY_DIR_PREFIX not in filename or \
-                   '-' not in filename:  # silently ignore unknown patterns
-                    continue
-                _, pid = filename.split('-')
-                pid = int(pid.split('.')[0])
-                if psutil.pid_exists(pid):
-                    self.log.debug('PID %s is live, skipping' % pid)
-                    continue
-                path_to_cleanup = os.path.join(self.temp_directory, filename)
-                # could be removed concurrently, another existence check
-                if os.path.exists(path_to_cleanup):
-                    shutil.rmtree(path_to_cleanup)
-            except Exception as e:
-                msg = 'Fail to clean dangling path %s: %s' % (
-                    path_to_cleanup, e)
-                self.log.warn(msg)
+        clean_dangling_folders(path=self.temp_directory,
+                               pattern_check=TEMPORARY_DIR_PREFIX_PATTERN,
+                               log=self.log)
 
     def cleanup(self):
         """Clean up the svn repository's working representation on disk.
@@ -458,9 +440,11 @@ Local repository not cleaned up for investigation: %s''' % (
         if destination_path:
             local_dirname = destination_path
         else:
-            local_dirname = tempfile.mkdtemp(suffix='-%s' % os.getpid(),
-                                             prefix=TEMPORARY_DIR_PREFIX,
-                                             dir=self.temp_directory)
+            local_dirname = tempfile.mkdtemp(
+                suffix='-%s' % os.getpid(),
+                prefix=TEMPORARY_DIR_PREFIX_PATTERN,
+                dir=self.temp_directory)
+
         self.svnrepo = self.get_svn_repo(svn_url, local_dirname, self.origin)
 
     def fetch_data(self):
@@ -545,7 +529,7 @@ class SWHSvnLoaderFromDumpArchive(SWHSvnLoader):
         self.log.info('Archive to mount and load %s' % archive_path)
         self.temp_dir, self.repo_path = init_svn_repo_from_archive_dump(
             archive_path,
-            prefix=TEMPORARY_DIR_PREFIX,
+            prefix=TEMPORARY_DIR_PREFIX_PATTERN,
             suffix='-%s' % os.getpid(),
             root_dir=self.temp_directory)
 

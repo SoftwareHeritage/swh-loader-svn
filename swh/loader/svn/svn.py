@@ -27,18 +27,17 @@ DEFAULT_AUTHOR_MESSAGE = ''
 class SWHSvnRepo:
     """SWH's svn repository representation.
 
+    Args:
+        remote_url (str):
+        origin_id (int): Associated origin identifier
+        storage (Storage): Storage to use to execute storage statements
+        local_dirname (str): Path to write intermediary svn action results
+
     """
-    def __init__(self, remote_url, origin_id, storage,
-                 destination_path=None):
+    def __init__(self, remote_url, origin_id, storage, local_dirname):
         self.remote_url = remote_url.rstrip('/')
         self.storage = storage
         self.origin_id = origin_id
-
-        if destination_path:
-            os.makedirs(destination_path, exist_ok=True)
-            self.root_dir = destination_path
-        else:
-            self.root_dir = '/tmp'
 
         auth = Auth([get_username_provider()])
         # one connection for log iteration
@@ -48,9 +47,7 @@ class SWHSvnRepo:
         # one client for update operation
         self.client = client.Client(auth=auth)
 
-        self.local_dirname = tempfile.mkdtemp(suffix='.tmp',
-                                              prefix='swh.loader.svn.',
-                                              dir=self.root_dir)
+        self.local_dirname = local_dirname
         local_name = os.path.basename(self.remote_url)
         self.local_url = os.path.join(self.local_dirname, local_name).encode(
             'utf-8')

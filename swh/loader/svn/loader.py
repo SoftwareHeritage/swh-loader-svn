@@ -10,6 +10,7 @@ swh-storage.
 
 import os
 import shutil
+import tempfile
 
 from swh.core import utils
 from swh.model import hashutil
@@ -17,6 +18,7 @@ from swh.model.from_disk import Directory
 from swh.model.identifiers import identifier_to_bytes, revision_identifier
 from swh.model.identifiers import snapshot_identifier
 from swh.loader.core.loader import SWHLoader
+from swh.loader.core.utils import clean_dangling_folders
 
 from . import svn, converters
 from .utils import init_svn_repo_from_archive_dump
@@ -46,6 +48,9 @@ def build_swh_snapshot(revision_id, branch=DEFAULT_BRANCH):
     }
 
 
+TEMPORARY_DIR_PREFIX_PATTERN = 'swh.loader.svn.'
+
+
 class SWHSvnLoader(SWHLoader):
     """Swh svn loader to load an svn repository The repository is either
     remote or local.  The loader deals with update on an already
@@ -62,6 +67,7 @@ class SWHSvnLoader(SWHLoader):
 
     ADDITIONAL_CONFIG = {
         'check_revision': ('int', 1000),
+        'temp_directory': ('str', '/tmp'),
         'debug': ('bool', False),  # NOT FOR PRODUCTION, False is mandatory
     }
 
@@ -71,6 +77,16 @@ class SWHSvnLoader(SWHLoader):
         self.origin_id = None
         self.debug = self.config['debug']
         self.last_seen_revision = None
+        self.temp_directory = self.config['temp_directory']
+
+    def pre_cleanup(self):
+        """Cleanup potential dangling files from prior runs (e.g. OOM killed
+           tasks)
+
+        """
+        clean_dangling_folders(self.temp_directory,
+                               pattern_check=TEMPORARY_DIR_PREFIX_PATTERN,
+                               log=self.log)
 
     def cleanup(self):
         """Clean up the svn repository's working representation on disk.
@@ -98,13 +114,13 @@ Local repository not cleaned up for investigation: %s''' % (
         self.svnrepo.clean_fs(local_dirname)
         return h
 
-    def get_svn_repo(self, svn_url, destination_path, origin):
+    def get_svn_repo(self, svn_url, local_dirname, origin):
         """Instantiates the needed svnrepo collaborator to permit reading svn
         repository.
 
         Args:
             svn_url (str): the svn repository url to read from
-            destination_path (str): the local path on disk to compute data
+            local_dirname (str): the local path on disk to compute data
             origin (int): the corresponding origin
 
         Returns:
@@ -112,7 +128,7 @@ Local repository not cleaned up for investigation: %s''' % (
         """
         return svn.SWHSvnRepo(
             svn_url, origin['id'], self.storage,
-            destination_path=destination_path)
+            local_dirname=local_dirname)
 
     def swh_latest_snapshot_revision(self, origin_id,
                                      previous_swh_revision=None):
@@ -409,7 +425,7 @@ Local repository not cleaned up for investigation: %s''' % (
         }
         self.visit_date = visit_date
 
-    def prepare(self, *, destination_path, svn_url,
+    def prepare(self, *, svn_url, destination_path=None,
                 swh_revision=None, start_from_scratch=False, **kwargs):
         self.start_from_scratch = start_from_scratch
         if swh_revision:
@@ -420,8 +436,16 @@ Local repository not cleaned up for investigation: %s''' % (
 
         self.latest_snapshot = self.swh_latest_snapshot_revision(
             self.origin_id, self.last_known_swh_revision)
-        self.svnrepo = self.get_svn_repo(
-            svn_url, destination_path, self.origin)
+
+        if destination_path:
+            local_dirname = destination_path
+        else:
+            local_dirname = tempfile.mkdtemp(
+                suffix='-%s' % os.getpid(),
+                prefix=TEMPORARY_DIR_PREFIX_PATTERN,
+                dir=self.temp_directory)
+
+        self.svnrepo = self.get_svn_repo(svn_url, local_dirname, self.origin)
 
     def fetch_data(self):
         """We need to fetch and stream the data to store directly.  So
@@ -504,12 +528,16 @@ class SWHSvnLoaderFromDumpArchive(SWHSvnLoader):
         super().__init__()
         self.log.info('Archive to mount and load %s' % archive_path)
         self.temp_dir, self.repo_path = init_svn_repo_from_archive_dump(
-            archive_path)
+            archive_path,
+            prefix=TEMPORARY_DIR_PREFIX_PATTERN,
+            suffix='-%s' % os.getpid(),
+            root_dir=self.temp_directory)
 
     def cleanup(self):
         super().cleanup()
 
         if self.temp_dir and os.path.exists(self.temp_dir):
-            self.log.debug('Clean up temp directory %s for project %s' % (
-                self.temp_dir, os.path.basename(self.repo_path)))
+            msg = 'Clean up temporary directory dump %s for project %s' % (
+                self.temp_dir, os.path.basename(self.repo_path))
+            self.log.debug(msg)
             shutil.rmtree(self.temp_dir)

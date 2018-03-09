@@ -33,14 +33,16 @@ def strdate_to_timestamp(strdate):
     return ts
 
 
-def init_svn_repo_from_archive_dump(archive_path, root_temp_dir='/tmp'):
+def init_svn_repo_from_archive_dump(archive_path, prefix=None, suffix=None,
+                                    root_dir='/tmp'):
     """Given a path to an archive containing an svn dump.
     Initialize an svn repository with the content of said dump.
 
     Returns:
         A tuple:
-        - temporary folder: containing the mounted repository
-        - repo_path, path to the mounted repository inside the temporary folder
+        - temporary folder (str): containing the mounted repository
+        - repo_path (str): path to the mounted repository inside the
+                           temporary folder
 
     Raises:
         ValueError in case of failure to run the command to uncompress
@@ -48,9 +50,7 @@ def init_svn_repo_from_archive_dump(archive_path, root_temp_dir='/tmp'):
 
     """
     project_name = os.path.basename(os.path.dirname(archive_path))
-    temp_dir = tempfile.mkdtemp(suffix='.tmp',
-                                prefix='swh.loader.svn.',
-                                dir=root_temp_dir)
+    temp_dir = tempfile.mkdtemp(prefix=prefix, suffix=suffix, dir=root_dir)
 
     try:
         repo_path = os.path.join(temp_dir, project_name)

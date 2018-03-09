@@ -1,8 +1,13 @@
-swh-loader-svn (0.0.39-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.40-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.40
+  * svn/loader: Remove wrong parameter name in dangling clean up call
+  * svn/loader: Refactor: Reuse loader.core.utils.clean_dangling_folders
+  * svn/tasks: Explicit tasks' arguments
+  * svn/loader: Add pre-cleanup step to clean potential dangling folders
+  * d/control: Bump to latest python3-swh.loader.core
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 07 Mar 2018 11:31:34 +0100
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 09 Mar 2018 14:51:09 +0100
 
 swh-loader-svn (0.0.39-1~swh1) unstable-swh; urgency=medium
 

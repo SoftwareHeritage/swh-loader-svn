@@ -156,7 +156,7 @@ class SWHFileEditor:
     def apply_textdelta(self, base_checksum):
         if os.path.lexists(self.fullpath):
             if os.path.islink(self.fullpath):
-                # svn does not deal with symlink so we tranform into
+                # svn does not deal with symlink so we transform into
                 # real svn symlink for potential patching in later
                 # commits
                 sbuf = self.__make_svnlink()

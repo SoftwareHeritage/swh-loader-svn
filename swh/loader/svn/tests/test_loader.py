@@ -10,7 +10,7 @@ from unittest import TestCase
 from swh.model import hashutil
 
 from swh.loader.svn.loader import build_swh_snapshot, DEFAULT_BRANCH
-from swh.loader.svn.loader import SvnLoader
+from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
 
 
 class TestSnapshot(TestCase):
@@ -928,3 +928,48 @@ class SvnLoaderITTest13(BaseSvnLoaderTest):
         # FIXME: Check the snapshot's state
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
+
+
+class SvnLoaderFromRemoteDumpNoStorage(LoaderNoStorage, LoaderWithState,
+                                       SvnLoaderFromRemoteDump):
+    """A SvnLoaderFromRemoteDump with no persistence.
+
+    Context:
+        Load a remote svn repository from a generated dump file.
+
+    """
+
+    def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
+        """We do not know this repository so no revision.
+
+        """
+        return {}
+
+
+class SvnLoaderFromRemoteDump(BaseSvnLoaderTest):
+    """
+    Check that the results obtained with the remote svn dump loader
+    and the base svn loader are the same.
+    """
+    def setUp(self):
+        super().setUp(archive_name='pkg-gourmet.tgz')
+
+    @istest
+    def load(self):
+        """
+        Compare results of remote dump loader and base loader
+        """
+        dump_loader = SvnLoaderFromRemoteDumpNoStorage()
+        dump_loader.load(svn_url=self.svn_mirror_url)
+
+        base_loader = SvnLoaderNoStorage()
+        base_loader.load(svn_url=self.svn_mirror_url)
+
+        self.assertEqual(dump_loader.all_contents,
+                         base_loader.all_contents)
+        self.assertEqual(dump_loader.all_directories,
+                         base_loader.all_directories)
+        self.assertEqual(dump_loader.all_revisions,
+                         base_loader.all_revisions)
+        self.assertEqual(dump_loader.all_snapshots,
+                         base_loader.all_snapshots)

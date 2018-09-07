@@ -3,9 +3,12 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+
 from swh.scheduler.task import Task
 
-from .loader import SvnLoader, SvnLoaderFromDumpArchive
+from .loader import (
+    SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump
+)
 
 
 class LoadSvnRepository(Task):
@@ -66,4 +69,27 @@ class MountAndLoadSvnRepository(Task):
                            origin_url=origin_url,
                            visit_date=visit_date,
                            archive_path=archive_path,
+                           start_from_scratch=start_from_scratch)
+
+
+class DumpMountAndLoadSvnRepository(Task):
+    """
+    Create a dump of a remote repository through the svnrdump
+    tool, mount it locally then load the repository into the
+    Software Heritage archive.
+    """
+    task_queue = 'swh_loader_svn_dump_mount_and_load'
+
+    def run_task(self, *, svn_url, origin_url=None, visit_date=None,
+                 start_from_scratch=False):
+        """1. Mount an svn dump from archive as a local svn repository.
+           2. Load it through the svn loader.
+           3. Clean up mounted svn repository archive.
+
+        """
+        loader = SvnLoaderFromRemoteDump()
+        loader.log = self.log
+        return loader.load(svn_url=svn_url,
+                           origin_url=origin_url,
+                           visit_date=visit_date,
                            start_from_scratch=start_from_scratch)

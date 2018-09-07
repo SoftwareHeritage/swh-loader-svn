@@ -9,8 +9,12 @@ swh-storage.
 """
 
 import os
+import re
 import shutil
 import tempfile
+
+from mmap import mmap, ACCESS_WRITE
+from subprocess import run, PIPE
 
 from swh.model import hashutil
 from swh.model.from_disk import Directory
@@ -20,7 +24,9 @@ from swh.loader.core.loader import SWHLoader
 from swh.loader.core.utils import clean_dangling_folders
 
 from . import svn, converters
-from .utils import init_svn_repo_from_archive_dump
+from .utils import (
+    init_svn_repo_from_dump, init_svn_repo_from_archive_dump
+)
 from .exception import SvnLoaderUneventful
 from .exception import SvnLoaderHistoryAltered
 
@@ -597,3 +603,135 @@ class SvnLoaderFromDumpArchive(SvnLoader):
                 self.temp_dir, os.path.basename(self.repo_path))
             self.log.debug(msg)
             shutil.rmtree(self.temp_dir)
+
+
+class SvnLoaderFromRemoteDump(SvnLoader):
+    """
+    Create a subversion repository dump using the svnrdump utility,
+    mount it locally and load the repository from it.
+    """
+    def __init__(self):
+        super().__init__()
+        self.temp_dir = tempfile.mkdtemp(dir=self.temp_directory)
+        self.repo_path = None
+        self.truncated_dump = False
+
+    def get_last_loaded_svn_rev(self, svn_url):
+        """
+        Check if the svn repository has already been visited
+        and return the last loaded svn revision number or -1
+        otherwise.
+        """
+        last_loaded_svn_rev = -1
+        try:
+            origin = \
+                self.storage.origin_get({'type': 'svn', 'url': svn_url})
+            last_swh_rev = \
+                self.swh_latest_snapshot_revision(origin['id'])['revision']
+            last_swh_rev_headers = \
+                dict(last_swh_rev['metadata']['extra_headers'])
+            last_loaded_svn_rev = int(last_swh_rev_headers['svn_revision'])
+        except Exception:
+            pass
+        return last_loaded_svn_rev
+
+    def dump_svn_revisions(self, svn_url, last_loaded_svn_rev=-1):
+        """
+        Generate a subversion dump file using the svnrdump tool.
+        If the svnrdump command failed somehow,
+        the produced dump file is analyzed to determine if a partial
+        loading is still feasible.
+        """
+        # Build the svnrdump command line
+        svnrdump_cmd = ['svnrdump', 'dump', svn_url]
+
+        # Launch the svnrdump command while capturing stderr as
+        # successfully dumped revision numbers are printed to it
+        dump_temp_dir = tempfile.mkdtemp(dir=self.temp_dir)
+        dump_name = ''.join(c for c in svn_url if c.isalnum())
+        dump_path = '%s/%s.svndump' % (dump_temp_dir, dump_name)
+        self.log.debug('Executing %s' % ' '.join(svnrdump_cmd))
+        with open(dump_path, 'wb') as dump_file:
+            svnrdump = run(svnrdump_cmd, stdout=dump_file, stderr=PIPE)
+
+        if svnrdump.returncode == 0:
+            return dump_path
+
+        # There was an error but it does not mean that no revisions
+        # can be loaded.
+
+        # Get the stderr line with latest dumped revision
+        stderr_lines = svnrdump.stderr.split(b'\n')
+        last_dumped_rev = None
+        if len(stderr_lines) > 1:
+            last_dumped_rev = stderr_lines[-2]
+
+        if last_dumped_rev:
+            # Get the latest dumped revision number
+            matched_rev = re.search(b'.*revision ([0-9]+)', last_dumped_rev)
+            last_dumped_rev = int(matched_rev.group(1)) if matched_rev else -1
+            # Check if revisions inside the dump file can be loaded anyway
+            if last_dumped_rev > last_loaded_svn_rev:
+                self.log.debug(('svnrdump did not dump all expected revisions '
+                                'but revisions range %s:%s are available in '
+                                'the generated dump file and will be loaded '
+                                'into the archive.') % (last_loaded_svn_rev+1,
+                                                        last_dumped_rev))
+                # Truncate the dump file after the last successfully dumped
+                # revision to avoid the loading of corrupted data
+                self.log.debug(('Truncating dump file after the last '
+                                'successfully dumped revision (%s) to avoid '
+                                'the loading of corrupted data')
+                               % last_dumped_rev)
+
+                with open(dump_path, 'r+b') as f:
+                    with mmap(f.fileno(), 0, access=ACCESS_WRITE) as s:
+                        pattern = ('Revision-number: %s' %
+                                   (last_dumped_rev+1)).encode()
+                        n = s.rfind(pattern)
+                        if n != -1:
+                            s.resize(n)
+                self.truncated_dump = True
+                return dump_path
+            elif last_dumped_rev != -1:
+                raise Exception(('Last dumped subversion revision (%s) is '
+                                 'lesser than the last one loaded into the '
+                                 'archive (%s).') % (last_dumped_rev,
+                                                     last_loaded_svn_rev))
+
+        raise Exception('An error occurred when running svnrdump and '
+                        'no exploitable dump file has been generated.')
+
+    def prepare(self, *, svn_url, destination_path=None,
+                swh_revision=None, start_from_scratch=False, **kwargs):
+        # First, check if previous revisions have been loaded for the
+        # subversion origin and get the number of the last one
+        last_loaded_svn_rev = self.get_last_loaded_svn_rev(svn_url)
+
+        # Then try to generate a dump file containing relevant svn revisions
+        # to load, an exception will be thrown if something wrong happened
+        dump_path = self.dump_svn_revisions(svn_url, last_loaded_svn_rev)
+
+        # Finally, mount the dump and load the repository
+        self.log.debug('Mounting dump file with "svnadmin load".')
+        _, self.repo_path = \
+            init_svn_repo_from_dump(dump_path,
+                                    prefix=TEMPORARY_DIR_PREFIX_PATTERN,
+                                    suffix='-%s' % os.getpid(),
+                                    root_dir=self.temp_dir)
+        super().prepare(svn_url='file://%s' % self.repo_path,
+                        destination_path=destination_path,
+                        swh_revision=swh_revision,
+                        start_from_scratch=start_from_scratch,
+                        **kwargs)
+
+    def cleanup(self):
+        super().cleanup()
+        if self.temp_dir and os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
+
+    def visit_status(self):
+        if self.truncated_dump:
+            return 'partial'
+        else:
+            return super().visit_status()

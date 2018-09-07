@@ -29,6 +29,7 @@ Depends: gzip,
          python3-swh.scheduler (>= 0.0.14~),
          python3-swh.storage (>= 0.0.83~),
          subversion,
+         rsvndump,
          ${misc:Depends},
          ${python3:Depends}
 Description: Software Heritage Loader Svn

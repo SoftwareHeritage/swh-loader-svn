@@ -14,9 +14,6 @@ from nose.plugins.attrib import attr
 from swh.model import hashutil
 
 
-PATH_TO_DATA = '../../../../..'
-
-
 @attr('fs')
 class BaseTestSvnLoader(unittest.TestCase):
     """Base test loader class.
@@ -29,9 +26,7 @@ class BaseTestSvnLoader(unittest.TestCase):
 
         start_path = os.path.dirname(__file__)
         svn_mirror_repo = os.path.join(start_path,
-                                       PATH_TO_DATA,
-                                       'swh-storage-testdata',
-                                       'svn-folders',
+                                       'svn-test-repos',
                                        archive_name)
 
         # uncompress the sample folder
@@ -63,31 +58,3 @@ class BaseTestSvnLoader(unittest.TestCase):
             directory_id = hashutil.hash_to_hex(rev['directory'])
 
             self.assertEquals(expected_revisions[rev_id], directory_id)
-
-
-class BaseTestTreeLoader(unittest.TestCase):
-    """Root class to ease walk and git hash testing without side-effecty
-    problems.
-
-    """
-    def setUp(self):
-        super().setUp()
-        self.tmp_root_path = tempfile.mkdtemp()
-        self.maxDiff = None
-
-        start_path = os.path.dirname(__file__)
-        sample_folder = os.path.join(start_path,
-                                     PATH_TO_DATA,
-                                     'swh-storage-testdata',
-                                     'dir-folders',
-                                     'sample-folder.tgz')
-
-        self.root_path = os.path.join(self.tmp_root_path, 'sample-folder')
-
-        # uncompress the sample folder
-        subprocess.check_output(
-            ['tar', 'xvf', sample_folder, '-C', self.tmp_root_path])
-
-    def tearDown(self):
-        if os.path.exists(self.tmp_root_path):
-            shutil.rmtree(self.tmp_root_path)

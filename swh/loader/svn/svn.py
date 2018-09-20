@@ -31,13 +31,11 @@ class SvnRepo:
     Args:
         remote_url (str):
         origin_id (int): Associated origin identifier
-        storage (Storage): Storage to use to execute storage statements
         local_dirname (str): Path to write intermediary svn action results
 
     """
-    def __init__(self, remote_url, origin_id, storage, local_dirname):
+    def __init__(self, remote_url, origin_id, local_dirname):
         self.remote_url = remote_url.rstrip('/')
-        self.storage = storage
         self.origin_id = origin_id
 
         auth = Auth([get_username_provider()])

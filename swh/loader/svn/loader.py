@@ -138,9 +138,7 @@ Local repository not cleaned up for investigation: %s''' % (
         Returns:
             Instance of :mod:`swh.loader.svn.svn` clients
         """
-        return svn.SvnRepo(
-            svn_url, origin['id'], self.storage,
-            local_dirname=local_dirname)
+        return svn.SvnRepo(svn_url, origin['id'], local_dirname=local_dirname)
 
     def swh_latest_snapshot_revision(self, origin_id,
                                      previous_swh_revision=None):

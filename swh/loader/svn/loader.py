@@ -348,14 +348,13 @@ Local repository not cleaned up for investigation: %s''' % (
                               revision_parents):
         """Process svn revisions from revision_start to revision_end.
 
-        At each svn revision, checkout the repository, compute the
-        tree hash and blobs and send for swh storage to store.  Then
-        computes and yields the computed swh contents, directories,
-        revision.
+        At each svn revision, apply new diffs and simultaneously
+        compute swh hashes.  This yields those computed swh hashes as
+        a tuple (contents, directories, revision).
 
-        Note that at every self.check_revision, an svn export is done
-        and a hash tree is computed to check that no divergence
-        occurred.
+        Note that at every `self.check_revision`, a supplementary
+        check takes place to check for hash-tree divergence (related
+        T570).
 
         Yields:
             tuple (contents, directories, revision) of dict as a

@@ -25,7 +25,7 @@ from . import ra, converters
 DEFAULT_AUTHOR_MESSAGE = ''
 
 
-class SWHSvnRepo:
+class SvnRepo:
     """SWH's svn repository representation.
 
     Args:

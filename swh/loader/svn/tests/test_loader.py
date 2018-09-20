@@ -10,7 +10,7 @@ from unittest import TestCase
 from swh.model import hashutil
 
 from swh.loader.svn.loader import build_swh_snapshot, DEFAULT_BRANCH
-from swh.loader.svn.loader import SWHSvnLoader
+from swh.loader.svn.loader import SvnLoader
 from swh.loader.svn.exception import SvnLoaderEventful, SvnLoaderUneventful
 from swh.loader.svn.exception import SvnLoaderHistoryAltered
 
@@ -40,7 +40,7 @@ class TestSvnLoader:
     """Mixin class to inhibit the persistence and keep in memory the data
     sent for storage.
 
-    cf. SWHSvnLoaderNoStorage
+    cf. SvnLoaderNoStorage
 
     """
     def __init__(self):
@@ -106,7 +106,7 @@ class TestSvnLoader:
         pass
 
 
-class SvnLoaderNoStorage(TestSvnLoader, SWHSvnLoader):
+class SvnLoaderNoStorage(TestSvnLoader, SvnLoader):
     """An SWHSVNLoader with no persistence.
 
     Context:
@@ -120,7 +120,7 @@ class SvnLoaderNoStorage(TestSvnLoader, SWHSvnLoader):
         return {}
 
 
-class SvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
+class SvnLoaderUpdateNoStorage(TestSvnLoader, SvnLoader):
     """An SWHSVNLoader with no persistence.
 
     Context:
@@ -138,7 +138,7 @@ class SvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
 
         Check the following for explanation about the hashes:
         - test_loader.org for (swh policy).
-        - cf. SWHSvnLoaderITTest
+        - cf. SvnLoaderITTest
 
         """
         return {
@@ -162,7 +162,7 @@ class SvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
         }
 
 
-class SvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
+class SvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SvnLoader):
     """An SWHSVNLoader with no persistence.
 
     Context: Load a known svn repository using the swh policy with its
@@ -175,7 +175,7 @@ class SvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
 
         Check the following for explanation about the hashes:
         - test_loader.org for (swh policy).
-        - cf. SWHSvnLoaderITTest
+        - cf. SvnLoaderITTest
 
         """
         return {
@@ -410,7 +410,7 @@ class SvnLoaderITTest5(BaseTestSvnLoader):
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderWithPreviousRevisionNoStorage(TestSvnLoader, SWHSvnLoader):
+class SvnLoaderWithPreviousRevisionNoStorage(TestSvnLoader, SvnLoader):
     """An SWHSVNLoader with no persistence.
 
     Context: Load a known svn repository using the swh policy with its
@@ -423,7 +423,7 @@ class SvnLoaderWithPreviousRevisionNoStorage(TestSvnLoader, SWHSvnLoader):
 
         Check the following for explanation about the hashes:
         - test_loader.org for (swh policy).
-        - cf. SWHSvnLoaderITTest
+        - cf. SvnLoaderITTest
 
         """
         return {
@@ -557,7 +557,7 @@ class SvnLoaderITest7(BaseTestSvnLoader):
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
+class SvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SvnLoader):
     """Context:
         Load a known svn repository.  The last visit seen is less
         recent than a previous unfinished crawl.
@@ -569,7 +569,7 @@ class SvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
 
         Check the following for explanation about the hashes:
         - test_loader.org for (swh policy).
-        - cf. SWHSvnLoaderITTest
+        - cf. SvnLoaderITTest
 
         """
         return {

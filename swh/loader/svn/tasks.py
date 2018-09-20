@@ -5,10 +5,10 @@
 
 from swh.scheduler.task import Task
 
-from .loader import SWHSvnLoader, SWHSvnLoaderFromDumpArchive
+from .loader import SvnLoader, SvnLoaderFromDumpArchive
 
 
-class LoadSWHSvnRepositoryTsk(Task):
+class LoadSvnRepository(Task):
     """Import one svn repository to Software Heritage.
 
     """
@@ -35,7 +35,7 @@ class LoadSWHSvnRepositoryTsk(Task):
                 docstring
 
         """
-        loader = SWHSvnLoader()
+        loader = SvnLoader()
         loader.log = self.log
         return loader.load(
             svn_url=svn_url,
@@ -46,7 +46,7 @@ class LoadSWHSvnRepositoryTsk(Task):
             start_from_scratch=start_from_scratch)
 
 
-class MountAndLoadSvnRepositoryTsk(Task):
+class MountAndLoadSvnRepository(Task):
     task_queue = 'swh_loader_svn_mount_and_load'
 
     def run_task(self, *, archive_path, origin_url=None, visit_date=None,
@@ -56,7 +56,7 @@ class MountAndLoadSvnRepositoryTsk(Task):
            3. Clean up mounted svn repository archive.
 
         """
-        loader = SWHSvnLoaderFromDumpArchive(archive_path)
+        loader = SvnLoaderFromDumpArchive(archive_path)
         loader.log = self.log
         return loader.load(svn_url='file://%s' % loader.repo_path,
                            origin_url=origin_url,

@@ -59,9 +59,9 @@ svn_url = 'file://%s/%s' % (local_repo_path, repo)
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
-from swh.loader.svn.tasks import LoadSWHSvnRepositoryTsk
+from swh.loader.svn.tasks import LoadSvnRepository
 
-t = LoadSWHSvnRepositoryTsk()
+t = LoadSvnRepository()
 t.run(svn_url=svn_url,
       destination_path='/tmp',
       origin_url=origin_url, visit_date='2016-05-03T15:16:32+00:00',

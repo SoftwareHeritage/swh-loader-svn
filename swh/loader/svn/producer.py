@@ -109,7 +109,7 @@ def produce_svn_to_load(url, origin_url, destination_path, visit_date,
     """Produce svn urls to celery queue
 
     """
-    task = get_task('swh.loader.svn.tasks.LoadSWHSvnRepositoryTsk')
+    task = get_task('swh.loader.svn.tasks.LoadSvnRepository')
 
     if synchroneous:
         fn = task
@@ -148,7 +148,7 @@ def produce_archive_to_mount_and_load(path, visit_date, synchroneous, dry_run,
     """Produce svn dumps to celery queue
 
     """
-    task = get_task('swh.loader.svn.tasks.MountAndLoadSvnRepositoryTsk')
+    task = get_task('swh.loader.svn.tasks.MountAndLoadSvnRepository')
 
     if synchroneous:
         fn = task

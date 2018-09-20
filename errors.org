@@ -4,7 +4,7 @@
 * Malformed xml exception when asking for log
 
 #+BEGIN_SRC sh
-[2016-04-03 11:10:43,740: ERROR/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[8ffa1cf0-6e88-40f5-9918-f659de0810f3] raised unexpected: ClientError('The XML response contains invalid XML\nMalformed XML: not well-formed (invalid token)',)
+[2016-04-03 11:10:43,740: ERROR/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepository[8ffa1cf0-6e88-40f5-9918-f659de0810f3] raised unexpected: ClientError('The XML response contains invalid XML\nMalformed XML: not well-formed (invalid token)',)
 Traceback (most recent call last):
   File "/usr/lib/python3/dist-packages/celery/app/trace.py", line 240, in trace_task
     R = retval = fun(*args, **kwargs)
@@ -274,7 +274,7 @@ pysvn._pysvn_3_5.ClientError: '/tmp/tmp.fc9qu8sx.swh.loader/org-trello' is alrea
 ???
 
 #+BEGIN_SRC sh
-[2016-04-03 12:45:41,468: ERROR/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepositoryTsk[9bf99330-4960-41ab-989f-3b172ffa92e6] raised unexpected: ValueError(ClientError("The node '/tmp/tmp.kra26_aa.swh.loader/dot-files/LICENSE.txt' was not found.",),)
+[2016-04-03 12:45:41,468: ERROR/MainProcess] Task swh.loader.svn.tasks.LoadSvnRepository[9bf99330-4960-41ab-989f-3b172ffa92e6] raised unexpected: ValueError(ClientError("The node '/tmp/tmp.kra26_aa.swh.loader/dot-files/LICENSE.txt' was not found.",),)
 Traceback (most recent call last):
   File "/usr/lib/python3/dist-packages/celery/app/trace.py", line 240, in trace_task
     R = retval = fun(*args, **kwargs)

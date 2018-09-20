@@ -50,7 +50,7 @@ def build_swh_snapshot(revision_id, branch=DEFAULT_BRANCH):
 TEMPORARY_DIR_PREFIX_PATTERN = 'swh.loader.svn.'
 
 
-class SWHSvnLoader(SWHLoader):
+class SvnLoader(SWHLoader):
     """Swh svn loader to load an svn repository The repository is either
     remote or local.  The loader deals with update on an already
     previously loaded repository.
@@ -138,7 +138,7 @@ Local repository not cleaned up for investigation: %s''' % (
         Returns:
             Instance of :mod:`swh.loader.svn.svn` clients
         """
-        return svn.SWHSvnRepo(
+        return svn.SvnRepo(
             svn_url, origin['id'], self.storage,
             local_dirname=local_dirname)
 
@@ -541,7 +541,7 @@ Local repository not cleaned up for investigation: %s''' % (
         return self._visit_status
 
 
-class SWHSvnLoaderFromDumpArchive(SWHSvnLoader):
+class SvnLoaderFromDumpArchive(SvnLoader):
     """Uncompress an archive containing an svn dump, mount the svn dump as
        an svn repository and load said repository.
 

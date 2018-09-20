@@ -209,11 +209,8 @@ Local repository not cleaned up for investigation: %s''' % (
             The swh revision corresponding to the svn revision.
 
         """
-        return converters.build_swh_revision(rev,
-                                             commit,
-                                             self.svnrepo.uuid,
-                                             dir_id,
-                                             parents)
+        return converters.build_swh_revision(
+            rev, commit, self.svnrepo.uuid, dir_id, parents)
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.

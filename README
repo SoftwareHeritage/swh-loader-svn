@@ -10,34 +10,20 @@ Documents are in the ./docs folder:
 ## Location
 
 Either:
-- /etc/softwareheritage/loader/svn.ini
-- ~/.config/swh/loader/svn.ini
-- ~/.swh/loader/svn.ini
+- /etc/softwareheritage/
+- ~/.config/swh/
+- ~/.swh/
+
+Note: Will call that location $SWH_CONFIG_PATH
 
 ## Configuration sample
 
+$SWH_CONFIG_PATH/loader/svn.yml:
 ```
 storage:
   cls: remote
   args:
     url: http://localhost:5002/
-
-send_contents: true
-send_directories: true
-send_revisions: true
-send_releases: true
-send_occurrences: true
-# nb of max contents to send for storage
-content_packet_size: 10000
-# 100 Mib of content data
-content_packet_block_size_bytes: 104857600
-# limit for swh content storage for one blob (beyond that limit, the
-# content's data is not sent for storage)
-content_packet_size_bytes: 1073741824
-directory_packet_size: 2500
-revision_packet_size: 10
-release_packet_size: 1000
-occurrence_packet_size: 1000
 
 check_revision: 10
 ```
@@ -47,18 +33,44 @@ check_revision: 10
 With at least the following module (swh.loader.svn.tasks) and queue
 (swh_loader_svn):
 
-
+$SWH_CONFIG_PATH/worker.yml:
 ```
-[main]
-task_broker = amqp://guest@localhost//
-task_modules = swh.loader.svn.tasks
-task_queues = swh_loader_svn
+task_broker: amqp://guest@localhost//
+task_modules:
+task_modules:
+  - swh.loader.svn.tasks
+task_queues:
+  - swh_loader_svn
 task_soft_time_limit = 0
 ```
 
-swh.loader.svn.tasks and swh_loader_svn are the important entries here.
+`swh.loader.svn.tasks` and `swh_loader_svn` are the important entries here.
 
-## start worker instance
+## toplevel
+
+```
+$ python3
+repo = 'pyang-repo-r343-eol-native-mixed-lf-crlf'
+#repo = 'zipeg-gae'
+origin_url = 'http://%s.googlecode.com' % repo
+local_repo_path = '/home/storage/svn/repo'
+svn_url = 'file://%s/%s' % (local_repo_path, repo)
+
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+from swh.loader.svn.tasks import LoadSWHSvnRepositoryTsk
+
+t = LoadSWHSvnRepositoryTsk()
+t.run(svn_url=svn_url,
+      destination_path='/tmp',
+      origin_url=origin_url, visit_date='2016-05-03T15:16:32+00:00',
+      start_from_scratch=True)
+```
+
+## Production like
+
+start worker instance
 
 To start a current worker instance:
 

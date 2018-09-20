@@ -15,7 +15,7 @@ from swh.model import hashutil
 
 
 @attr('fs')
-class BaseTestSvnLoader(unittest.TestCase):
+class BaseSvnLoaderTest(unittest.TestCase):
     """Base test loader class.
 
     In its setup, it's uncompressing a local svn mirror to /tmp.

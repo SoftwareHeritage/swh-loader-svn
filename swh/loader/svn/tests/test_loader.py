@@ -4,15 +4,13 @@
 # See top-level LICENSE file for more information
 
 from nose.tools import istest
-from test_base import BaseTestSvnLoader
+from test_base import BaseSvnLoaderTest
 from unittest import TestCase
 
 from swh.model import hashutil
 
 from swh.loader.svn.loader import build_swh_snapshot, DEFAULT_BRANCH
 from swh.loader.svn.loader import SvnLoader
-from swh.loader.svn.exception import SvnLoaderEventful, SvnLoaderUneventful
-from swh.loader.svn.exception import SvnLoaderHistoryAltered
 
 
 class TestSnapshot(TestCase):
@@ -36,7 +34,7 @@ class TestSnapshot(TestCase):
 # Only for testing purposes.
 
 
-class TestSvnLoader:
+class LoaderNoStorage:
     """Mixin class to inhibit the persistence and keep in memory the data
     sent for storage.
 
@@ -106,7 +104,7 @@ class TestSvnLoader:
         pass
 
 
-class SvnLoaderNoStorage(TestSvnLoader, SvnLoader):
+class SvnLoaderNoStorage(LoaderNoStorage, SvnLoader):
     """An SVNLoader with no persistence.
 
     Context:
@@ -120,7 +118,7 @@ class SvnLoaderNoStorage(TestSvnLoader, SvnLoader):
         return {}
 
 
-class SvnLoaderUpdateNoStorage(TestSvnLoader, SvnLoader):
+class SvnLoaderUpdateNoStorage(LoaderNoStorage, SvnLoader):
     """An SVNLoader with no persistence.
 
     Context:
@@ -162,7 +160,7 @@ class SvnLoaderUpdateNoStorage(TestSvnLoader, SvnLoader):
         }
 
 
-class SvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SvnLoader):
+class SvnLoaderUpdateHistoryAlteredNoStorage(LoaderNoStorage, SvnLoader):
     """An SVNLoader with no persistence.
 
     Context: Load a known svn repository using the swh policy with its
@@ -200,7 +198,7 @@ class SvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SvnLoader):
         }
 
 
-class SvnLoaderITest1(BaseTestSvnLoader):
+class SvnLoaderITest1(BaseSvnLoaderTest):
     """Load an unknown svn repository results in new data.
 
     """
@@ -243,7 +241,7 @@ class SvnLoaderITest1(BaseTestSvnLoader):
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderITest2(BaseTestSvnLoader):
+class SvnLoaderITest2(BaseSvnLoaderTest):
     """Load a visited repository with no new change results in no data
        change.
 
@@ -275,7 +273,7 @@ class SvnLoaderITest2(BaseTestSvnLoader):
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderITest3(BaseTestSvnLoader):
+class SvnLoaderITest3(BaseSvnLoaderTest):
     """In this scenario, the dump has been tampered with to modify the
        commit log.  This results in a hash divergence which is
        detected at startup.
@@ -311,7 +309,7 @@ class SvnLoaderITest3(BaseTestSvnLoader):
         self.assertEqual(self.loader.visit_status(), 'partial')
 
 
-class SvnLoaderITest4(BaseTestSvnLoader):
+class SvnLoaderITest4(BaseSvnLoaderTest):
     """In this scenario, the repository has been updated with new changes.
        The loading visit should result in new objects stored and 1 new
        snapshot.
@@ -358,7 +356,7 @@ class SvnLoaderITest4(BaseTestSvnLoader):
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderITTest5(BaseTestSvnLoader):
+class SvnLoaderITTest5(BaseSvnLoaderTest):
     """Context:
 
        - Repository already injected with successfull data
@@ -410,7 +408,7 @@ class SvnLoaderITTest5(BaseTestSvnLoader):
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderWithPreviousRevisionNoStorage(TestSvnLoader, SvnLoader):
+class SvnLoaderWithPreviousRevisionNoStorage(LoaderNoStorage, SvnLoader):
     """An SVNLoader with no persistence.
 
     Context: Load a known svn repository using the swh policy with its
@@ -446,7 +444,7 @@ class SvnLoaderWithPreviousRevisionNoStorage(TestSvnLoader, SvnLoader):
         }
 
 
-class SvnLoaderITTest6(BaseTestSvnLoader):
+class SvnLoaderITTest6(BaseSvnLoaderTest):
     """Context:
        - repository already visited with load successfull
        - Changes on existing repository
@@ -493,7 +491,7 @@ class SvnLoaderITTest6(BaseTestSvnLoader):
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderITest7(BaseTestSvnLoader):
+class SvnLoaderITest7(BaseSvnLoaderTest):
     """Context:
        - repository already visited with load successfull
        - Changes on existing repository
@@ -557,7 +555,7 @@ class SvnLoaderITest7(BaseTestSvnLoader):
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SvnLoader):
+class SvnLoaderUpdateLessRecentNoStorage(LoaderNoStorage, SvnLoader):
     """Context:
         Load a known svn repository.  The last visit seen is less
         recent than a previous unfinished crawl.
@@ -593,7 +591,7 @@ class SvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SvnLoader):
         }
 
 
-class SvnLoaderITest8(BaseTestSvnLoader):
+class SvnLoaderITest8(BaseSvnLoaderTest):
     """Context:
 
        - Previous visit on existing repository done
@@ -657,7 +655,7 @@ class SvnLoaderITest8(BaseTestSvnLoader):
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderTTest9(BaseTestSvnLoader):
+class SvnLoaderTTest9(BaseSvnLoaderTest):
     """Check that a svn repo containing a versioned file with CRLF line
        endings with svn:eol-style property set to 'native' (this is a
        violation of svn specification as the file should have been
@@ -689,7 +687,7 @@ class SvnLoaderTTest9(BaseTestSvnLoader):
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderITest10(BaseTestSvnLoader): # noqa
+class SvnLoaderITest10(BaseSvnLoaderTest): # noqa
     """Check that a svn repo containing a versioned file with mixed
     CRLF/LF line endings with svn:eol-style property set to 'native'
     (this is a violation of svn specification as mixed line endings
@@ -723,7 +721,7 @@ class SvnLoaderITest10(BaseTestSvnLoader): # noqa
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderITest11(BaseTestSvnLoader):
+class SvnLoaderITest11(BaseSvnLoaderTest):
     """Context:
 
        - Repository with svn:external (which is not deal with for now)
@@ -786,7 +784,7 @@ class SvnLoaderITest11(BaseTestSvnLoader):
         self.assertEqual(self.loader.visit_status(), 'partial')
 
 
-class SvnLoaderITest12(BaseTestSvnLoader):
+class SvnLoaderITest12(BaseSvnLoaderTest):
     """Edge cases:
        - first create a file and commit it.
          Remove it, then add folder holding the same name, commit.
@@ -846,7 +844,7 @@ class SvnLoaderITest12(BaseTestSvnLoader):
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderITTest13(BaseTestSvnLoader):
+class SvnLoaderITTest13(BaseSvnLoaderTest):
     """Edge cases:
        - wrong symbolic link
        - wrong symbolic link with empty space names

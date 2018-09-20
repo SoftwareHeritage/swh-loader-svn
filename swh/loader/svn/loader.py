@@ -126,19 +126,21 @@ Local repository not cleaned up for investigation: %s''' % (
         self.svnrepo.clean_fs(local_dirname)
         return h
 
-    def get_svn_repo(self, svn_url, local_dirname, origin):
+    def get_svn_repo(self, svn_url, local_dirname, origin_id):
         """Instantiates the needed svnrepo collaborator to permit reading svn
         repository.
 
         Args:
             svn_url (str): the svn repository url to read from
             local_dirname (str): the local path on disk to compute data
-            origin (int): the corresponding origin
+            origin_id (int): the corresponding origin id
 
         Returns:
             Instance of :mod:`swh.loader.svn.svn` clients
+
         """
-        return svn.SvnRepo(svn_url, origin['id'], local_dirname=local_dirname)
+        return svn.SvnRepo(svn_url,
+                           local_dirname=local_dirname, origin_id=origin_id)
 
     def swh_latest_snapshot_revision(self, origin_id,
                                      previous_swh_revision=None):
@@ -432,7 +434,8 @@ Local repository not cleaned up for investigation: %s''' % (
                 prefix=TEMPORARY_DIR_PREFIX_PATTERN,
                 dir=self.temp_directory)
 
-        self.svnrepo = self.get_svn_repo(svn_url, local_dirname, self.origin)
+        self.svnrepo = self.get_svn_repo(
+            svn_url, local_dirname, self.origin_id)
         try:
             revision_start, revision_end, revision_parents = self.start_from(
                 self.last_known_swh_revision, self.start_from_scratch)

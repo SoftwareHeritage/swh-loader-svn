@@ -90,8 +90,20 @@ class LoaderNoStorage:
     def maybe_load_snapshot(self, snapshot):
         self._add('snapshot', [snapshot])
 
-    def send_origin(self, origin):
-        return 1
+    def _store_origin_visit(self):
+        pass
+
+    def open_fetch_history(self):
+        pass
+
+    def close_fetch_history_success(self, fetch_history_id):
+        pass
+
+    def close_fetch_history_failure(self, fetch_history_id):
+        pass
+
+    def update_origin_visit(self, origin_id, visit, status):
+        pass
 
     # Override to do nothing at the end
     def close_failure(self):
@@ -104,7 +116,24 @@ class LoaderNoStorage:
         pass
 
 
-class SvnLoaderNoStorage(LoaderNoStorage, SvnLoader):
+class LoaderWithState:
+    """Additional state setup (bypassed by some override for test purposes)
+
+    """
+    def __init__(self):
+        super().__init__()
+        self.origin = {
+            'id': 1,
+            'url': '/dev/null',
+            'type': 'svn',
+        }
+        self.visit = {
+            'origin': 1,
+            'visit': 1,
+        }
+
+
+class SvnLoaderNoStorage(LoaderNoStorage, LoaderWithState, SvnLoader):
     """An SVNLoader with no persistence.
 
     Context:
@@ -118,7 +147,7 @@ class SvnLoaderNoStorage(LoaderNoStorage, SvnLoader):
         return {}
 
 
-class SvnLoaderUpdateNoStorage(LoaderNoStorage, SvnLoader):
+class SvnLoaderUpdateNoStorage(LoaderNoStorage, LoaderWithState, SvnLoader):
     """An SVNLoader with no persistence.
 
     Context:
@@ -160,10 +189,9 @@ class SvnLoaderUpdateNoStorage(LoaderNoStorage, SvnLoader):
         }
 
 
-class SvnLoaderUpdateHistoryAlteredNoStorage(LoaderNoStorage, SvnLoader):
-    """An SVNLoader with no persistence.
-
-    Context: Load a known svn repository using the swh policy with its
+class SvnLoaderUpdateHistoryAlteredNoStorage(LoaderNoStorage, LoaderWithState,
+                                             SvnLoader):
+    """Context: Load a known svn repository using the swh policy with its
     history altered so we do not update it.
 
     """
@@ -408,7 +436,8 @@ class SvnLoaderITTest5(BaseSvnLoaderTest):
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderWithPreviousRevisionNoStorage(LoaderNoStorage, SvnLoader):
+class SvnLoaderWithPreviousRevisionNoStorage(LoaderNoStorage, LoaderWithState,
+                                             SvnLoader):
     """An SVNLoader with no persistence.
 
     Context: Load a known svn repository using the swh policy with its
@@ -555,7 +584,8 @@ class SvnLoaderITest7(BaseSvnLoaderTest):
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderUpdateLessRecentNoStorage(LoaderNoStorage, SvnLoader):
+class SvnLoaderUpdateLessRecentNoStorage(LoaderNoStorage, LoaderWithState,
+                                         SvnLoader):
     """Context:
         Load a known svn repository.  The last visit seen is less
         recent than a previous unfinished crawl.

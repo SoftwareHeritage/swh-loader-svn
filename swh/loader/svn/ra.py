@@ -111,7 +111,7 @@ SVN_PROPERTY_EOL = 'svn:eol-style'
 EOL_STYLE = {}
 
 
-class SWHFileEditor:
+class FileEditor:
     """File Editor in charge of updating file on disk and memory objects.
 
     """
@@ -235,10 +235,10 @@ class SWHFileEditor:
                                                           data=True)
 
 
-class BaseDirSWHEditor:
+class BaseDirEditor:
     """Base class implementation of dir editor.
 
-    see :class:`SWHDirEditor` for an implementation that hashes every
+    see :class:`DirEditor` for an implementation that hashes every
     directory encountered.
 
     Instantiate a new class inheriting from this class and define the following
@@ -303,7 +303,7 @@ class BaseDirSWHEditor:
         """
         path = os.fsencode(args[0])
         self.directory[path] = Content()
-        return SWHFileEditor(self.directory, rootpath=self.rootpath, path=path)
+        return FileEditor(self.directory, rootpath=self.rootpath, path=path)
 
     def add_file(self, path, copyfrom_path=None, copyfrom_rev=-1):
         """Creating a new file.
@@ -311,7 +311,7 @@ class BaseDirSWHEditor:
         """
         path = os.fsencode(path)
         self.directory[path] = Content()
-        return SWHFileEditor(self.directory, self.rootpath, path)
+        return FileEditor(self.directory, self.rootpath, path)
 
     def change_prop(self, key, value):
         """Change property callback on directory.
@@ -334,7 +334,7 @@ class BaseDirSWHEditor:
         self.update_checksum()
 
 
-class SWHDirEditor(BaseDirSWHEditor):
+class DirEditor(BaseDirEditor):
     """Directory Editor in charge of updating directory hashes computation.
 
     This implementation includes empty folder in the hash computation.
@@ -366,12 +366,12 @@ class SWHDirEditor(BaseDirSWHEditor):
         return self
 
 
-class SWHEditor:
-    """SWH Editor in charge of replaying svn events and computing objects
-    along.
+class Editor:
+    """Editor in charge of replaying svn events and computing objects
+       along.
 
-    This implementation accounts for empty folder during hash
-    computations.
+       This implementation accounts for empty folder during hash
+       computations.
 
     """
     def __init__(self, rootpath, directory):
@@ -388,10 +388,10 @@ class SWHEditor:
         pass
 
     def open_root(self, base_revnum):
-        return SWHDirEditor(self.directory, rootpath=self.rootpath)
+        return DirEditor(self.directory, rootpath=self.rootpath)
 
 
-class SWHReplay:
+class Replay:
     """Replay class.
     """
     def __init__(self, conn, rootpath, directory=None):
@@ -400,7 +400,7 @@ class SWHReplay:
         if directory is None:
             directory = Directory()
         self.directory = directory
-        self.editor = SWHEditor(rootpath=rootpath, directory=directory)
+        self.editor = Editor(rootpath=rootpath, directory=directory)
 
     def replay(self, rev):
         """Replay svn actions between rev and rev+1.
@@ -445,7 +445,7 @@ class SWHReplay:
 @click.option('--cleanup/--nocleanup', default=True,
               help="Indicates whether to cleanup disk when done or not.")
 def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
-    """Script to present how to use SWHReplay class.
+    """Script to present how to use Replay class.
 
     """
     conn = RemoteAccess(svn_url.encode('utf-8'),
@@ -466,7 +466,7 @@ def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
     revision_end = min(revision_end, revision_end_max)
 
     try:
-        replay = SWHReplay(conn, rootpath)
+        replay = Replay(conn, rootpath)
 
         for rev in range(revision_start, revision_end+1):
             objects = replay.compute_hashes(rev)

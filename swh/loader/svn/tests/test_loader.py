@@ -15,7 +15,7 @@ from swh.loader.svn.exception import SvnLoaderEventful, SvnLoaderUneventful
 from swh.loader.svn.exception import SvnLoaderHistoryAltered
 
 
-class TestSWHSnapshot(TestCase):
+class TestSnapshot(TestCase):
     @istest
     def build_swh_snapshot(self):
         actual_snap = build_swh_snapshot('revision-id')
@@ -107,7 +107,7 @@ class TestSvnLoader:
 
 
 class SvnLoaderNoStorage(TestSvnLoader, SvnLoader):
-    """An SWHSVNLoader with no persistence.
+    """An SVNLoader with no persistence.
 
     Context:
         Load a new svn repository using the swh policy (so no update).
@@ -121,7 +121,7 @@ class SvnLoaderNoStorage(TestSvnLoader, SvnLoader):
 
 
 class SvnLoaderUpdateNoStorage(TestSvnLoader, SvnLoader):
-    """An SWHSVNLoader with no persistence.
+    """An SVNLoader with no persistence.
 
     Context:
         Load a known svn repository using the swh policy.
@@ -163,7 +163,7 @@ class SvnLoaderUpdateNoStorage(TestSvnLoader, SvnLoader):
 
 
 class SvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SvnLoader):
-    """An SWHSVNLoader with no persistence.
+    """An SVNLoader with no persistence.
 
     Context: Load a known svn repository using the swh policy with its
     history altered so we do not update it.
@@ -411,7 +411,7 @@ class SvnLoaderITTest5(BaseTestSvnLoader):
 
 
 class SvnLoaderWithPreviousRevisionNoStorage(TestSvnLoader, SvnLoader):
-    """An SWHSVNLoader with no persistence.
+    """An SVNLoader with no persistence.
 
     Context: Load a known svn repository using the swh policy with its
     history altered so we do not update it.

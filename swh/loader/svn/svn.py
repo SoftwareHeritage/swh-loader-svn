@@ -26,7 +26,7 @@ DEFAULT_AUTHOR_MESSAGE = ''
 
 
 class SvnRepo:
-    """SWH's svn repository representation.
+    """Svn repository representation.
 
     Args:
         remote_url (str):
@@ -54,7 +54,7 @@ class SvnRepo:
             'utf-8')
 
         self.uuid = self.conn.get_uuid().encode('utf-8')
-        self.swhreplay = ra.SWHReplay(conn=self.conn, rootpath=self.local_url)
+        self.swhreplay = ra.Replay(conn=self.conn, rootpath=self.local_url)
 
     def __str__(self):
         return str({
@@ -243,7 +243,7 @@ class SvnRepo:
                                         save_path=True)
 
         # Update the replay collaborator with the right state
-        self.swhreplay = ra.SWHReplay(
+        self.swhreplay = ra.Replay(
             conn=self.conn,
             rootpath=self.local_url,
             directory=directory)

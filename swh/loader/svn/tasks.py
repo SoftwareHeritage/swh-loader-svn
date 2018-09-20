@@ -30,7 +30,7 @@ class LoadSvnRepository(Task):
               - destination_path (str): (mandatory) root directory to
                 locally retrieve svn's data
               - origin_url (str): Optional original url override
-              - swh_revision (dict): (optional) extra SWH revision hex to
+              - swh_revision (dict): (optional) extra revision hex to
                 start from.  see swh.loader.svn.SvnLoader.process
                 docstring
 

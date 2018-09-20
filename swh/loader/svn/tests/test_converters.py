@@ -54,7 +54,7 @@ class TestAuthorGitSvnConverters(unittest.TestCase):
         })
 
 
-class TestAuthorSWHConverters(unittest.TestCase):
+class TestAuthorConverters(unittest.TestCase):
     @istest
     def svn_author_to_swh_person(self):
         """The author should have name, email and fullname filled.
@@ -94,7 +94,7 @@ class TestAuthorSWHConverters(unittest.TestCase):
         })
 
 
-class TestSWHRevisionConverters(unittest.TestCase):
+class TestRevisionConverters(unittest.TestCase):
     @istest
     def build_swh_revision_default(self):
         """This should build the swh revision with the swh revision's extra
@@ -214,7 +214,7 @@ class TestGitSvnRevisionConverters(unittest.TestCase):
         })
 
 
-class ConvertSWHDate(unittest.TestCase):
+class ConvertDate(unittest.TestCase):
     @istest
     def svn_date_to_swh_date(self):
         """The timestamp should not be tampered with and include the

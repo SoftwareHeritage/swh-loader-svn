@@ -9,6 +9,7 @@ commit.
 
 """
 
+import logging
 import os
 import tempfile
 import shutil
@@ -261,7 +262,7 @@ class SWHSvnRepo:
             used for svn repository loading.
 
         """
-        if local_dirname:
-            shutil.rmtree(local_dirname)
-        else:
-            shutil.rmtree(self.local_dirname)
+        dirname = local_dirname if local_dirname else self.local_dirname
+        if os.path.exists(dirname):
+            logging.debug('cleanup %s' % dirname)
+            shutil.rmtree(dirname)

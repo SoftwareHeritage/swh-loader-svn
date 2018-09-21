@@ -9,7 +9,7 @@ from .loader import SvnLoader, SvnLoaderFromDumpArchive
 
 
 class LoadSvnRepository(Task):
-    """Import one svn repository to Software Heritage.
+    """Load an svn repository to Software Heritage.
 
     """
     task_queue = 'swh_loader_svn'
@@ -20,7 +20,7 @@ class LoadSvnRepository(Task):
                  origin_url=None,
                  visit_date=None,
                  start_from_scratch=None):
-        """Import a svn repository with swh policy.
+        """Import a svn repository
 
         Args:
             args: ordered arguments (expected None)
@@ -47,13 +47,17 @@ class LoadSvnRepository(Task):
 
 
 class MountAndLoadSvnRepository(Task):
+    """Mount an archive dump into an svn repository, then load the
+       repository to Software Heritage.
+
+    """
     task_queue = 'swh_loader_svn_mount_and_load'
 
     def run_task(self, *, archive_path, origin_url=None, visit_date=None,
                  start_from_scratch=False):
-        """1. Mount an svn dump from archive as a local svn repository.
-           2. Load it through the svn loader.
-           3. Clean up mounted svn repository archive.
+        """1. Mount an svn dump from archive as a local svn repository
+           2. Load it through the svn loader
+           3. Clean up mounted svn repository archive
 
         """
         loader = SvnLoaderFromDumpArchive(archive_path)

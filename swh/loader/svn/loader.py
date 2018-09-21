@@ -101,7 +101,7 @@ class SvnLoader(SWHLoader):
         """Clean up the svn repository's working representation on disk.
 
         """
-        if self.svnrepo:  # could happen if `prepare` fails
+        if not self.svnrepo:  # could happen if `prepare` fails
             return
         if self.debug:
             self.log.error('''NOT FOR PRODUCTION - debug flag activated

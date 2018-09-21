@@ -62,7 +62,7 @@ class MountAndLoadSvnRepository(Task):
         """
         loader = SvnLoaderFromDumpArchive(archive_path)
         loader.log = self.log
-        return loader.load(svn_url='file://%s' % loader.repo_path,
+        return loader.load(svn_url=None,
                            origin_url=origin_url,
                            visit_date=visit_date,
                            archive_path=archive_path,

@@ -544,12 +544,24 @@ class SvnLoaderFromDumpArchive(SvnLoader):
     """
     def __init__(self, archive_path):
         super().__init__()
-        self.log.info('Archive to mount and load %s' % archive_path)
+        self.archive_path = archive_path
+        self.temp_dir = None
+        self.repo_path = None
+
+    def prepare(self, *, svn_url, destination_path=None,
+                swh_revision=None, start_from_scratch=False, **kwargs):
+        self.log.info('Archive to mount and load %s' % self.archive_path)
         self.temp_dir, self.repo_path = init_svn_repo_from_archive_dump(
-            archive_path,
+            self.archive_path,
             prefix=TEMPORARY_DIR_PREFIX_PATTERN,
             suffix='-%s' % os.getpid(),
             root_dir=self.temp_directory)
+        if not svn_url:
+            svn_url = 'file://%s' % self.repo_path
+        super().prepare(svn_url=svn_url, destination_path=destination_path,
+                        swh_revision=swh_revision,
+                        start_from_scratch=start_from_scratch,
+                        **kwargs)
 
     def cleanup(self):
         super().cleanup()

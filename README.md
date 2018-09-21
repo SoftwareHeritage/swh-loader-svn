@@ -48,6 +48,8 @@ task_soft_time_limit = 0
 
 ## toplevel
 
+### local svn repository
+
 ```
 $ python3
 repo = 'pyang-repo-r343-eol-native-mixed-lf-crlf'
@@ -63,8 +65,29 @@ from swh.loader.svn.tasks import LoadSvnRepository
 
 t = LoadSvnRepository()
 t.run(svn_url=svn_url,
-      destination_path='/tmp',
       origin_url=origin_url, visit_date='2016-05-03T15:16:32+00:00',
+      start_from_scratch=True)
+```
+
+### repository dump
+
+```
+$ python3
+repo = '0-512-md'
+archive_name = '%s-repo.svndump.gz' % repo
+archive_path = '/home/storage/svn/dumps/%s' % archive_name
+origin_url = 'http://%s.googlecode.com' % repo
+svn_url = 'file://%s' % repo
+
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+from swh.loader.svn.tasks import MountAndLoadSvnRepository
+
+t = MountAndLoadSvnRepository()
+t.run(archive_path=archive_path,
+      origin_url=origin_url,
+      visit_date='2016-05-03T15:16:32+00:00',
       start_from_scratch=True)
 ```
 
@@ -116,4 +139,3 @@ svn://svn.debian.org/svn/pkg-gnome/ optional-url
 ## Produce archive of svndumps list to load
 
 see. `python3 -m swh.loader.svn.producer svn-archive --help`
-

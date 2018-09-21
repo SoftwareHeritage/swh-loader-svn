@@ -78,6 +78,7 @@ class SvnLoader(SWHLoader):
         self.last_seen_revision = None
         self.temp_directory = self.config['temp_directory']
         self.done = False
+        self.svnrepo = None
         # internal state used to store swh objects
         self._contents = []
         self._directories = []
@@ -100,9 +101,7 @@ class SvnLoader(SWHLoader):
         """Clean up the svn repository's working representation on disk.
 
         """
-        if not hasattr(self, 'svnrepo'):
-            # could happen if `prepare` fails
-            # nothing to do in that case
+        if self.svnrepo:  # could happen if `prepare` fails
             return
         if self.debug:
             self.log.error('''NOT FOR PRODUCTION - debug flag activated

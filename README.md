@@ -3,7 +3,6 @@ swh-loader-svn
 
 Documents are in the ./docs folder:
 - Specification: ./docs/swh-loader-svn.txt
-- Comparison performance with git-svn: ./docs/comparison-git-svn-swh-svn.org
 
 # Configuration file
 

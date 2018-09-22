@@ -25,25 +25,7 @@ storage:
     url: http://localhost:5002/
 ```
 
-## configuration content
-
-With at least the following module (swh.loader.svn.tasks) and queue
-(swh_loader_svn):
-
-$SWH_CONFIG_PATH/worker.yml:
-```
-task_broker: amqp://guest@localhost//
-task_modules:
-task_modules:
-  - swh.loader.svn.tasks
-task_queues:
-  - swh_loader_svn
-task_soft_time_limit = 0
-```
-
-`swh.loader.svn.tasks` and `swh_loader_svn` are the important entries here.
-
-## toplevel
+## Local run
 
 ### local svn repository
 
@@ -66,7 +48,7 @@ t.run(svn_url=svn_url,
       start_from_scratch=True)
 ```
 
-### repository dump
+### Mount and load an archive repository dump
 
 ```
 $ python3
@@ -87,52 +69,3 @@ t.run(archive_path=archive_path,
       visit_date='2016-05-03T15:16:32+00:00',
       start_from_scratch=True)
 ```
-
-## Production like
-
-start worker instance
-
-To start a current worker instance:
-
-```sh
-python3 -m celery worker --app=swh.scheduler.celery_backend.config.app \
-                --pool=prefork \
-                --concurrency=10 \
-                -Ofair \
-                --loglevel=debug 2>&1
-```
-
-## Produce a repository to load
-
-You can see:
-
-`python3 -m swh.loader.svn.producer svn --help`
-
-### one repository
-```sh
-python3 -u -m swh.loader.svn.producer svn --svn-url file:///home/storage/svn/repos/pkg-fox --visit-date 'Tue, 3 May 2017 17:16:32 +0200'
-```
-
-Note:
-- `--visit-date` to override the default visit-date to now.
-
-### multiple repositories
-
-```sh
-cat ~/svn-repository-list | python3 -m swh.loader.svn.producer svn
-```
-
-The file svn-repository-list contains a list of svn repository urls
-(one per line), something like:
-
-```txt
-svn://svn.debian.org/svn/pkg-fox/ optional-url
-svn://svn.debian.org/svn/glibc-bsd/ optional-url
-svn://svn.debian.org/svn/pkg-voip/ optional-url
-svn://svn.debian.org/svn/python-modules/ optional-url
-svn://svn.debian.org/svn/pkg-gnome/ optional-url
-```
-
-## Produce archive of svndumps list to load
-
-see. `python3 -m swh.loader.svn.producer svn-archive --help`

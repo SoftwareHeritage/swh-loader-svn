@@ -51,15 +51,10 @@ TEMPORARY_DIR_PREFIX_PATTERN = 'swh.loader.svn.'
 
 
 class SvnLoader(SWHLoader):
-    """Swh svn loader to load an svn repository The repository is either
-    remote or local.  The loader deals with update on an already
-    previously loaded repository.
+    """Swh svn loader.
 
-    Default policy:
-        Keep data as close as possible from the original svn data.  We
-        only add information that are needed for update or continuing
-        from last known revision (svn revision and svn repository's
-        uuid).
+    The repository is either remote or local.  The loader deals with
+    update on an already previously loaded repository.
 
     """
     CONFIG_BASE_FILENAME = 'loader/svn'

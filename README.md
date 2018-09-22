@@ -24,8 +24,6 @@ storage:
   cls: remote
   args:
     url: http://localhost:5002/
-
-check_revision: 10
 ```
 
 ## configuration content

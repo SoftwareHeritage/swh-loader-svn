@@ -65,20 +65,28 @@ class SvnLoader(SWHLoader):
     CONFIG_BASE_FILENAME = 'loader/svn'
 
     ADDITIONAL_CONFIG = {
-        'check_revision': ('int', 1000),
         'temp_directory': ('str', '/tmp'),
-        'debug': ('bool', False),  # NOT FOR PRODUCTION, False is mandatory
+        'debug': ('bool', False),  # NOT FOR PRODUCTION, False for production
+        'check_revision': ('dict', {
+            'status': False,  # do we check the revision?
+            'limit': 1000,    # at which pace do we check it?
+        }),
     }
 
     def __init__(self):
         super().__init__(logging_class='swh.loader.svn.SvnLoader')
-        self.check_revision = self.config['check_revision']
         self.origin_id = None
         self.debug = self.config['debug']
         self.last_seen_revision = None
         self.temp_directory = self.config['temp_directory']
         self.done = False
         self.svnrepo = None
+        # Revision check is configurable
+        check_revision = self.config['check_revision']
+        if check_revision['status']:
+            self.check_revision = check_revision['limit']
+        else:
+            self.check_revision = None
         # internal state used to store swh objects
         self._contents = []
         self._directories = []
@@ -342,6 +350,38 @@ Local repository not cleaned up for investigation: %s''' % (
 
         return revision_start, revision_end, revision_parents
 
+    def _check_revision_divergence(self, count, rev, dir_id):
+        """Check for hash revision computation divergence.
+
+           The Rationale behind this is that svn can trigger unknown
+           edge cases (mixed CRLF, svn properties, etc...).  Those are
+           not always easy to spot. Adding a check will help in
+           spotting missing edge cases.
+
+        Args:
+            count (int): The number of revisions done so far
+            rev (dict): The actual revision we are computing from
+            dir_id (bytes): The actual directory for the given revision
+
+        Returns:
+            False if no hash divergence detected
+
+        Raises
+            ValueError if a hash divergence is detected
+
+        """
+        if (count % self.check_revision) == 0:  # hash computation check
+            self.log.debug('Checking hash computations on revision %s...' %
+                           rev)
+            checked_dir_id = self.swh_revision_hash_tree_at_svn_revision(
+                rev)
+            if checked_dir_id != dir_id:
+                err = 'Hash tree computation divergence detected ' \
+                      '(%s != %s), stopping!' % (
+                          hashutil.hash_to_hex(dir_id),
+                          hashutil.hash_to_hex(checked_dir_id))
+                raise ValueError(err)
+
     def process_svn_revisions(self, svnrepo, revision_start, revision_end,
                               revision_parents):
         """Process svn revisions from revision_start to revision_end.
@@ -385,18 +425,8 @@ Local repository not cleaned up for investigation: %s''' % (
                 hashutil.hash_to_hex(swh_revision['id']),
                 hashutil.hash_to_hex(dir_id)))
 
-            # FIXME: Is that still necessary? Rationale: T570 is now closed
-            if (count % self.check_revision) == 0:  # hash computation check
-                self.log.debug('Checking hash computations on revision %s...' %
-                               rev)
-                checked_dir_id = self.swh_revision_hash_tree_at_svn_revision(
-                    rev)
-                if checked_dir_id != dir_id:
-                    err = 'Hash tree computation divergence detected ' \
-                          '(%s != %s), stopping!' % (
-                              hashutil.hash_to_hex(dir_id),
-                              hashutil.hash_to_hex(checked_dir_id))
-                    raise ValueError(err)
+            if self.check_revision:
+                self._check_revision_divergence(count, rev, dir_id)
 
             if nextrev:
                 revision_parents[nextrev] = [swh_revision['id']]

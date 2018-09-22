@@ -49,9 +49,6 @@ class LoaderNoStorage:
         self.all_releases = []
         self.all_snapshots = []
 
-        # Check at each svn revision that the hash tree computation
-        # does not diverge
-        self.check_revision = 10
         # typed data
         self.objects = {
             'content': self.all_contents,

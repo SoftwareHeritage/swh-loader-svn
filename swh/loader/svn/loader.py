@@ -501,7 +501,8 @@ Local repository not cleaned up for investigation: %s''' % (
             self.done = True
             self._visit_status = 'full'
             return False  # Stopping iteration
-        except Exception as e:  # Potential: svn:external, i/o error...
+        except Exception as e:  # svn:external, hash divergence, i/o error...
+            self.log.exception(e)
             self.done = True
             self._visit_status = 'partial'
             return False  # Stopping iteration

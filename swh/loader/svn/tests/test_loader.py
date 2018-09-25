@@ -4,13 +4,14 @@
 # See top-level LICENSE file for more information
 
 from nose.tools import istest
-from test_base import BaseSvnLoaderTest
 from unittest import TestCase
 
 from swh.model import hashutil
 
 from swh.loader.svn.loader import build_swh_snapshot, DEFAULT_BRANCH
 from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
+
+from .test_base import BaseSvnLoaderTest
 
 
 class TestSnapshot(TestCase):
@@ -384,8 +385,8 @@ class SvnLoaderITest4(BaseSvnLoaderTest):
 class SvnLoaderITTest5(BaseSvnLoaderTest):
     """Context:
 
-       - Repository already injected with successfull data
-       - New visit from scratch done with successfull load
+       - Repository already injected with successful data
+       - New visit from scratch done with successful load
 
     """
     def setUp(self):
@@ -472,7 +473,7 @@ class SvnLoaderWithPreviousRevisionNoStorage(LoaderNoStorage, LoaderWithState,
 
 class SvnLoaderITTest6(BaseSvnLoaderTest):
     """Context:
-       - repository already visited with load successfull
+       - repository already visited with load successful
        - Changes on existing repository
        - New Visit done with successful new data
 
@@ -519,7 +520,7 @@ class SvnLoaderITTest6(BaseSvnLoaderTest):
 
 class SvnLoaderITest7(BaseSvnLoaderTest):
     """Context:
-       - repository already visited with load successfull
+       - repository already visited with load successful
        - Changes on existing repository
        - New Visit done with successful new data
 

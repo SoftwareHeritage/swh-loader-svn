@@ -9,12 +9,9 @@ import subprocess
 import tempfile
 import unittest
 
-from nose.plugins.attrib import attr
-
 from swh.model import hashutil
 
 
-@attr('fs')
 class BaseSvnLoaderTest(unittest.TestCase):
     """Base test loader class.
 

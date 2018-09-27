@@ -8,6 +8,7 @@
 """
 
 import click
+import codecs
 import os
 import shutil
 import tempfile
@@ -99,6 +100,19 @@ def is_file_an_svnlink_p(fullpath):
     with open(fullpath, 'rb') as f:
         filetype, src = read_svn_link(f.read())
         return filetype == b'link', src
+
+
+def _ra_codecs_error_handler(e):
+    """Subvertpy may fail to decode to utf-8 the user svn properties.  As
+       they are not used by the loader, return an empty string instead
+       of the decoded content.
+
+    Args:
+        e (UnicodeDecodeError): exception raised during the svn
+                                properties decoding.
+
+    """
+    return u"", e.end
 
 
 DEFAULT_FLAG = 0
@@ -412,7 +426,9 @@ class Replay:
            The updated root directory
 
         """
+        codecs.register_error("strict", _ra_codecs_error_handler)
         self.conn.replay(rev, rev+1, self.editor)
+        codecs.register_error("strict", codecs.strict_errors)
         return self.editor.directory
 
     def compute_hashes(self, rev):

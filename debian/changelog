@@ -1,8 +1,14 @@
-swh-loader-svn (0.0.40-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.41-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.41
+  * Fix UnicodeDecodeError when decoding user-defined svn properties
+  * preventing the origin ingestion to finish (T946)
+  * Fix CR/LF issue preventing the origin ingestion to finish (T570)
+  * svn.loader: Add more efficient loader based on remote dumps
+  * svn.loader: Refactoring (align loader with other, name conventions,
+  * improve maintenance, simplify some code, etc...)
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 09 Mar 2018 14:51:09 +0100
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 28 Sep 2018 12:16:31 +0200
 
 swh-loader-svn (0.0.40-1~swh1) unstable-swh; urgency=medium
 

@@ -8,6 +8,7 @@
 """
 
 import click
+import codecs
 import os
 import shutil
 import tempfile
@@ -19,7 +20,30 @@ from swh.model import hashutil
 from swh.model.from_disk import Content, Directory
 
 
-CRLF = b'\r\n'
+_eol_style = {
+    'native': b'\n',
+    'CRLF': b'\r\n',
+    'LF': b'\n',
+    'CR': b'\r'
+}
+
+
+def _normalize_line_endings(lines, eol_style='native'):
+    """Normalize line endings to unix (\n), windows (\r\n) or mac (\r).
+    Args:
+        lines (bytes): The lines to normalize
+        line_ending (str): The line ending format as defined for
+            svn:eol-style property. Acceptable values are 'native',
+            'CRLF', 'LF' and 'CR'
+    Returns
+        bytes: lines with endings normalized
+    """
+    lines = lines.replace(_eol_style['CRLF'], _eol_style['LF'])\
+                 .replace(_eol_style['CR'], _eol_style['LF'])
+    if _eol_style[eol_style] != _eol_style['LF']:
+        lines = lines.replace(_eol_style['LF'], _eol_style[eol_style])
+
+    return lines
 
 
 def apply_txdelta_handler(sbuf, target_stream):
@@ -78,6 +102,19 @@ def is_file_an_svnlink_p(fullpath):
         return filetype == b'link', src
 
 
+def _ra_codecs_error_handler(e):
+    """Subvertpy may fail to decode to utf-8 the user svn properties.  As
+       they are not used by the loader, return an empty string instead
+       of the decoded content.
+
+    Args:
+        e (UnicodeDecodeError): exception raised during the svn
+                                properties decoding.
+
+    """
+    return u"", e.end
+
+
 DEFAULT_FLAG = 0
 EXEC_FLAG = 1
 NOEXEC_FLAG = 2
@@ -85,10 +122,10 @@ NOEXEC_FLAG = 2
 SVN_PROPERTY_EOL = 'svn:eol-style'
 
 # EOL state check mess
-EOL_CHECK = {}
+EOL_STYLE = {}
 
 
-class SWHFileEditor:
+class FileEditor:
     """File Editor in charge of updating file on disk and memory objects.
 
     """
@@ -112,12 +149,9 @@ class SWHFileEditor:
             # Possibly a symbolic link. We cannot check further at
             # that moment though, patch(s) not being applied yet
             self.link = True
-        elif key == SVN_PROPERTY_EOL:  # Detect inconsistent repositories
-            if value in ['LF', 'native']:
-                EOL_CHECK[self.fullpath] = value
-            else:
-                if self.fullpath in EOL_CHECK:
-                    del EOL_CHECK[self.fullpath]
+        elif key == SVN_PROPERTY_EOL:
+            # backup end of line style for file
+            EOL_STYLE[self.fullpath] = value
 
     def __make_symlink(self, src):
         """Convert the svnlink to a symlink on disk.
@@ -156,7 +190,7 @@ class SWHFileEditor:
     def apply_textdelta(self, base_checksum):
         if os.path.lexists(self.fullpath):
             if os.path.islink(self.fullpath):
-                # svn does not deal with symlink so we tranform into
+                # svn does not deal with symlink so we transform into
                 # real svn symlink for potential patching in later
                 # commits
                 sbuf = self.__make_svnlink()
@@ -198,24 +232,27 @@ class SWHFileEditor:
             elif self.executable == NOEXEC_FLAG:
                 os.chmod(self.fullpath, 0o644)
 
-            check_eol = EOL_CHECK.get(self.fullpath)
-            if check_eol:
-                raw_content = open(self.fullpath, 'rb').read()
-                if CRLF in raw_content:  # CRLF
-                    msg = 'Inconsistency. CRLF detected in a converted ' \
-                          'file %s (%s: %s)' % (
-                              self.fullpath, SVN_PROPERTY_EOL, check_eol)
-                    raise ValueError(msg)
-
         # And now compute file's checksums
-        self.directory[self.path] = Content.from_file(path=self.fullpath,
-                                                      data=True)
+        eol_style = EOL_STYLE.get(self.fullpath, None)
+        if eol_style:
+            # ensure to normalize line endings as defined by svn:eol-style
+            # property to get the same file checksum as after an export
+            # or checkout operation with subversion
+            with open(self.fullpath, 'rb') as f:
+                data = f.read()
+                data = _normalize_line_endings(data, eol_style)
+                mode = os.lstat(self.fullpath).st_mode
+                self.directory[self.path] = Content.from_bytes(mode=mode,
+                                                               data=data)
+        else:
+            self.directory[self.path] = Content.from_file(path=self.fullpath,
+                                                          data=True)
 
 
-class BaseDirSWHEditor:
+class BaseDirEditor:
     """Base class implementation of dir editor.
 
-    see :class:`SWHDirEditor` for an implementation that hashes every
+    see :class:`DirEditor` for an implementation that hashes every
     directory encountered.
 
     Instantiate a new class inheriting from this class and define the following
@@ -262,8 +299,8 @@ class BaseDirSWHEditor:
                 shutil.rmtree(fpath)
             else:
                 os.remove(fpath)
-        if path in EOL_CHECK:
-            del EOL_CHECK[path]
+        if path in EOL_STYLE:
+            del EOL_STYLE[path]
 
     def update_checksum(self):
         raise NotImplementedError('This should be implemented.')
@@ -280,7 +317,7 @@ class BaseDirSWHEditor:
         """
         path = os.fsencode(args[0])
         self.directory[path] = Content()
-        return SWHFileEditor(self.directory, rootpath=self.rootpath, path=path)
+        return FileEditor(self.directory, rootpath=self.rootpath, path=path)
 
     def add_file(self, path, copyfrom_path=None, copyfrom_rev=-1):
         """Creating a new file.
@@ -288,7 +325,7 @@ class BaseDirSWHEditor:
         """
         path = os.fsencode(path)
         self.directory[path] = Content()
-        return SWHFileEditor(self.directory, self.rootpath, path)
+        return FileEditor(self.directory, self.rootpath, path)
 
     def change_prop(self, key, value):
         """Change property callback on directory.
@@ -311,7 +348,7 @@ class BaseDirSWHEditor:
         self.update_checksum()
 
 
-class SWHDirEditor(BaseDirSWHEditor):
+class DirEditor(BaseDirEditor):
     """Directory Editor in charge of updating directory hashes computation.
 
     This implementation includes empty folder in the hash computation.
@@ -343,12 +380,12 @@ class SWHDirEditor(BaseDirSWHEditor):
         return self
 
 
-class SWHEditor:
-    """SWH Editor in charge of replaying svn events and computing objects
-    along.
+class Editor:
+    """Editor in charge of replaying svn events and computing objects
+       along.
 
-    This implementation accounts for empty folder during hash
-    computations.
+       This implementation accounts for empty folder during hash
+       computations.
 
     """
     def __init__(self, rootpath, directory):
@@ -365,10 +402,10 @@ class SWHEditor:
         pass
 
     def open_root(self, base_revnum):
-        return SWHDirEditor(self.directory, rootpath=self.rootpath)
+        return DirEditor(self.directory, rootpath=self.rootpath)
 
 
-class SWHReplay:
+class Replay:
     """Replay class.
     """
     def __init__(self, conn, rootpath, directory=None):
@@ -377,7 +414,7 @@ class SWHReplay:
         if directory is None:
             directory = Directory()
         self.directory = directory
-        self.editor = SWHEditor(rootpath=rootpath, directory=directory)
+        self.editor = Editor(rootpath=rootpath, directory=directory)
 
     def replay(self, rev):
         """Replay svn actions between rev and rev+1.
@@ -389,7 +426,9 @@ class SWHReplay:
            The updated root directory
 
         """
+        codecs.register_error("strict", _ra_codecs_error_handler)
         self.conn.replay(rev, rev+1, self.editor)
+        codecs.register_error("strict", codecs.strict_errors)
         return self.editor.directory
 
     def compute_hashes(self, rev):
@@ -422,7 +461,7 @@ class SWHReplay:
 @click.option('--cleanup/--nocleanup', default=True,
               help="Indicates whether to cleanup disk when done or not.")
 def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
-    """Script to present how to use SWHReplay class.
+    """Script to present how to use Replay class.
 
     """
     conn = RemoteAccess(svn_url.encode('utf-8'),
@@ -443,7 +482,7 @@ def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
     revision_end = min(revision_end, revision_end_max)
 
     try:
-        replay = SWHReplay(conn, rootpath)
+        replay = Replay(conn, rootpath)
 
         for rev in range(revision_start, revision_end+1):
             objects = replay.compute_hashes(rev)

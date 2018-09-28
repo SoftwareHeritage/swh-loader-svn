@@ -4,18 +4,17 @@
 # See top-level LICENSE file for more information
 
 from nose.tools import istest
-from test_base import BaseTestSvnLoader
 from unittest import TestCase
 
 from swh.model import hashutil
 
 from swh.loader.svn.loader import build_swh_snapshot, DEFAULT_BRANCH
-from swh.loader.svn.loader import SWHSvnLoader
-from swh.loader.svn.exception import SvnLoaderEventful, SvnLoaderUneventful
-from swh.loader.svn.exception import SvnLoaderHistoryAltered
+from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
+
+from .test_base import BaseSvnLoaderTest
 
 
-class TestSWHSnapshot(TestCase):
+class TestSnapshot(TestCase):
     @istest
     def build_swh_snapshot(self):
         actual_snap = build_swh_snapshot('revision-id')
@@ -36,11 +35,11 @@ class TestSWHSnapshot(TestCase):
 # Only for testing purposes.
 
 
-class TestSvnLoader:
+class LoaderNoStorage:
     """Mixin class to inhibit the persistence and keep in memory the data
     sent for storage.
 
-    cf. SWHSvnLoaderNoStorage
+    cf. SvnLoaderNoStorage
 
     """
     def __init__(self):
@@ -49,15 +48,15 @@ class TestSvnLoader:
         self.all_directories = []
         self.all_revisions = []
         self.all_releases = []
-        # Check at each svn revision that the hash tree computation
-        # does not diverge
-        self.check_revision = 10
+        self.all_snapshots = []
+
         # typed data
         self.objects = {
             'content': self.all_contents,
             'directory': self.all_directories,
             'revision': self.all_revisions,
             'release': self.all_releases,
+            'snapshot': self.all_snapshots,
         }
 
     def _add(self, type, l):
@@ -86,6 +85,24 @@ class TestSvnLoader:
     def maybe_load_releases(self, releases):
         raise ValueError('If called, the test must break.')
 
+    def maybe_load_snapshot(self, snapshot):
+        self._add('snapshot', [snapshot])
+
+    def _store_origin_visit(self):
+        pass
+
+    def open_fetch_history(self):
+        pass
+
+    def close_fetch_history_success(self, fetch_history_id):
+        pass
+
+    def close_fetch_history_failure(self, fetch_history_id):
+        pass
+
+    def update_origin_visit(self, origin_id, visit, status):
+        pass
+
     # Override to do nothing at the end
     def close_failure(self):
         pass
@@ -93,16 +110,29 @@ class TestSvnLoader:
     def close_success(self):
         pass
 
-    def prepare(self, *args, **kwargs):
-        # Override to only prepare the svn repository
-        self.svnrepo = self.get_svn_repo(*args)
-        origin_id = 10
-        self.latest_snapshot = self.swh_latest_snapshot_revision(
-            origin_id, None)
+    def pre_cleanup(self):
+        pass
 
 
-class SWHSvnLoaderNoStorage(TestSvnLoader, SWHSvnLoader):
-    """An SWHSVNLoader with no persistence.
+class LoaderWithState:
+    """Additional state setup (bypassed by some override for test purposes)
+
+    """
+    def __init__(self):
+        super().__init__()
+        self.origin = {
+            'id': 1,
+            'url': '/dev/null',
+            'type': 'svn',
+        }
+        self.visit = {
+            'origin': 1,
+            'visit': 1,
+        }
+
+
+class SvnLoaderNoStorage(LoaderNoStorage, LoaderWithState, SvnLoader):
+    """An SVNLoader with no persistence.
 
     Context:
         Load a new svn repository using the swh policy (so no update).
@@ -115,8 +145,8 @@ class SWHSvnLoaderNoStorage(TestSvnLoader, SWHSvnLoader):
         return {}
 
 
-class SWHSvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
-    """An SWHSVNLoader with no persistence.
+class SvnLoaderUpdateNoStorage(LoaderNoStorage, LoaderWithState, SvnLoader):
+    """An SVNLoader with no persistence.
 
     Context:
         Load a known svn repository using the swh policy.
@@ -133,11 +163,11 @@ class SWHSvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
 
         Check the following for explanation about the hashes:
         - test_loader.org for (swh policy).
-        - cf. SWHSvnLoaderITTest
+        - cf. SvnLoaderITTest
 
         """
         return {
-            'snapshot': None,
+            'snapshot': 'something',  # need a snapshot of sort
             'revision': {
                 'id': hashutil.hash_to_bytes(
                     '4876cb10aec6f708f7466dddf547567b65f6c39c'),
@@ -157,10 +187,9 @@ class SWHSvnLoaderUpdateNoStorage(TestSvnLoader, SWHSvnLoader):
         }
 
 
-class SWHSvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
-    """An SWHSVNLoader with no persistence.
-
-    Context: Load a known svn repository using the swh policy with its
+class SvnLoaderUpdateHistoryAlteredNoStorage(LoaderNoStorage, LoaderWithState,
+                                             SvnLoader):
+    """Context: Load a known svn repository using the swh policy with its
     history altered so we do not update it.
 
     """
@@ -170,7 +199,7 @@ class SWHSvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
 
         Check the following for explanation about the hashes:
         - test_loader.org for (swh policy).
-        - cf. SWHSvnLoaderITTest
+        - cf. SvnLoaderITTest
 
         """
         return {
@@ -195,28 +224,23 @@ class SWHSvnLoaderUpdateHistoryAlteredNoStorage(TestSvnLoader, SWHSvnLoader):
         }
 
 
-class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
+class SvnLoaderITest1(BaseSvnLoaderTest):
+    """Load an unknown svn repository results in new data.
+
+    """
     def setUp(self):
         super().setUp()
-
-        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
-
-        self.origin_visit = {
-            'origin': self.origin['id'],
-            'visit': 2,
-        }
-
-        self.loader = SWHSvnLoaderNoStorage()
-        self.loader.prepare(
-            self.svn_mirror_url, self.destination_path, self.origin)
+        self.loader = SvnLoaderNoStorage()
 
     @istest
-    def process_repository(self):
-        """Process a new repository with swh policy should be ok.
+    def load(self):
+        """Load a new repository results in new swh object and snapshot
 
         """
         # when
-        self.loader.process_repository(self.origin_visit)
+        self.loader.load(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path)
 
         # then
         self.assertEquals(len(self.loader.all_revisions), 6)
@@ -236,95 +260,100 @@ class SWHSvnLoaderNewRepositoryITTest(BaseTestSvnLoader):
         }
 
         self.assertRevisionsOk(expected_revisions)
+        self.assertEquals(len(self.loader.all_snapshots), 1)
+        # FIXME: Check the snapshot's state
+        # self.assertEquals(self.loader.all_snapshots[0], {})
+        self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
+        self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SWHSvnLoaderUpdateWithNoChangeITTest(BaseTestSvnLoader):
+class SvnLoaderITest2(BaseSvnLoaderTest):
+    """Load a visited repository with no new change results in no data
+       change.
+
+    """
     def setUp(self):
         super().setUp()
-
-        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
-
-        self.origin_visit = {
-            'origin': self.origin['id'],
-            'visit': 3,
-        }
-
-        self.loader = SWHSvnLoaderUpdateNoStorage()
-        self.loader.prepare(
-            self.svn_mirror_url, self.destination_path, self.origin)
+        self.loader = SvnLoaderUpdateNoStorage()
 
     @istest
-    def process_repository(self):
-        """Process a known repository with swh policy and no new data should
-        be ok.
+    def load(self):
+        """Load a repository without new changes results in same snapshot
 
         """
         # when
-        with self.assertRaises(SvnLoaderUneventful):
-            self.loader.process_repository(self.origin_visit)
+        self.loader.load(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path)
 
         # then
+
+        self.assertEquals(len(self.loader.all_contents), 0)
+        self.assertEquals(len(self.loader.all_directories), 0)
         self.assertEquals(len(self.loader.all_revisions), 0)
         self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertEquals(len(self.loader.all_snapshots), 1)
+        # FIXME: Check the snapshot's state
+        # self.assertEquals(self.loader.all_snapshots[0], {})
+        self.assertEqual(self.loader.load_status(), {'status': 'uneventful'})
+        self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SWHSvnLoaderUpdateWithHistoryAlteredITTest(BaseTestSvnLoader):
+class SvnLoaderITest3(BaseSvnLoaderTest):
+    """In this scenario, the dump has been tampered with to modify the
+       commit log.  This results in a hash divergence which is
+       detected at startup.
+
+       In effect, that stops the loading and do nothing.
+
+    """
     def setUp(self):
         # the svn repository pkg-gourmet has been updated with changes
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
-
-        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
-
-        self.origin_visit = {
-            'origin': self.origin['id'],
-            'visit': 4,
-        }
-
-        self.loader = SWHSvnLoaderUpdateHistoryAlteredNoStorage()
-        self.loader.prepare(
-            self.svn_mirror_url, self.destination_path, self.origin)
+        self.loader = SvnLoaderUpdateHistoryAlteredNoStorage()
 
     @istest
-    def process_repository(self):
-        """Process a known repository with swh policy and history altered
-        should stop and do nothing.
+    def load(self):
+        """Load known repository with history altered should do nothing
 
         """
         # when
-        with self.assertRaises(SvnLoaderHistoryAltered):
-            self.loader.args = (self.origin_visit,)
-            self.loader.process_repository(self.origin_visit)
+        self.loader.load(svn_url=self.svn_mirror_url,
+                         destination_path=self.destination_path)
 
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 news + 1 old
+        self.assertEquals(len(self.loader.all_contents), 0)
+        self.assertEquals(len(self.loader.all_directories), 0)
         self.assertEquals(len(self.loader.all_revisions), 0)
         self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertEquals(len(self.loader.all_snapshots), 0)
+        # FIXME: Check the snapshot's state
+        # self.assertEquals(self.loader.all_snapshots[0], {})
+        self.assertEqual(self.loader.load_status(), {'status': 'uneventful'})
+        self.assertEqual(self.loader.visit_status(), 'partial')
 
 
-class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
+class SvnLoaderITest4(BaseSvnLoaderTest):
+    """In this scenario, the repository has been updated with new changes.
+       The loading visit should result in new objects stored and 1 new
+       snapshot.
+
+    """
     def setUp(self):
         # the svn repository pkg-gourmet has been updated with changes
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
-
-        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
-
-        self.origin_visit = {
-            'origin': self.origin['id'],
-            'visit': 5,
-        }
-
-        self.loader = SWHSvnLoaderUpdateNoStorage()
-        self.loader.prepare(
-            self.svn_mirror_url, self.destination_path, self.origin)
+        self.loader = SvnLoaderUpdateNoStorage()
 
     @istest
     def process_repository(self):
-        """Process updated repository should yield new revisions
+        """Process updated repository should yield new objects
 
         """
         # when
-        self.loader.process_repository(self.origin_visit)
+        self.loader.load(svn_url=self.svn_mirror_url,
+                         destination_path=self.destination_path)
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -346,31 +375,34 @@ class SWHSvnLoaderUpdateWithChangesITTest(BaseTestSvnLoader):
 
         self.assertRevisionsOk(expected_revisions)
 
+        self.assertEquals(len(self.loader.all_snapshots), 1)
+        # FIXME: Check the snapshot's state
+        # self.assertEquals(self.loader.all_snapshots[0], {})
+        self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
+        self.assertEqual(self.loader.visit_status(), 'full')
 
-class SWHSvnLoaderUpdateWithChangesStartFromScratchITTest(BaseTestSvnLoader):
+
+class SvnLoaderITTest5(BaseSvnLoaderTest):
+    """Context:
+
+       - Repository already injected with successful data
+       - New visit from scratch done with successful load
+
+    """
     def setUp(self):
         # the svn repository pkg-gourmet has been updated with changes
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
-
-        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
-
-        self.origin_visit = {
-            'origin': self.origin['id'],
-            'visit': 5,
-        }
-
-        self.loader = SWHSvnLoaderUpdateNoStorage()
-        self.loader.prepare(
-            self.svn_mirror_url, self.destination_path, self.origin)
+        self.loader = SvnLoaderUpdateNoStorage()
 
     @istest
-    def process_repository(self):
-        """Process known repository from scratch should yield revisions again
+    def load(self):
+        """Load an existing repository from scratch yields same swh objects
 
         """
         # when
-        self.loader.process_repository(self.origin_visit,
-                                       start_from_scratch=True)
+        self.loader.load(svn_url=self.svn_mirror_url,
+                         destination_path=self.destination_path,
+                         start_from_scratch=True)
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -395,46 +427,70 @@ class SWHSvnLoaderUpdateWithChangesStartFromScratchITTest(BaseTestSvnLoader):
 
         self.assertRevisionsOk(expected_revisions)
 
+        self.assertEquals(len(self.loader.all_snapshots), 1)
+        # FIXME: Check the snapshot's state
+        # self.assertEquals(self.loader.all_snapshots[0], {})
+        self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
+        self.assertEqual(self.loader.visit_status(), 'full')
 
-class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
-    def setUp(self):
-        super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
 
-        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
+class SvnLoaderWithPreviousRevisionNoStorage(LoaderNoStorage, LoaderWithState,
+                                             SvnLoader):
+    """An SVNLoader with no persistence.
 
-        self.origin_visit = {
-            'origin': self.origin['id'],
-            'visit': 6
-        }
+    Context: Load a known svn repository using the swh policy with its
+    history altered so we do not update it.
 
-        self.loader = SWHSvnLoaderNoStorage()
-        self.loader.prepare(
-            self.svn_mirror_url, self.destination_path, self.origin)
+    """
+    def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
+        """Avoid the storage persistence call and return the expected previous
+        revision for that repository.
 
-    @istest
-    def process_repository(self):
-        """Process partially visited repository should finish loading
+        Check the following for explanation about the hashes:
+        - test_loader.org for (swh policy).
+        - cf. SvnLoaderITTest
 
         """
-        previous_unfinished_revision = {
-            'id': hashutil.hash_to_bytes(
-                '4876cb10aec6f708f7466dddf547567b65f6c39c'),
-            'parents': [hashutil.hash_to_bytes(
-                'a3a577948fdbda9d1061913b77a1588695eadb41')],
-            'directory': hashutil.hash_to_bytes(
-                '0deab3023ac59398ae467fc4bff5583008af1ee2'),
-            'target_type': 'revision',
-            'metadata': {
-                'extra_headers': [
-                    ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
-                    ['svn_revision', '6']
-                ]
+        return {
+            'snapshot': None,
+            'revision': {
+                'id': hashutil.hash_to_bytes(
+                    '4876cb10aec6f708f7466dddf547567b65f6c39c'),
+                'parents': [hashutil.hash_to_bytes(
+                    'a3a577948fdbda9d1061913b77a1588695eadb41')],
+                'directory': hashutil.hash_to_bytes(
+                    '0deab3023ac59398ae467fc4bff5583008af1ee2'),
+                'target_type': 'revision',
+                'metadata': {
+                    'extra_headers': [
+                        ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],  # noqa
+                        ['svn_revision', '6']
+                    ]
+                }
             }
         }
+
+
+class SvnLoaderITTest6(BaseSvnLoaderTest):
+    """Context:
+       - repository already visited with load successful
+       - Changes on existing repository
+       - New Visit done with successful new data
+
+    """
+    def setUp(self):
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
+        self.loader = SvnLoaderWithPreviousRevisionNoStorage()
+
+    @istest
+    def load(self):
+        """Load from partial previous visit result in new changes
+
+        """
         # when
-        self.loader.process_repository(
-            self.origin_visit,
-            last_known_swh_revision=previous_unfinished_revision)
+        self.loader.load(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path)
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -455,27 +511,27 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesITTest(BaseTestSvnLoader):
         }
 
         self.assertRevisionsOk(expected_revisions)
+        self.assertEquals(len(self.loader.all_snapshots), 1)
+        # FIXME: Check the snapshot's state
+        # self.assertEquals(self.loader.all_snapshots[0], {})
+        self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
+        self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButVisitDoneITTest(
-        BaseTestSvnLoader):
+class SvnLoaderITest7(BaseSvnLoaderTest):
+    """Context:
+       - repository already visited with load successful
+       - Changes on existing repository
+       - New Visit done with successful new data
+
+    """
     def setUp(self):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
-
-        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
-
-        self.origin_visit = {
-            'origin': self.origin['id'],
-            'visit': 9,
-        }
-
-        self.loader = SWHSvnLoaderUpdateNoStorage()
-        self.loader.prepare(
-            self.svn_mirror_url, self.destination_path, self.origin)
+        self.loader = SvnLoaderUpdateNoStorage()
 
     @istest
-    def process_repository(self):
-        """Process known and partial repository should start from last visit
+    def load(self):
+        """Load known and partial repository should start from last visit
 
         """
         previous_unfinished_revision = {
@@ -495,9 +551,10 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButVisitDoneITTest(
         }
 
         # when
-        self.loader.process_repository(
-            self.origin_visit,
-            last_known_swh_revision=previous_unfinished_revision)
+        self.loader.load(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path,
+            swh_revision=previous_unfinished_revision)
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -518,14 +575,18 @@ class SWHSvnLoaderUpdateWithUnfinishedLoadingChangesButVisitDoneITTest(
         }
 
         self.assertRevisionsOk(expected_revisions)
+        self.assertEquals(len(self.loader.all_snapshots), 1)
+        # FIXME: Check the snapshot's state
+        # self.assertEquals(self.loader.all_snapshots[0], {})
+        self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
+        self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
-    """An SWHSVNLoader with no persistence.
-
-    Context:
-        Load a known svn repository using the swh policy.  The last
-        visit seen is less recent than a previous unfinished crawl.
+class SvnLoaderUpdateLessRecentNoStorage(LoaderNoStorage, LoaderWithState,
+                                         SvnLoader):
+    """Context:
+        Load a known svn repository.  The last visit seen is less
+        recent than a previous unfinished crawl.
 
     """
     def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
@@ -534,7 +595,7 @@ class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
 
         Check the following for explanation about the hashes:
         - test_loader.org for (swh policy).
-        - cf. SWHSvnLoaderITTest
+        - cf. SvnLoaderITTest
 
         """
         return {
@@ -558,25 +619,21 @@ class SWHSvnLoaderUpdateLessRecentNoStorage(TestSvnLoader, SWHSvnLoader):
         }
 
 
-class SWHSvnLoaderUnfinishedLoadingChangesSinceLastVisitITTest(
-        BaseTestSvnLoader):
+class SvnLoaderITest8(BaseSvnLoaderTest):
+    """Context:
+
+       - Previous visit on existing repository done
+       - Starting the loading from the last unfinished visit
+       - New objects are created (1 new snapshot)
+
+    """
     def setUp(self):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
-
-        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
-
-        self.origin_visit = {
-            'origin': self.origin['id'],
-            'visit': 1,
-        }
-
-        self.loader = SWHSvnLoaderUpdateLessRecentNoStorage()
-        self.loader.prepare(
-            self.svn_mirror_url, self.destination_path, self.origin)
+        self.loader = SvnLoaderUpdateLessRecentNoStorage()
 
     @istest
-    def process_repository(self):
-        """Process updated repository should yield revisions from last visit
+    def load(self):
+        """Load repository should yield revisions starting from last visit
 
         """
         previous_unfinished_revision = {
@@ -595,9 +652,10 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastVisitITTest(
             }
         }
         # when
-        self.loader.process_repository(
-            self.origin_visit,
-            last_known_swh_revision=previous_unfinished_revision)
+        self.loader.load(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path,
+            swh_revision=previous_unfinished_revision)
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -618,116 +676,110 @@ class SWHSvnLoaderUnfinishedLoadingChangesSinceLastVisitITTest(
         }
 
         self.assertRevisionsOk(expected_revisions)
+        self.assertEquals(len(self.loader.all_snapshots), 1)
+        # FIXME: Check the snapshot's state
+        # self.assertEquals(self.loader.all_snapshots[0], {})
+        self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
+        self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SWHSvnLoaderUpdateAndTestCornerCasesAboutEolITTest(BaseTestSvnLoader):
+class SvnLoaderTTest9(BaseSvnLoaderTest):
+    """Check that a svn repo containing a versioned file with CRLF line
+       endings with svn:eol-style property set to 'native' (this is a
+       violation of svn specification as the file should have been
+       stored with LF line endings) can be loaded anyway.
+
+    """
     def setUp(self):
-        super().setUp(archive_name='pkg-gourmet-with-eol-corner-cases.tgz')
-
-        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
-
-        self.origin_visit = {
-            'origin': self.origin['id'],
-            'visit': 1,
-        }
-
-        self.loader = SWHSvnLoaderUpdateLessRecentNoStorage()
-        self.loader.prepare(
-            self.svn_mirror_url, self.destination_path, self.origin)
+        super().setUp(archive_name='mediawiki-repo-r407-eol-native-crlf.tgz',
+                      filename='mediawiki-repo-r407-eol-native-crlf')
+        self.loader = SvnLoaderNoStorage()
 
     @istest
     def process_repository(self):
-        """EOL corner cases and update.
+        """Load repository with CRLF endings (svn:eol-style: native) is ok
+
+        """ # noqa
+        # when
+        self.loader.load(svn_url=self.svn_mirror_url,
+                         destination_path=self.destination_path)
+
+        expected_revisions = {
+            '7da4975c363101b819756d33459f30a866d01b1b': 'f63637223ee0f7d4951ffd2d4d9547a4882c5d8b' # noqa
+        }
+        self.assertRevisionsOk(expected_revisions)
+        self.assertEquals(len(self.loader.all_snapshots), 1)
+        # FIXME: Check the snapshot's state
+        # self.assertEquals(self.loader.all_snapshots[0], {})
+        self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
+        self.assertEqual(self.loader.visit_status(), 'full')
+
+
+class SvnLoaderITest10(BaseSvnLoaderTest): # noqa
+    """Check that a svn repo containing a versioned file with mixed
+    CRLF/LF line endings with svn:eol-style property set to 'native'
+    (this is a violation of svn specification as mixed line endings
+    for textual content should not be stored when the svn:eol-style
+    property is set) can be loaded anyway.
+
+    """
+    def setUp(self):
+        super().setUp(
+            archive_name='pyang-repo-r343-eol-native-mixed-lf-crlf.tgz',
+            filename='pyang-repo-r343-eol-native-mixed-lf-crlf')
+        self.loader = SvnLoaderNoStorage()
+
+    @istest
+    def load(self):
+        """Load repo with mixed CRLF/LF endings (svn:eol-style:native) is ok
 
         """
-        previous_unfinished_revision = {
-            'id': hashutil.hash_to_bytes(
-                '171dc35522bfd17dda4e90a542a0377fb2fc707a'),
-            'parents': [hashutil.hash_to_bytes(
-                '902f29b4323a9b9de3af6d28e72dd581e76d9397')],
-            'directory': hashutil.hash_to_bytes(
-                'fd24a76c87a3207428e06612b49860fc78e9f6dc'),
-            'target_type': 'revision',
-            'metadata': {
-                'extra_headers': [
-                    ['svn_repo_uuid', '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
-                    ['svn_revision', '11']
-                ]
-            }
-        }
+        self.loader.load(svn_url=self.svn_mirror_url,
+                         destination_path=self.destination_path)
 
-        # when
-        self.loader.process_repository(
-            self.origin_visit,
-            last_known_swh_revision=previous_unfinished_revision)
-
-        # then
-        # we got the previous run's last revision (rev 11)
-        # so 8 new
-        self.assertEquals(len(self.loader.all_revisions), 8)
-        self.assertEquals(len(self.loader.all_releases), 0)
-
-        last_revision = '0148ae3eaa520b73a50802c59f3f416b7a36cf8c'
-
-        # cf. test_loader.org for explaining from where those hashes
-        # come from
         expected_revisions = {
-            # revision hash | directory hash
-            '027e8769f4786597436ab94a91f85527d04a6cbb': '2d9ca72c6afec6284fb01e459588cbb007017c8c',  # noqa
-            '4474d96018877742d9697d5c76666c9693353bfc': 'ab111577e0ab39e4a157c476072af48f2641d93f',  # noqa
-            '97ad21eab92961e2a22ca0285f09c6d1e9a7ffbc': 'ab111577e0ab39e4a157c476072af48f2641d93f',  # noqa
-            'd04ea8afcee6205cc8384c091bfc578931c169fd': 'b0a648b02e55a4dce356ac35187a058f89694ec7',  # noqa
-            'ded78810401fd354ffe894aa4a1e5c7d30a645d1': 'b0a648b02e55a4dce356ac35187a058f89694ec7',  # noqa
-            '4ee95e39358712f53c4fc720da3fafee9249ed19': 'c3c98df624733fef4e592bef983f93e2ed02b179',  # noqa
-            'ffa901b69ca0f46a2261f42948838d19709cb9f8': 'c3c98df624733fef4e592bef983f93e2ed02b179',  # noqa
-            last_revision:                              '844d4646d6c2b4f3a3b2b22ab0ee38c7df07bab2',  # noqa
+            '9c6962eeb9164a636c374be700672355e34a98a7': '16aa6b6271f3456d4643999d234cf39fe3d0cc5a' # noqa
         }
 
         self.assertRevisionsOk(expected_revisions)
+        self.assertEquals(len(self.loader.all_snapshots), 1)
+        # FIXME: Check the snapshot's state
+        # self.assertEquals(self.loader.all_snapshots[0], {})
+        self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
+        self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SWHSvnLoaderExternalIdCornerCaseITTest(BaseTestSvnLoader):
+class SvnLoaderITest11(BaseSvnLoaderTest):
+    """Context:
+
+       - Repository with svn:external (which is not deal with for now)
+       - Visit is partial with as much data loaded as possible
+
+    """
     def setUp(self):
         super().setUp(archive_name='pkg-gourmet-with-external-id.tgz')
-
-        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
-
-        self.origin_visit = {
-            'origin': self.origin['id'],
-            'visit': 1,
-        }
-
-        self.loader = SWHSvnLoaderNoStorage()
-        # override revision-block size
-        self.loader.config['revision_packet_size'] = 3
-        self.loader.prepare(
-            self.svn_mirror_url, self.destination_path, self.origin)
+        self.loader = SvnLoaderNoStorage()
 
     @istest
-    def process_repository(self):
+    def load(self):
         """Repository with svn:externals property, will stop raising an error
 
         """
         previous_unfinished_revision = None
 
         # when
-        with self.assertRaises(SvnLoaderEventful) as exc:
-            self.loader.process_repository(
-                self.origin_visit,
-                last_known_swh_revision=previous_unfinished_revision)
-
-        actual_raised_revision = exc.exception.swh_revision
+        self.loader.load(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path,
+            swh_revision=previous_unfinished_revision)
 
         # then repositories holds 21 revisions, but the last commit
         # one holds an 'svn:externals' property which will make the
-        # loader-svn stops. This will then stop at the 6th iterations
-        # of 3-revision block size, so only 18 revisions will be
-        # flushed
-        self.assertEquals(len(self.loader.all_revisions), 18)
+        # loader-svn stops at the last revision prior to the bad one
+        self.assertEquals(len(self.loader.all_revisions), 20)
         self.assertEquals(len(self.loader.all_releases), 0)
 
-        last_revision = 'ffa901b69ca0f46a2261f42948838d19709cb9f8'
-
+        last_revision = '82a7a4a09f9549223429143ba36ad77375e33c5c'
         expected_revisions = {
             # revision hash | directory hash
             '0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71': '669a71cce6c424a81ba42b7dc5d560d32252f0ca',  # noqa
@@ -747,49 +799,43 @@ class SWHSvnLoaderExternalIdCornerCaseITTest(BaseTestSvnLoader):
             'd04ea8afcee6205cc8384c091bfc578931c169fd': 'b0a648b02e55a4dce356ac35187a058f89694ec7',  # noqa
             'ded78810401fd354ffe894aa4a1e5c7d30a645d1': 'b0a648b02e55a4dce356ac35187a058f89694ec7',  # noqa
             '4ee95e39358712f53c4fc720da3fafee9249ed19': 'c3c98df624733fef4e592bef983f93e2ed02b179',  # noqa
-            last_revision                             : 'c3c98df624733fef4e592bef983f93e2ed02b179',  # noqa
+            'ffa901b69ca0f46a2261f42948838d19709cb9f8': 'c3c98df624733fef4e592bef983f93e2ed02b179',  # noqa
+            '0148ae3eaa520b73a50802c59f3f416b7a36cf8c': '844d4646d6c2b4f3a3b2b22ab0ee38c7df07bab2',  # noqa
+            last_revision: '0de6e75d2b79ec90d00a3a7611aa3861b2e4aa5e',  # noqa
         }
 
         # The last revision being the one used later to start back from
-        self.assertEquals(hashutil.hash_to_hex(actual_raised_revision['id']),
-                          last_revision)
-
         self.assertRevisionsOk(expected_revisions)
+        self.assertEquals(len(self.loader.all_snapshots), 1)
+        # FIXME: Check the snapshot's state
+        self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
+        self.assertEqual(self.loader.visit_status(), 'partial')
 
 
-class SWHSvnLoaderLinkFileAndFolderWithSameNameITTest(BaseTestSvnLoader):
+class SvnLoaderITest12(BaseSvnLoaderTest):
+    """Edge cases:
+       - first create a file and commit it.
+         Remove it, then add folder holding the same name, commit.
+       - do the same scenario with symbolic link (instead of file)
+
+    """
     def setUp(self):
-        # edge cases:
-        # - first create a file and commit it.
-        #   Remove it, then add folder holding the same name, commit.
-        # - do the same scenario with symbolic link (instead of file)
         super().setUp(
             archive_name='pkg-gourmet-with-edge-case-links-and-files.tgz')
-
-        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
-
-        self.origin_visit = {
-            'origin': self.origin['id'],
-            'visit': 1,
-        }
-
-        self.loader = SWHSvnLoaderNoStorage()
-        # override revision-block size
-        self.loader.config['revision_packet_size'] = 3
-        self.loader.prepare(
-            self.svn_mirror_url, self.destination_path, self.origin)
+        self.loader = SvnLoaderNoStorage()
 
     @istest
-    def process_repository(self):
-        """File/Link destroyed prior to folder with same name creation should be ok
+    def load(self):
+        """File/Link removed prior to folder with same name creation is ok
 
         """
         previous_unfinished_revision = None
 
         # when
-        self.loader.process_repository(
-            self.origin_visit,
-            last_known_swh_revision=previous_unfinished_revision)
+        self.loader.load(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path,
+            swh_revision=previous_unfinished_revision)
 
         # then repositories holds 14 revisions, but the last commit
         self.assertEquals(len(self.loader.all_revisions), 19)
@@ -820,40 +866,32 @@ class SWHSvnLoaderLinkFileAndFolderWithSameNameITTest(BaseTestSvnLoader):
         }
 
         self.assertRevisionsOk(expected_revisions)
+        self.assertEquals(len(self.loader.all_snapshots), 1)
+        # FIXME: Check the snapshot's state
+        self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
+        self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SWHSvnLoaderWrongLinkCasesITTest(BaseTestSvnLoader):
+class SvnLoaderITTest13(BaseSvnLoaderTest):
+    """Edge cases:
+       - wrong symbolic link
+       - wrong symbolic link with empty space names
+
+    """
     def setUp(self):
-        # edge cases:
-        # - wrong symbolic link
-        # - wrong symbolic link with empty space names
         super().setUp(
             archive_name='pkg-gourmet-with-wrong-link-cases.tgz')
-
-        self.origin = {'id': 2, 'type': 'svn', 'url': 'file:///dev/null'}
-
-        self.origin_visit = {
-            'origin': self.origin['id'],
-            'visit': 1,
-        }
-
-        self.loader = SWHSvnLoaderNoStorage()
-        # override revision-block size
-        self.loader.config['revision_packet_size'] = 3
-        self.loader.prepare(
-            self.svn_mirror_url, self.destination_path, self.origin)
+        self.loader = SvnLoaderNoStorage()
 
     @istest
-    def process_repository(self):
+    def load(self):
         """Wrong link or empty space-named link should be ok
 
         """
-        previous_unfinished_revision = None
-
         # when
-        self.loader.process_repository(
-            self.origin_visit,
-            last_known_swh_revision=previous_unfinished_revision)
+        self.loader.load(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path)
 
         # then repositories holds 14 revisions, but the last commit
         self.assertEquals(len(self.loader.all_revisions), 21)
@@ -887,3 +925,103 @@ class SWHSvnLoaderWrongLinkCasesITTest(BaseTestSvnLoader):
         }
 
         self.assertRevisionsOk(expected_revisions)
+        self.assertEquals(len(self.loader.all_snapshots), 1)
+        # FIXME: Check the snapshot's state
+        self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
+        self.assertEqual(self.loader.visit_status(), 'full')
+
+
+class SvnLoaderFromRemoteDumpNoStorage(LoaderNoStorage, LoaderWithState,
+                                       SvnLoaderFromRemoteDump):
+    """A SvnLoaderFromRemoteDump with no persistence.
+
+    Context:
+        Load a remote svn repository from a generated dump file.
+
+    """
+
+    def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
+        """We do not know this repository so no revision.
+
+        """
+        return {}
+
+
+class SvnLoaderFromRemoteDump(BaseSvnLoaderTest):
+    """
+    Check that the results obtained with the remote svn dump loader
+    and the base svn loader are the same.
+    """
+    def setUp(self):
+        super().setUp(archive_name='pkg-gourmet.tgz')
+
+    @istest
+    def load(self):
+        """
+        Compare results of remote dump loader and base loader
+        """
+        dump_loader = SvnLoaderFromRemoteDumpNoStorage()
+        dump_loader.load(svn_url=self.svn_mirror_url)
+
+        base_loader = SvnLoaderNoStorage()
+        base_loader.load(svn_url=self.svn_mirror_url)
+
+        self.assertEqual(dump_loader.all_contents,
+                         base_loader.all_contents)
+        self.assertEqual(dump_loader.all_directories,
+                         base_loader.all_directories)
+        self.assertEqual(dump_loader.all_revisions,
+                         base_loader.all_revisions)
+        self.assertEqual(dump_loader.all_snapshots,
+                         base_loader.all_snapshots)
+
+
+class SvnLoaderITTest14(BaseSvnLoaderTest):
+    """Edge cases: The repository held some user defined svn-properties
+       with special encodings, this prevented the repository from
+       being loaded even though we do not ingest those information.
+
+    """
+    def setUp(self):
+        super().setUp(archive_name='httthttt.tgz', filename='httthttt')
+        self.loader = SvnLoaderNoStorage()
+
+    @istest
+    def load(self):
+        """Decoding user defined svn properties error should not fail loading
+
+        """
+        # when
+        self.loader.load(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path)
+
+        self.assertEquals(len(self.loader.all_revisions), 7, '7 svn commits')
+        self.assertEquals(len(self.loader.all_releases), 0)
+
+        last_revision = '604a17dbb15e8d7ecb3e9f3768d09bf493667a93'
+
+        expected_revisions = {
+            'e6ae8487c6d14df9e6cb7196c6aac045798fd5be': '75ed58f260bfa4102d0e09657803511f5f0ab372',  # noqa
+            'e1e3314e0e9c9d17e6a3f60d6662f48f0e3c2fa3': '7bfb95cef68c1affe8d7f786353213d92abbb2b7',  # noqa
+            '1632fd38a8653e9b607c00feb93a41faddfb544c': 'cd6de65c84d9405e7ca45fead02aa10162e30727',  # noqa
+            '0ad1ebbb92d00721644b0a46d6322d18dbcba848': 'cd6de65c84d9405e7ca45fead02aa10162e30727',  # noqa
+            '94b87c97697d178a9311b018daa5179f7d4ba31e': 'c2128108adecb59a0144339c2e701cd8118cff5a',  # noqa
+            'bd741cf22f0642d88cd0d8b545e8896b898c692d': 'c2128108adecb59a0144339c2e701cd8118cff5a',  # noqa
+            last_revision: 'f051d60256b2d89a0ca2704d6f91ad1b0ab44e02',
+        }
+
+        self.assertRevisionsOk(expected_revisions)
+
+        expected_snapshot_id = '7984351300a02fa2eba9be072e5ed98d547974df'
+        expected_branches = {
+            'master': {
+                'target': last_revision,
+                'target_type': 'revision'
+            }
+        }
+
+        self.assertSnapshotOk(expected_snapshot_id, expected_branches)
+
+        self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
+        self.assertEqual(self.loader.visit_status(), 'full')

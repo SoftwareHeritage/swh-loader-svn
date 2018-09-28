@@ -9,6 +9,7 @@ commit.
 
 """
 
+import logging
 import os
 import tempfile
 import shutil
@@ -24,19 +25,17 @@ from . import ra, converters
 DEFAULT_AUTHOR_MESSAGE = ''
 
 
-class SWHSvnRepo:
-    """SWH's svn repository representation.
+class SvnRepo:
+    """Svn repository representation.
 
     Args:
         remote_url (str):
         origin_id (int): Associated origin identifier
-        storage (Storage): Storage to use to execute storage statements
         local_dirname (str): Path to write intermediary svn action results
 
     """
-    def __init__(self, remote_url, origin_id, storage, local_dirname):
+    def __init__(self, remote_url, origin_id, local_dirname):
         self.remote_url = remote_url.rstrip('/')
-        self.storage = storage
         self.origin_id = origin_id
 
         auth = Auth([get_username_provider()])
@@ -53,7 +52,7 @@ class SWHSvnRepo:
             'utf-8')
 
         self.uuid = self.conn.get_uuid().encode('utf-8')
-        self.swhreplay = ra.SWHReplay(conn=self.conn, rootpath=self.local_url)
+        self.swhreplay = ra.Replay(conn=self.conn, rootpath=self.local_url)
 
     def __str__(self):
         return str({
@@ -242,7 +241,7 @@ class SWHSvnRepo:
                                         save_path=True)
 
         # Update the replay collaborator with the right state
-        self.swhreplay = ra.SWHReplay(
+        self.swhreplay = ra.Replay(
             conn=self.conn,
             rootpath=self.local_url,
             directory=directory)
@@ -261,7 +260,7 @@ class SWHSvnRepo:
             used for svn repository loading.
 
         """
-        if local_dirname:
-            shutil.rmtree(local_dirname)
-        else:
-            shutil.rmtree(self.local_dirname)
+        dirname = local_dirname if local_dirname else self.local_dirname
+        if os.path.exists(dirname):
+            logging.debug('cleanup %s' % dirname)
+            shutil.rmtree(dirname)

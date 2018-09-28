@@ -974,3 +974,54 @@ class SvnLoaderFromRemoteDump(BaseSvnLoaderTest):
                          base_loader.all_revisions)
         self.assertEqual(dump_loader.all_snapshots,
                          base_loader.all_snapshots)
+
+
+class SvnLoaderITTest14(BaseSvnLoaderTest):
+    """Edge cases: The repository held some user defined svn-properties
+       with special encodings, this prevented the repository from
+       being loaded even though we do not ingest those information.
+
+    """
+    def setUp(self):
+        super().setUp(archive_name='httthttt.tgz', filename='httthttt')
+        self.loader = SvnLoaderNoStorage()
+
+    @istest
+    def load(self):
+        """Decoding user defined svn properties error should not fail loading
+
+        """
+        # when
+        self.loader.load(
+            svn_url=self.svn_mirror_url,
+            destination_path=self.destination_path)
+
+        self.assertEquals(len(self.loader.all_revisions), 7, '7 svn commits')
+        self.assertEquals(len(self.loader.all_releases), 0)
+
+        last_revision = '604a17dbb15e8d7ecb3e9f3768d09bf493667a93'
+
+        expected_revisions = {
+            'e6ae8487c6d14df9e6cb7196c6aac045798fd5be': '75ed58f260bfa4102d0e09657803511f5f0ab372',
+            'e1e3314e0e9c9d17e6a3f60d6662f48f0e3c2fa3': '7bfb95cef68c1affe8d7f786353213d92abbb2b7',
+            '1632fd38a8653e9b607c00feb93a41faddfb544c': 'cd6de65c84d9405e7ca45fead02aa10162e30727',
+            '0ad1ebbb92d00721644b0a46d6322d18dbcba848': 'cd6de65c84d9405e7ca45fead02aa10162e30727',
+            '94b87c97697d178a9311b018daa5179f7d4ba31e': 'c2128108adecb59a0144339c2e701cd8118cff5a',
+            'bd741cf22f0642d88cd0d8b545e8896b898c692d': 'c2128108adecb59a0144339c2e701cd8118cff5a',
+            last_revision: 'f051d60256b2d89a0ca2704d6f91ad1b0ab44e02',
+        }
+
+        self.assertRevisionsOk(expected_revisions)
+
+        expected_snapshot_id = '7984351300a02fa2eba9be072e5ed98d547974df'
+        expected_branches = {
+            'master': {
+                'target': last_revision,
+                'target_type': 'revision'
+            }
+        }
+
+        self.assertSnapshotOk(expected_snapshot_id, expected_branches)
+
+        self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
+        self.assertEqual(self.loader.visit_status(), 'full')

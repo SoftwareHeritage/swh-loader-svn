@@ -38,6 +38,35 @@ class BaseSvnLoaderTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp_root_path)
 
+    def assertSnapshotOk(self, expected_snapshot, expected_branches):
+        snapshots = self.loader.all_snapshots
+        self.assertEqual(len(snapshots), 1)
+
+        snap = snapshots[0]
+        snap_id = hashutil.hash_to_hex(snap['id'])
+        self.assertEqual(snap_id, expected_snapshot)
+
+        def decode_target(target):
+            if not target:
+                return target
+            target_type = target['target_type']
+
+            if target_type == 'alias':
+                decoded_target = target['target'].decode('utf-8')
+            else:
+                decoded_target = hashutil.hash_to_hex(target['target'])
+
+            return {
+                'target': decoded_target,
+                'target_type': target_type
+            }
+
+        branches = {
+            branch.decode('utf-8'): decode_target(target)
+            for branch, target in snap['branches'].items()
+        }
+        self.assertEqual(expected_branches, branches)
+
     def assertRevisionsOk(self, expected_revisions):  # noqa: N802
         """Check the loader's revisions match the expected revisions.
 

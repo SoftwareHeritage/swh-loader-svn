@@ -1,4 +1,4 @@
-# Copyright (C) 2016  The Software Heritage developers
+# Copyright (C) 2016-2018  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -19,12 +19,11 @@ class BaseSvnLoaderTest(unittest.TestCase):
 
     """
     def setUp(self, archive_name='pkg-gourmet.tgz', filename='pkg-gourmet'):
-        self.tmp_root_path = tempfile.mkdtemp()
+        self.tmp_root_path = tempfile.mkdtemp(
+            prefix='swh.loader.svn', suffix='-tests')
 
         start_path = os.path.dirname(__file__)
-        svn_mirror_repo = os.path.join(start_path,
-                                       'resources',
-                                       archive_name)
+        svn_mirror_repo = os.path.join(start_path, 'resources', archive_name)
 
         # uncompress the sample folder
         subprocess.check_output(

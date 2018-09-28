@@ -23,7 +23,7 @@ class BaseSvnLoaderTest(unittest.TestCase):
 
         start_path = os.path.dirname(__file__)
         svn_mirror_repo = os.path.join(start_path,
-                                       'svn-test-repos',
+                                       'resources',
                                        archive_name)
 
         # uncompress the sample folder

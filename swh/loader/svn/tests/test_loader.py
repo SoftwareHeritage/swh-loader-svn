@@ -3,6 +3,8 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import os
+
 from nose.tools import istest
 from unittest import TestCase
 
@@ -10,8 +12,20 @@ from swh.model import hashutil
 
 from swh.loader.svn.loader import build_swh_snapshot, DEFAULT_BRANCH
 from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
+from swh.loader.core.tests import LoaderNoStorage, BaseLoaderTest
 
-from .test_base import BaseSvnLoaderTest
+
+class BaseSvnLoaderTest(BaseLoaderTest):
+    """Base test loader class.
+
+    In its setup, it's uncompressing a local svn mirror to /tmp.
+
+    """
+    def setUp(self, archive_name='pkg-gourmet.tgz', filename='pkg-gourmet'):
+        super().setUp(archive_name=archive_name, filename=filename,
+                      prefix_tmp_folder_name='swh.loader.svn.',
+                      start_path=os.path.dirname(__file__))
+        self.svn_mirror_url = self.repo_url
 
 
 class TestSnapshot(TestCase):
@@ -28,90 +42,6 @@ class TestSnapshot(TestCase):
                 }
             }
         })
-
-
-# Define loaders with no storage
-# They'll just accumulate the data in place
-# Only for testing purposes.
-
-
-class LoaderNoStorage:
-    """Mixin class to inhibit the persistence and keep in memory the data
-    sent for storage.
-
-    cf. SvnLoaderNoStorage
-
-    """
-    def __init__(self):
-        super().__init__()
-        self.all_contents = []
-        self.all_directories = []
-        self.all_revisions = []
-        self.all_releases = []
-        self.all_snapshots = []
-
-        # typed data
-        self.objects = {
-            'content': self.all_contents,
-            'directory': self.all_directories,
-            'revision': self.all_revisions,
-            'release': self.all_releases,
-            'snapshot': self.all_snapshots,
-        }
-
-    def _add(self, type, l):
-        """Add without duplicates and keeping the insertion order.
-
-        Args:
-            type (str): Type of objects concerned by the action
-            l ([object]): List of 'type' object
-
-        """
-        col = self.objects[type]
-        for o in l:
-            if o in col:
-                continue
-            col.extend([o])
-
-    def maybe_load_contents(self, all_contents):
-        self._add('content', all_contents)
-
-    def maybe_load_directories(self, all_directories):
-        self._add('directory', all_directories)
-
-    def maybe_load_revisions(self, all_revisions):
-        self._add('revision', all_revisions)
-
-    def maybe_load_releases(self, releases):
-        raise ValueError('If called, the test must break.')
-
-    def maybe_load_snapshot(self, snapshot):
-        self._add('snapshot', [snapshot])
-
-    def _store_origin_visit(self):
-        pass
-
-    def open_fetch_history(self):
-        pass
-
-    def close_fetch_history_success(self, fetch_history_id):
-        pass
-
-    def close_fetch_history_failure(self, fetch_history_id):
-        pass
-
-    def update_origin_visit(self, origin_id, visit, status):
-        pass
-
-    # Override to do nothing at the end
-    def close_failure(self):
-        pass
-
-    def close_success(self):
-        pass
-
-    def pre_cleanup(self):
-        pass
 
 
 class LoaderWithState:

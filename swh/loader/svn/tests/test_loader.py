@@ -173,8 +173,8 @@ class SvnLoaderITest1(BaseSvnLoaderTest):
             destination_path=self.destination_path)
 
         # then
-        self.assertEquals(len(self.loader.all_revisions), 6)
-        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertCountRevisions(6)
+        self.assertCountReleases(0)
 
         last_revision = '4876cb10aec6f708f7466dddf547567b65f6c39c'
         # cf. test_loader.org for explaining from where those hashes
@@ -190,7 +190,7 @@ class SvnLoaderITest1(BaseSvnLoaderTest):
         }
 
         self.assertRevisionsOk(expected_revisions)
-        self.assertEquals(len(self.loader.all_snapshots), 1)
+        self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         # self.assertEquals(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
@@ -218,11 +218,11 @@ class SvnLoaderITest2(BaseSvnLoaderTest):
 
         # then
 
-        self.assertEquals(len(self.loader.all_contents), 0)
-        self.assertEquals(len(self.loader.all_directories), 0)
-        self.assertEquals(len(self.loader.all_revisions), 0)
-        self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_snapshots), 1)
+        self.assertCountContents(0)
+        self.assertCountDirectories(0)
+        self.assertCountRevisions(0)
+        self.assertCountReleases(0)
+        self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         # self.assertEquals(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'uneventful'})
@@ -254,11 +254,11 @@ class SvnLoaderITest3(BaseSvnLoaderTest):
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 news + 1 old
-        self.assertEquals(len(self.loader.all_contents), 0)
-        self.assertEquals(len(self.loader.all_directories), 0)
-        self.assertEquals(len(self.loader.all_revisions), 0)
-        self.assertEquals(len(self.loader.all_releases), 0)
-        self.assertEquals(len(self.loader.all_snapshots), 0)
+        self.assertCountContents(0)
+        self.assertCountDirectories(0)
+        self.assertCountRevisions(0)
+        self.assertCountReleases(0)
+        self.assertCountSnapshots(0)
         # FIXME: Check the snapshot's state
         # self.assertEquals(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'uneventful'})
@@ -288,8 +288,8 @@ class SvnLoaderITest4(BaseSvnLoaderTest):
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 new
-        self.assertEquals(len(self.loader.all_revisions), 5)
-        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertCountRevisions(5)
+        self.assertCountReleases(0)
 
         last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
@@ -305,7 +305,7 @@ class SvnLoaderITest4(BaseSvnLoaderTest):
 
         self.assertRevisionsOk(expected_revisions)
 
-        self.assertEquals(len(self.loader.all_snapshots), 1)
+        self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         # self.assertEquals(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
@@ -338,8 +338,8 @@ class SvnLoaderITTest5(BaseSvnLoaderTest):
         # we got the previous run's last revision (rev 6)
         # but we do not inspect that as we start from from scratch so
         # we should have all revisions so 11
-        self.assertEquals(len(self.loader.all_revisions), 11)
-        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertCountRevisions(11)
+        self.assertCountReleases(0)
 
         expected_revisions = {
             '0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71': '669a71cce6c424a81ba42b7dc5d560d32252f0ca',  # noqa
@@ -357,7 +357,7 @@ class SvnLoaderITTest5(BaseSvnLoaderTest):
 
         self.assertRevisionsOk(expected_revisions)
 
-        self.assertEquals(len(self.loader.all_snapshots), 1)
+        self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         # self.assertEquals(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
@@ -425,8 +425,8 @@ class SvnLoaderITTest6(BaseSvnLoaderTest):
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 new
-        self.assertEquals(len(self.loader.all_revisions), 5)
-        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertCountRevisions(5)
+        self.assertCountReleases(0)
 
         last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
@@ -441,7 +441,7 @@ class SvnLoaderITTest6(BaseSvnLoaderTest):
         }
 
         self.assertRevisionsOk(expected_revisions)
-        self.assertEquals(len(self.loader.all_snapshots), 1)
+        self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         # self.assertEquals(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
@@ -489,8 +489,8 @@ class SvnLoaderITest7(BaseSvnLoaderTest):
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 new
-        self.assertEquals(len(self.loader.all_revisions), 5)
-        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertCountRevisions(5)
+        self.assertCountReleases(0)
 
         last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
@@ -505,7 +505,7 @@ class SvnLoaderITest7(BaseSvnLoaderTest):
         }
 
         self.assertRevisionsOk(expected_revisions)
-        self.assertEquals(len(self.loader.all_snapshots), 1)
+        self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         # self.assertEquals(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
@@ -590,8 +590,8 @@ class SvnLoaderITest8(BaseSvnLoaderTest):
         # then
         # we got the previous run's last revision (rev 6)
         # so 2 new
-        self.assertEquals(len(self.loader.all_revisions), 5)
-        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertCountRevisions(5)
+        self.assertCountReleases(0)
 
         last_revision = '171dc35522bfd17dda4e90a542a0377fb2fc707a'
         # cf. test_loader.org for explaining from where those hashes
@@ -606,7 +606,7 @@ class SvnLoaderITest8(BaseSvnLoaderTest):
         }
 
         self.assertRevisionsOk(expected_revisions)
-        self.assertEquals(len(self.loader.all_snapshots), 1)
+        self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         # self.assertEquals(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
@@ -638,7 +638,7 @@ class SvnLoaderTTest9(BaseSvnLoaderTest):
             '7da4975c363101b819756d33459f30a866d01b1b': 'f63637223ee0f7d4951ffd2d4d9547a4882c5d8b' # noqa
         }
         self.assertRevisionsOk(expected_revisions)
-        self.assertEquals(len(self.loader.all_snapshots), 1)
+        self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         # self.assertEquals(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
@@ -672,7 +672,7 @@ class SvnLoaderITest10(BaseSvnLoaderTest): # noqa
         }
 
         self.assertRevisionsOk(expected_revisions)
-        self.assertEquals(len(self.loader.all_snapshots), 1)
+        self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         # self.assertEquals(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
@@ -706,8 +706,8 @@ class SvnLoaderITest11(BaseSvnLoaderTest):
         # then repositories holds 21 revisions, but the last commit
         # one holds an 'svn:externals' property which will make the
         # loader-svn stops at the last revision prior to the bad one
-        self.assertEquals(len(self.loader.all_revisions), 20)
-        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertCountRevisions(20)
+        self.assertCountReleases(0)
 
         last_revision = '82a7a4a09f9549223429143ba36ad77375e33c5c'
         expected_revisions = {
@@ -736,7 +736,7 @@ class SvnLoaderITest11(BaseSvnLoaderTest):
 
         # The last revision being the one used later to start back from
         self.assertRevisionsOk(expected_revisions)
-        self.assertEquals(len(self.loader.all_snapshots), 1)
+        self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'partial')
@@ -768,8 +768,8 @@ class SvnLoaderITest12(BaseSvnLoaderTest):
             swh_revision=previous_unfinished_revision)
 
         # then repositories holds 14 revisions, but the last commit
-        self.assertEquals(len(self.loader.all_revisions), 19)
-        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertCountRevisions(19)
+        self.assertCountReleases(0)
 
         last_revision = '3f43af2578fccf18b0d4198e48563da7929dc608'
         expected_revisions = {
@@ -796,7 +796,7 @@ class SvnLoaderITest12(BaseSvnLoaderTest):
         }
 
         self.assertRevisionsOk(expected_revisions)
-        self.assertEquals(len(self.loader.all_snapshots), 1)
+        self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
@@ -824,8 +824,8 @@ class SvnLoaderITTest13(BaseSvnLoaderTest):
             destination_path=self.destination_path)
 
         # then repositories holds 14 revisions, but the last commit
-        self.assertEquals(len(self.loader.all_revisions), 21)
-        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertCountRevisions(21)
+        self.assertCountReleases(0)
 
         last_revision = 'cf30d3bb9d5967d0a2bbeacc405f10a5dd9b138a'
 
@@ -855,7 +855,7 @@ class SvnLoaderITTest13(BaseSvnLoaderTest):
         }
 
         self.assertRevisionsOk(expected_revisions)
-        self.assertEquals(len(self.loader.all_snapshots), 1)
+        self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
@@ -896,14 +896,14 @@ class SvnLoaderFromRemoteDump(BaseSvnLoaderTest):
         base_loader = SvnLoaderNoStorage()
         base_loader.load(svn_url=self.svn_mirror_url)
 
-        self.assertEqual(dump_loader.all_contents,
-                         base_loader.all_contents)
-        self.assertEqual(dump_loader.all_directories,
-                         base_loader.all_directories)
-        self.assertEqual(dump_loader.all_revisions,
-                         base_loader.all_revisions)
-        self.assertEqual(dump_loader.all_snapshots,
-                         base_loader.all_snapshots)
+        self.assertEqual(dump_loader.state('content'),
+                         base_loader.state('content'))
+        self.assertEqual(dump_loader.state('directory'),
+                         base_loader.state('directory'))
+        self.assertEqual(dump_loader.state('revision'),
+                         base_loader.state('revision'))
+        self.assertEqual(dump_loader.state('snapshot'),
+                         base_loader.state('snapshot'))
 
 
 class SvnLoaderITTest14(BaseSvnLoaderTest):
@@ -926,8 +926,8 @@ class SvnLoaderITTest14(BaseSvnLoaderTest):
             svn_url=self.svn_mirror_url,
             destination_path=self.destination_path)
 
-        self.assertEquals(len(self.loader.all_revisions), 7, '7 svn commits')
-        self.assertEquals(len(self.loader.all_releases), 0)
+        self.assertCountRevisions(7, '7 svn commits')
+        self.assertCountReleases(0)
 
         last_revision = '604a17dbb15e8d7ecb3e9f3768d09bf493667a93'
 

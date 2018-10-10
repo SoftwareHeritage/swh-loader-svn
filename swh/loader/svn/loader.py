@@ -31,7 +31,7 @@ from .exception import SvnLoaderUneventful
 from .exception import SvnLoaderHistoryAltered
 
 
-DEFAULT_BRANCH = b'master'
+DEFAULT_BRANCH = b'HEAD'
 
 
 def _revision_id(revision):

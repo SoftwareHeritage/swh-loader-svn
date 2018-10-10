@@ -943,9 +943,9 @@ class SvnLoaderITTest14(BaseSvnLoaderTest):
 
         self.assertRevisionsOk(expected_revisions)
 
-        expected_snapshot_id = '7984351300a02fa2eba9be072e5ed98d547974df'
+        expected_snapshot_id = '70487267f682c07e52a2371061369b6cf5bffa47'
         expected_branches = {
-            'master': {
+            'HEAD': {
                 'target': last_revision,
                 'target_type': 'revision'
             }

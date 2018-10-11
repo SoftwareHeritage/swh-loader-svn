@@ -5,12 +5,12 @@ MANIFEST.in
 Makefile
 README.md
 requirements-swh.txt
+requirements-test.txt
 requirements.txt
 setup.py
 svn-lib-client-analysis.org
 version.txt
 bin/init-svn-repository.sh
-bin/swh-hashtree
 bin/swh-svn
 debian/changelog
 debian/compat
@@ -44,7 +44,6 @@ swh/loader/svn/svn.py
 swh/loader/svn/tasks.py
 swh/loader/svn/utils.py
 swh/loader/svn/tests/__init__.py
-swh/loader/svn/tests/test_base.py
 swh/loader/svn/tests/test_converters.py
 swh/loader/svn/tests/test_loader.org
 swh/loader/svn/tests/test_loader.py

@@ -3,8 +3,11 @@ python-dateutil
 retrying
 subvertpy>=0.9.4
 swh.core>=0.0.19
-swh.loader.core>=0.0.33
+swh.loader.core>=0.0.34
 swh.model>=0.0.18
 swh.scheduler>=0.0.14
 swh.storage>=0.0.83
 vcversioner
+
+[testing]
+nose

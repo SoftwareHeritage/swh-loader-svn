@@ -1,8 +1,13 @@
-swh-loader-svn (0.0.41-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.42-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.43
+  * loader: Rename default branch as HEAD
+  * svn.tests: Refactor using loader-core mixins
+  * setup: prepare for pypi upload
+  * Add requirements-test.txt
+  * docs: add title and brief module description
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 28 Sep 2018 12:16:31 +0200
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Thu, 11 Oct 2018 14:52:54 +0200
 
 swh-loader-svn (0.0.41-1~swh1) unstable-swh; urgency=medium
 

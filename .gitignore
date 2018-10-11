@@ -8,3 +8,5 @@ __pycache__
 version.txt
 logs/
 archives/
+build/
+dist/

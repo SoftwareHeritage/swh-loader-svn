@@ -5,14 +5,11 @@
 
 import unittest
 
-from nose.tools import istest
-
 from swh.loader.svn import converters
 
 
 class TestAuthorGitSvnConverters(unittest.TestCase):
-    @istest
-    def svn_author_to_gitsvn_person(self):
+    def test_svn_author_to_gitsvn_person(self):
         """The author should have name, email and fullname filled.
 
         """
@@ -25,8 +22,7 @@ class TestAuthorGitSvnConverters(unittest.TestCase):
             'email': b'ynot@dagobah',
         })
 
-    @istest
-    def svn_author_to_gitsvn_person_no_email(self):
+    def test_svn_author_to_gitsvn_person_no_email(self):
         """The author should see his/her email filled with author@<repo-uuid>.
 
         """
@@ -39,8 +35,7 @@ class TestAuthorGitSvnConverters(unittest.TestCase):
             'email': b'tony@some-uuid',
         })
 
-    @istest
-    def svn_author_to_gitsvn_person_empty_person(self):
+    def test_svn_author_to_gitsvn_person_empty_person(self):
         """The empty person should see name, fullname and email filled.
 
         """
@@ -55,8 +50,7 @@ class TestAuthorGitSvnConverters(unittest.TestCase):
 
 
 class TestAuthorConverters(unittest.TestCase):
-    @istest
-    def svn_author_to_swh_person(self):
+    def test_svn_author_to_swh_person(self):
         """The author should have name, email and fullname filled.
 
         """
@@ -68,8 +62,7 @@ class TestAuthorConverters(unittest.TestCase):
             'email': b'ynot@dagobah',
         })
 
-    @istest
-    def svn_author_to_swh_person_no_email(self):
+    def test_svn_author_to_swh_person_no_email(self):
         """The author and fullname should be the same as the input (author).
 
         """
@@ -80,8 +73,7 @@ class TestAuthorConverters(unittest.TestCase):
             'email': None,
         })
 
-    @istest
-    def svn_author_to_swh_person_empty_person(self):
+    def test_svn_author_to_swh_person_empty_person(self):
         """Empty person has only its fullname filled with the empty
         byte-string.
 
@@ -95,8 +87,7 @@ class TestAuthorConverters(unittest.TestCase):
 
 
 class TestRevisionConverters(unittest.TestCase):
-    @istest
-    def build_swh_revision_default(self):
+    def test_build_swh_revision_default(self):
         """This should build the swh revision with the swh revision's extra
         headers about the repository.
 
@@ -158,8 +149,7 @@ class TestRevisionConverters(unittest.TestCase):
 
 
 class TestGitSvnRevisionConverters(unittest.TestCase):
-    @istest
-    def build_gitsvn_swh_revision_default(self):
+    def test_build_gitsvn_swh_revision_default(self):
         """This should build the swh revision without the swh revision's extra
         headers about the repository.
 
@@ -215,8 +205,7 @@ class TestGitSvnRevisionConverters(unittest.TestCase):
 
 
 class ConvertDate(unittest.TestCase):
-    @istest
-    def svn_date_to_swh_date(self):
+    def test_svn_date_to_swh_date(self):
         """The timestamp should not be tampered with and include the
         decimals.
 
@@ -240,8 +229,7 @@ class ConvertDate(unittest.TestCase):
                 'offset': 0
             })
 
-    @istest
-    def svn_date_to_swh_date_epoch(self):
+    def test_svn_date_to_swh_date_epoch(self):
         """Empty date should be EPOCH (timestamp and offset at 0)."""
         # It should return 0, epoch
         self.assertEquals({
@@ -260,8 +248,7 @@ class ConvertDate(unittest.TestCase):
 
 
 class ConvertGitSvnDate(unittest.TestCase):
-    @istest
-    def svn_date_to_gitsvn_date(self):
+    def test_svn_date_to_gitsvn_date(self):
         """The timestamp should be truncated to be an integer."""
         actual_ts = converters.svn_date_to_gitsvn_date(
             '2011-05-31T06:04:39.800722Z')
@@ -274,8 +261,7 @@ class ConvertGitSvnDate(unittest.TestCase):
             'offset': 0,
         })
 
-    @istest
-    def svn_date_to_gitsvn_date_epoch(self):
+    def test_svn_date_to_gitsvn_date_epoch(self):
         """Empty date should be EPOCH (timestamp and offset at 0)."""
         # It should return 0, epoch
         self.assertEquals({

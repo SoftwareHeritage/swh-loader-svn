@@ -4,15 +4,12 @@
 # See top-level LICENSE file for more information
 
 import os
-
-from nose.tools import istest
 from unittest import TestCase
 
+from swh.loader.core.tests import BaseLoaderTest, LoaderNoStorage
+from swh.loader.svn.loader import (DEFAULT_BRANCH, SvnLoader,
+                                   SvnLoaderFromRemoteDump, build_swh_snapshot)
 from swh.model import hashutil
-
-from swh.loader.svn.loader import build_swh_snapshot, DEFAULT_BRANCH
-from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
-from swh.loader.core.tests import LoaderNoStorage, BaseLoaderTest
 
 
 class BaseSvnLoaderTest(BaseLoaderTest):
@@ -29,8 +26,7 @@ class BaseSvnLoaderTest(BaseLoaderTest):
 
 
 class TestSnapshot(TestCase):
-    @istest
-    def build_swh_snapshot(self):
+    def test_build_swh_snapshot(self):
         actual_snap = build_swh_snapshot('revision-id')
 
         self.assertEquals(actual_snap, {
@@ -162,8 +158,7 @@ class SvnLoaderITest1(BaseSvnLoaderTest):
         super().setUp()
         self.loader = SvnLoaderNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Load a new repository results in new swh object and snapshot
 
         """
@@ -206,8 +201,7 @@ class SvnLoaderITest2(BaseSvnLoaderTest):
         super().setUp()
         self.loader = SvnLoaderUpdateNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Load a repository without new changes results in same snapshot
 
         """
@@ -242,8 +236,7 @@ class SvnLoaderITest3(BaseSvnLoaderTest):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
         self.loader = SvnLoaderUpdateHistoryAlteredNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Load known repository with history altered should do nothing
 
         """
@@ -276,8 +269,7 @@ class SvnLoaderITest4(BaseSvnLoaderTest):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
         self.loader = SvnLoaderUpdateNoStorage()
 
-    @istest
-    def process_repository(self):
+    def test_process_repository(self):
         """Process updated repository should yield new objects
 
         """
@@ -324,8 +316,7 @@ class SvnLoaderITTest5(BaseSvnLoaderTest):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
         self.loader = SvnLoaderUpdateNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Load an existing repository from scratch yields same swh objects
 
         """
@@ -412,8 +403,7 @@ class SvnLoaderITTest6(BaseSvnLoaderTest):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
         self.loader = SvnLoaderWithPreviousRevisionNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Load from partial previous visit result in new changes
 
         """
@@ -459,8 +449,7 @@ class SvnLoaderITest7(BaseSvnLoaderTest):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
         self.loader = SvnLoaderUpdateNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Load known and partial repository should start from last visit
 
         """
@@ -561,8 +550,7 @@ class SvnLoaderITest8(BaseSvnLoaderTest):
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
         self.loader = SvnLoaderUpdateLessRecentNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Load repository should yield revisions starting from last visit
 
         """
@@ -625,8 +613,7 @@ class SvnLoaderTTest9(BaseSvnLoaderTest):
                       filename='mediawiki-repo-r407-eol-native-crlf')
         self.loader = SvnLoaderNoStorage()
 
-    @istest
-    def process_repository(self):
+    def test_process_repository(self):
         """Load repository with CRLF endings (svn:eol-style: native) is ok
 
         """ # noqa
@@ -659,8 +646,7 @@ class SvnLoaderITest10(BaseSvnLoaderTest): # noqa
             filename='pyang-repo-r343-eol-native-mixed-lf-crlf')
         self.loader = SvnLoaderNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Load repo with mixed CRLF/LF endings (svn:eol-style:native) is ok
 
         """
@@ -690,8 +676,7 @@ class SvnLoaderITest11(BaseSvnLoaderTest):
         super().setUp(archive_name='pkg-gourmet-with-external-id.tgz')
         self.loader = SvnLoaderNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Repository with svn:externals property, will stop raising an error
 
         """
@@ -754,8 +739,7 @@ class SvnLoaderITest12(BaseSvnLoaderTest):
             archive_name='pkg-gourmet-with-edge-case-links-and-files.tgz')
         self.loader = SvnLoaderNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """File/Link removed prior to folder with same name creation is ok
 
         """
@@ -813,8 +797,7 @@ class SvnLoaderITTest13(BaseSvnLoaderTest):
             archive_name='pkg-gourmet-with-wrong-link-cases.tgz')
         self.loader = SvnLoaderNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Wrong link or empty space-named link should be ok
 
         """
@@ -885,8 +868,7 @@ class SvnLoaderFromRemoteDump(BaseSvnLoaderTest):
     def setUp(self):
         super().setUp(archive_name='pkg-gourmet.tgz')
 
-    @istest
-    def load(self):
+    def test_load(self):
         """
         Compare results of remote dump loader and base loader
         """
@@ -916,8 +898,7 @@ class SvnLoaderITTest14(BaseSvnLoaderTest):
         super().setUp(archive_name='httthttt.tgz', filename='httthttt')
         self.loader = SvnLoaderNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Decoding user defined svn properties error should not fail loading
 
         """

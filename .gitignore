@@ -10,3 +10,4 @@ logs/
 archives/
 build/
 dist/
+.tox/

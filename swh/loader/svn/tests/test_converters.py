@@ -16,7 +16,7 @@ class TestAuthorGitSvnConverters(unittest.TestCase):
         actual_person = converters.svn_author_to_gitsvn_person(
             'tony <ynot@dagobah>',
             repo_uuid=None)
-        self.assertEquals(actual_person, {
+        self.assertEqual(actual_person, {
             'fullname': b'tony <ynot@dagobah>',
             'name': b'tony',
             'email': b'ynot@dagobah',
@@ -29,7 +29,7 @@ class TestAuthorGitSvnConverters(unittest.TestCase):
         actual_person = converters.svn_author_to_gitsvn_person(
             'tony',
             repo_uuid=b'some-uuid')
-        self.assertEquals(actual_person, {
+        self.assertEqual(actual_person, {
             'fullname': b'tony <tony@some-uuid>',
             'name': b'tony',
             'email': b'tony@some-uuid',
@@ -56,7 +56,7 @@ class TestAuthorConverters(unittest.TestCase):
         """
         actual_person = converters.svn_author_to_swh_person(
             'tony <ynot@dagobah>')
-        self.assertEquals(actual_person, {
+        self.assertEqual(actual_person, {
             'fullname': b'tony <ynot@dagobah>',
             'name': b'tony',
             'email': b'ynot@dagobah',
@@ -67,7 +67,7 @@ class TestAuthorConverters(unittest.TestCase):
 
         """
         actual_person = converters.svn_author_to_swh_person('tony')
-        self.assertEquals(actual_person, {
+        self.assertEqual(actual_person, {
             'fullname': b'tony',
             'name': b'tony',
             'email': None,
@@ -121,7 +121,7 @@ class TestRevisionConverters(unittest.TestCase):
             'offset': 0,
         }
 
-        self.assertEquals(actual_swh_revision, {
+        self.assertEqual(actual_swh_revision, {
             'date': date,
             'committer_date': date,
             'type': 'svn',
@@ -182,7 +182,7 @@ class TestGitSvnRevisionConverters(unittest.TestCase):
             'offset': 0,
         }
 
-        self.assertEquals(actual_swh_revision, {
+        self.assertEqual(actual_swh_revision, {
             'date': date,
             'committer_date': date,
             'type': 'svn',
@@ -210,7 +210,7 @@ class ConvertDate(unittest.TestCase):
         decimals.
 
         """
-        self.assertEquals(
+        self.assertEqual(
             converters.svn_date_to_swh_date('2011-05-31T06:04:39.500900Z'), {
                 'timestamp': {
                     'seconds': 1306821879,
@@ -219,7 +219,7 @@ class ConvertDate(unittest.TestCase):
                 'offset': 0
             })
 
-        self.assertEquals(
+        self.assertEqual(
             converters.svn_date_to_swh_date('2011-05-31T06:04:39.800722Z'),
             {
                 'timestamp': {
@@ -232,14 +232,14 @@ class ConvertDate(unittest.TestCase):
     def test_svn_date_to_swh_date_epoch(self):
         """Empty date should be EPOCH (timestamp and offset at 0)."""
         # It should return 0, epoch
-        self.assertEquals({
+        self.assertEqual({
             'timestamp': {
                 'seconds': 0,
                 'microseconds': 0,
             },
             'offset': 0,
         }, converters.svn_date_to_swh_date(''))
-        self.assertEquals({
+        self.assertEqual({
             'timestamp': {
                 'seconds': 0,
                 'microseconds': 0,
@@ -253,7 +253,7 @@ class ConvertGitSvnDate(unittest.TestCase):
         actual_ts = converters.svn_date_to_gitsvn_date(
             '2011-05-31T06:04:39.800722Z')
 
-        self.assertEquals(actual_ts, {
+        self.assertEqual(actual_ts, {
             'timestamp': {
                 'seconds': 1306821879,
                 'microseconds': 0,
@@ -264,14 +264,14 @@ class ConvertGitSvnDate(unittest.TestCase):
     def test_svn_date_to_gitsvn_date_epoch(self):
         """Empty date should be EPOCH (timestamp and offset at 0)."""
         # It should return 0, epoch
-        self.assertEquals({
+        self.assertEqual({
             'timestamp': {
                 'seconds': 0,
                 'microseconds': 0,
             },
             'offset': 0,
         }, converters.svn_date_to_gitsvn_date(''))
-        self.assertEquals({
+        self.assertEqual({
             'timestamp': {
                 'seconds': 0,
                 'microseconds': 0,

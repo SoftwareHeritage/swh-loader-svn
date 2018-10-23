@@ -469,7 +469,7 @@ Local repository not cleaned up for investigation: %s''' % (
             self.swh_revision_gen = self.process_svn_revisions(
                 self.svnrepo, revision_start, revision_end, revision_parents)
         except SvnLoaderUneventful as e:
-            self.log.warn(e)
+            self.log.warning(e)
             if self.latest_snapshot and 'snapshot' in self.latest_snapshot:
                 self._snapshot = self.latest_snapshot['snapshot']
             self.done = True

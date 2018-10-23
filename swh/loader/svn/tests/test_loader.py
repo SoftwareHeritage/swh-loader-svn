@@ -29,7 +29,7 @@ class TestSnapshot(TestCase):
     def test_build_swh_snapshot(self):
         actual_snap = build_swh_snapshot('revision-id')
 
-        self.assertEquals(actual_snap, {
+        self.assertEqual(actual_snap, {
             'id': None,
             'branches': {
                 DEFAULT_BRANCH: {
@@ -187,7 +187,7 @@ class SvnLoaderITest1(BaseSvnLoaderTest):
         self.assertRevisionsOk(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
@@ -218,7 +218,7 @@ class SvnLoaderITest2(BaseSvnLoaderTest):
         self.assertCountReleases(0)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'uneventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
@@ -253,7 +253,7 @@ class SvnLoaderITest3(BaseSvnLoaderTest):
         self.assertCountReleases(0)
         self.assertCountSnapshots(0)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'uneventful'})
         self.assertEqual(self.loader.visit_status(), 'partial')
 
@@ -299,7 +299,7 @@ class SvnLoaderITest4(BaseSvnLoaderTest):
 
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
@@ -350,7 +350,7 @@ class SvnLoaderITTest5(BaseSvnLoaderTest):
 
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
@@ -433,7 +433,7 @@ class SvnLoaderITTest6(BaseSvnLoaderTest):
         self.assertRevisionsOk(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
@@ -496,7 +496,7 @@ class SvnLoaderITest7(BaseSvnLoaderTest):
         self.assertRevisionsOk(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
@@ -596,7 +596,7 @@ class SvnLoaderITest8(BaseSvnLoaderTest):
         self.assertRevisionsOk(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
@@ -627,7 +627,7 @@ class SvnLoaderTTest9(BaseSvnLoaderTest):
         self.assertRevisionsOk(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
@@ -660,7 +660,7 @@ class SvnLoaderITest10(BaseSvnLoaderTest): # noqa
         self.assertRevisionsOk(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 

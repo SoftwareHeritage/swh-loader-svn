@@ -6,14 +6,10 @@ Software Heritage - Subversion loader
 Loader for `Subversion <https://subversion.apache.org/>`_ repositories.
 
 
+Reference Documentation
+-----------------------
+
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   /apidoc/swh.loader.svn

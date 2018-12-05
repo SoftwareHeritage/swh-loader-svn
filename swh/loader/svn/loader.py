@@ -20,7 +20,7 @@ from swh.model import hashutil
 from swh.model.from_disk import Directory
 from swh.model.identifiers import identifier_to_bytes, revision_identifier
 from swh.model.identifiers import snapshot_identifier
-from swh.loader.core.loader import SWHLoader
+from swh.loader.core.loader import BufferedLoader
 from swh.loader.core.utils import clean_dangling_folders
 
 from . import svn, converters
@@ -56,7 +56,7 @@ def build_swh_snapshot(revision_id, branch=DEFAULT_BRANCH):
 TEMPORARY_DIR_PREFIX_PATTERN = 'swh.loader.svn.'
 
 
-class SvnLoader(SWHLoader):
+class SvnLoader(BufferedLoader):
     """Swh svn loader.
 
     The repository is either remote or local.  The loader deals with

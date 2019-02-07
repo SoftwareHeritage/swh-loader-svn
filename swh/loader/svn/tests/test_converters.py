@@ -5,42 +5,37 @@
 
 import unittest
 
-from nose.tools import istest
-
 from swh.loader.svn import converters
 
 
 class TestAuthorGitSvnConverters(unittest.TestCase):
-    @istest
-    def svn_author_to_gitsvn_person(self):
+    def test_svn_author_to_gitsvn_person(self):
         """The author should have name, email and fullname filled.
 
         """
         actual_person = converters.svn_author_to_gitsvn_person(
             'tony <ynot@dagobah>',
             repo_uuid=None)
-        self.assertEquals(actual_person, {
+        self.assertEqual(actual_person, {
             'fullname': b'tony <ynot@dagobah>',
             'name': b'tony',
             'email': b'ynot@dagobah',
         })
 
-    @istest
-    def svn_author_to_gitsvn_person_no_email(self):
+    def test_svn_author_to_gitsvn_person_no_email(self):
         """The author should see his/her email filled with author@<repo-uuid>.
 
         """
         actual_person = converters.svn_author_to_gitsvn_person(
             'tony',
             repo_uuid=b'some-uuid')
-        self.assertEquals(actual_person, {
+        self.assertEqual(actual_person, {
             'fullname': b'tony <tony@some-uuid>',
             'name': b'tony',
             'email': b'tony@some-uuid',
         })
 
-    @istest
-    def svn_author_to_gitsvn_person_empty_person(self):
+    def test_svn_author_to_gitsvn_person_empty_person(self):
         """The empty person should see name, fullname and email filled.
 
         """
@@ -55,33 +50,30 @@ class TestAuthorGitSvnConverters(unittest.TestCase):
 
 
 class TestAuthorConverters(unittest.TestCase):
-    @istest
-    def svn_author_to_swh_person(self):
+    def test_svn_author_to_swh_person(self):
         """The author should have name, email and fullname filled.
 
         """
         actual_person = converters.svn_author_to_swh_person(
             'tony <ynot@dagobah>')
-        self.assertEquals(actual_person, {
+        self.assertEqual(actual_person, {
             'fullname': b'tony <ynot@dagobah>',
             'name': b'tony',
             'email': b'ynot@dagobah',
         })
 
-    @istest
-    def svn_author_to_swh_person_no_email(self):
+    def test_svn_author_to_swh_person_no_email(self):
         """The author and fullname should be the same as the input (author).
 
         """
         actual_person = converters.svn_author_to_swh_person('tony')
-        self.assertEquals(actual_person, {
+        self.assertEqual(actual_person, {
             'fullname': b'tony',
             'name': b'tony',
             'email': None,
         })
 
-    @istest
-    def svn_author_to_swh_person_empty_person(self):
+    def test_svn_author_to_swh_person_empty_person(self):
         """Empty person has only its fullname filled with the empty
         byte-string.
 
@@ -95,8 +87,7 @@ class TestAuthorConverters(unittest.TestCase):
 
 
 class TestRevisionConverters(unittest.TestCase):
-    @istest
-    def build_swh_revision_default(self):
+    def test_build_swh_revision_default(self):
         """This should build the swh revision with the swh revision's extra
         headers about the repository.
 
@@ -130,7 +121,7 @@ class TestRevisionConverters(unittest.TestCase):
             'offset': 0,
         }
 
-        self.assertEquals(actual_swh_revision, {
+        self.assertEqual(actual_swh_revision, {
             'date': date,
             'committer_date': date,
             'type': 'svn',
@@ -158,8 +149,7 @@ class TestRevisionConverters(unittest.TestCase):
 
 
 class TestGitSvnRevisionConverters(unittest.TestCase):
-    @istest
-    def build_gitsvn_swh_revision_default(self):
+    def test_build_gitsvn_swh_revision_default(self):
         """This should build the swh revision without the swh revision's extra
         headers about the repository.
 
@@ -192,7 +182,7 @@ class TestGitSvnRevisionConverters(unittest.TestCase):
             'offset': 0,
         }
 
-        self.assertEquals(actual_swh_revision, {
+        self.assertEqual(actual_swh_revision, {
             'date': date,
             'committer_date': date,
             'type': 'svn',
@@ -215,13 +205,12 @@ class TestGitSvnRevisionConverters(unittest.TestCase):
 
 
 class ConvertDate(unittest.TestCase):
-    @istest
-    def svn_date_to_swh_date(self):
+    def test_svn_date_to_swh_date(self):
         """The timestamp should not be tampered with and include the
         decimals.
 
         """
-        self.assertEquals(
+        self.assertEqual(
             converters.svn_date_to_swh_date('2011-05-31T06:04:39.500900Z'), {
                 'timestamp': {
                     'seconds': 1306821879,
@@ -230,7 +219,7 @@ class ConvertDate(unittest.TestCase):
                 'offset': 0
             })
 
-        self.assertEquals(
+        self.assertEqual(
             converters.svn_date_to_swh_date('2011-05-31T06:04:39.800722Z'),
             {
                 'timestamp': {
@@ -240,18 +229,17 @@ class ConvertDate(unittest.TestCase):
                 'offset': 0
             })
 
-    @istest
-    def svn_date_to_swh_date_epoch(self):
+    def test_svn_date_to_swh_date_epoch(self):
         """Empty date should be EPOCH (timestamp and offset at 0)."""
         # It should return 0, epoch
-        self.assertEquals({
+        self.assertEqual({
             'timestamp': {
                 'seconds': 0,
                 'microseconds': 0,
             },
             'offset': 0,
         }, converters.svn_date_to_swh_date(''))
-        self.assertEquals({
+        self.assertEqual({
             'timestamp': {
                 'seconds': 0,
                 'microseconds': 0,
@@ -260,13 +248,12 @@ class ConvertDate(unittest.TestCase):
 
 
 class ConvertGitSvnDate(unittest.TestCase):
-    @istest
-    def svn_date_to_gitsvn_date(self):
+    def test_svn_date_to_gitsvn_date(self):
         """The timestamp should be truncated to be an integer."""
         actual_ts = converters.svn_date_to_gitsvn_date(
             '2011-05-31T06:04:39.800722Z')
 
-        self.assertEquals(actual_ts, {
+        self.assertEqual(actual_ts, {
             'timestamp': {
                 'seconds': 1306821879,
                 'microseconds': 0,
@@ -274,18 +261,17 @@ class ConvertGitSvnDate(unittest.TestCase):
             'offset': 0,
         })
 
-    @istest
-    def svn_date_to_gitsvn_date_epoch(self):
+    def test_svn_date_to_gitsvn_date_epoch(self):
         """Empty date should be EPOCH (timestamp and offset at 0)."""
         # It should return 0, epoch
-        self.assertEquals({
+        self.assertEqual({
             'timestamp': {
                 'seconds': 0,
                 'microseconds': 0,
             },
             'offset': 0,
         }, converters.svn_date_to_gitsvn_date(''))
-        self.assertEquals({
+        self.assertEqual({
             'timestamp': {
                 'seconds': 0,
                 'microseconds': 0,

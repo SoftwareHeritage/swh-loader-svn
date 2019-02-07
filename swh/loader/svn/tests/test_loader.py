@@ -3,37 +3,21 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import copy
 import os
-
-from nose.tools import istest
 from unittest import TestCase
 
+from swh.loader.core.tests import BaseLoaderTest
+from swh.loader.svn.loader import (DEFAULT_BRANCH, SvnLoader,
+                                   SvnLoaderFromRemoteDump, build_swh_snapshot)
 from swh.model import hashutil
-
-from swh.loader.svn.loader import build_swh_snapshot, DEFAULT_BRANCH
-from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
-from swh.loader.core.tests import LoaderNoStorage, BaseLoaderTest
-
-
-class BaseSvnLoaderTest(BaseLoaderTest):
-    """Base test loader class.
-
-    In its setup, it's uncompressing a local svn mirror to /tmp.
-
-    """
-    def setUp(self, archive_name='pkg-gourmet.tgz', filename='pkg-gourmet'):
-        super().setUp(archive_name=archive_name, filename=filename,
-                      prefix_tmp_folder_name='swh.loader.svn.',
-                      start_path=os.path.dirname(__file__))
-        self.svn_mirror_url = self.repo_url
 
 
 class TestSnapshot(TestCase):
-    @istest
-    def build_swh_snapshot(self):
+    def test_build_swh_snapshot(self):
         actual_snap = build_swh_snapshot('revision-id')
 
-        self.assertEquals(actual_snap, {
+        self.assertEqual(actual_snap, {
             'id': None,
             'branches': {
                 DEFAULT_BRANCH: {
@@ -44,11 +28,39 @@ class TestSnapshot(TestCase):
         })
 
 
-class LoaderWithState:
-    """Additional state setup (bypassed by some override for test purposes)
+_LOADER_TEST_CONFIG = {
+    'check_revision': {'limit': 100, 'status': False},
+    'content_packet_block_size_bytes': 104857600,
+    'content_packet_size': 10000,
+    'content_packet_size_bytes': 1073741824,
+    'content_size_limit': 104857600,
+    'debug': False,
+    'directory_packet_size': 2500,
+    'log_db': 'dbname=softwareheritage-log',
+    'occurrence_packet_size': 1000,
+    'release_packet_size': 1000,
+    'revision_packet_size': 10,
+    'save_data': False,
+    'save_data_path': '',
+    'send_contents': True,
+    'send_directories': True,
+    'send_occurrences': True,
+    'send_releases': True,
+    'send_revisions': True,
+    'send_snapshot': True,
+    'storage': {'args': {}, 'cls': 'memory'},
+    'temp_directory': '/tmp'
+}
+
+
+class SvnLoaderTest(SvnLoader):
+    """An SVNLoader with no persistence.
+
+    Context:
+        Load a new svn repository using the swh policy (so no update).
 
     """
-    def __init__(self):
+    def __init__(self, last_snp_rev={}):
         super().__init__()
         self.origin = {
             'id': 1,
@@ -59,111 +71,44 @@ class LoaderWithState:
             'origin': 1,
             'visit': 1,
         }
+        self.last_snp_rev = last_snp_rev
 
+    def parse_config_file(self, *args, **kwargs):
+        return _LOADER_TEST_CONFIG
 
-class SvnLoaderNoStorage(LoaderNoStorage, LoaderWithState, SvnLoader):
-    """An SVNLoader with no persistence.
-
-    Context:
-        Load a new svn repository using the swh policy (so no update).
-
-    """
-    def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
-        """We do not know this repository so no revision.
-
-        """
-        return {}
-
-
-class SvnLoaderUpdateNoStorage(LoaderNoStorage, LoaderWithState, SvnLoader):
-    """An SVNLoader with no persistence.
-
-    Context:
-        Load a known svn repository using the swh policy.
-        We can either:
-        - do nothing since it does not contain any new commit (so no
-          change)
-        - either check its history is not altered and update in
-          consequence by loading the new revision
-
-    """
     def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
         """Avoid the storage persistence call and return the expected previous
         revision for that repository.
 
         Check the following for explanation about the hashes:
         - test_loader.org for (swh policy).
-        - cf. SvnLoaderITTest
+        - cf. SvnLoaderTest
 
         """
-        return {
-            'snapshot': 'something',  # need a snapshot of sort
-            'revision': {
-                'id': hashutil.hash_to_bytes(
-                    '4876cb10aec6f708f7466dddf547567b65f6c39c'),
-                'parents': [hashutil.hash_to_bytes(
-                    'a3a577948fdbda9d1061913b77a1588695eadb41')],
-                'directory': hashutil.hash_to_bytes(
-                    '0deab3023ac59398ae467fc4bff5583008af1ee2'),
-                'target_type': 'revision',
-                'metadata': {
-                    'extra_headers': [
-                        ['svn_repo_uuid',
-                         '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
-                        ['svn_revision', '6']
-                    ]
-                }
-            }
-        }
+        return self.last_snp_rev
 
 
-class SvnLoaderUpdateHistoryAlteredNoStorage(LoaderNoStorage, LoaderWithState,
-                                             SvnLoader):
-    """Context: Load a known svn repository using the swh policy with its
-    history altered so we do not update it.
+class BaseSvnLoaderTest(BaseLoaderTest):
+    """Base test loader class.
+
+    In its setup, it's uncompressing a local svn mirror to /tmp.
 
     """
-    def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
-        """Avoid the storage persistence call and return the expected previous
-        revision for that repository.
-
-        Check the following for explanation about the hashes:
-        - test_loader.org for (swh policy).
-        - cf. SvnLoaderITTest
-
-        """
-        return {
-            'snapshot': None,
-            'revision': {
-                # Changed the revision id's hash to simulate history altered
-                'id': hashutil.hash_to_bytes(
-                    'badbadbadbadf708f7466dddf547567b65f6c39d'),
-                'parents': [hashutil.hash_to_bytes(
-                    'a3a577948fdbda9d1061913b77a1588695eadb41')],
-                'directory': hashutil.hash_to_bytes(
-                    '0deab3023ac59398ae467fc4bff5583008af1ee2'),
-                'target_type': 'revision',
-                'metadata': {
-                    'extra_headers': [
-                        ['svn_repo_uuid',
-                         '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
-                        ['svn_revision', b'6']
-                    ]
-                }
-            }
-        }
+    def setUp(self, archive_name='pkg-gourmet.tgz', filename='pkg-gourmet',
+              loader=None):
+        super().setUp(archive_name=archive_name, filename=filename,
+                      prefix_tmp_folder_name='swh.loader.svn.',
+                      start_path=os.path.dirname(__file__))
+        self.svn_mirror_url = self.repo_url
+        self.loader = loader or SvnLoaderTest()
+        self.storage = self.loader.storage
 
 
-class SvnLoaderITest1(BaseSvnLoaderTest):
+class SvnLoaderTest1(BaseSvnLoaderTest):
     """Load an unknown svn repository results in new data.
 
     """
-    def setUp(self):
-        super().setUp()
-        self.loader = SvnLoaderNoStorage()
-
-    @istest
-    def load(self):
+    def test_load(self):
         """Load a new repository results in new swh object and snapshot
 
         """
@@ -189,25 +134,47 @@ class SvnLoaderITest1(BaseSvnLoaderTest):
             last_revision:                              '0deab3023ac59398ae467fc4bff5583008af1ee2',  # noqa
         }
 
-        self.assertRevisionsOk(expected_revisions)
+        self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderITest2(BaseSvnLoaderTest):
+_LAST_SNP_REV = {
+    'snapshot': {
+        'id': 'something',
+        'branches': {}
+    },  # need a snapshot of sort
+    'revision': {
+        'id': hashutil.hash_to_bytes(
+            '4876cb10aec6f708f7466dddf547567b65f6c39c'),
+        'parents': [hashutil.hash_to_bytes(
+            'a3a577948fdbda9d1061913b77a1588695eadb41')],
+        'directory': hashutil.hash_to_bytes(
+            '0deab3023ac59398ae467fc4bff5583008af1ee2'),
+        'target_type': 'revision',
+        'metadata': {
+            'extra_headers': [
+                ['svn_repo_uuid',
+                    '3187e211-bb14-4c82-9596-0b59d67cd7f4'],
+                ['svn_revision', '6']
+            ]
+        }
+    }
+}
+
+
+class SvnLoaderTest2(BaseSvnLoaderTest):
     """Load a visited repository with no new change results in no data
        change.
 
     """
     def setUp(self):
-        super().setUp()
-        self.loader = SvnLoaderUpdateNoStorage()
+        super().setUp(loader=SvnLoaderTest(last_snp_rev=_LAST_SNP_REV))
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Load a repository without new changes results in same snapshot
 
         """
@@ -224,12 +191,12 @@ class SvnLoaderITest2(BaseSvnLoaderTest):
         self.assertCountReleases(0)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'uneventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderITest3(BaseSvnLoaderTest):
+class SvnLoaderTest3(BaseSvnLoaderTest):
     """In this scenario, the dump has been tampered with to modify the
        commit log.  This results in a hash divergence which is
        detected at startup.
@@ -238,12 +205,16 @@ class SvnLoaderITest3(BaseSvnLoaderTest):
 
     """
     def setUp(self):
+        last_snp_rev = copy.deepcopy(_LAST_SNP_REV)
+        last_snp_rev['snapshot'] = None
+        # Changed the revision id's hash to simulate history altered
+        last_snp_rev['revision']['id'] = \
+            hashutil.hash_to_bytes('badbadbadbadf708f7466dddf547567b65f6c39d')
         # the svn repository pkg-gourmet has been updated with changes
-        super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
-        self.loader = SvnLoaderUpdateHistoryAlteredNoStorage()
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz',
+                      loader=SvnLoaderTest(last_snp_rev=last_snp_rev))
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Load known repository with history altered should do nothing
 
         """
@@ -260,12 +231,12 @@ class SvnLoaderITest3(BaseSvnLoaderTest):
         self.assertCountReleases(0)
         self.assertCountSnapshots(0)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'uneventful'})
         self.assertEqual(self.loader.visit_status(), 'partial')
 
 
-class SvnLoaderITest4(BaseSvnLoaderTest):
+class SvnLoaderTest4(BaseSvnLoaderTest):
     """In this scenario, the repository has been updated with new changes.
        The loading visit should result in new objects stored and 1 new
        snapshot.
@@ -273,11 +244,10 @@ class SvnLoaderITest4(BaseSvnLoaderTest):
     """
     def setUp(self):
         # the svn repository pkg-gourmet has been updated with changes
-        super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
-        self.loader = SvnLoaderUpdateNoStorage()
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz',
+                      loader=SvnLoaderTest(last_snp_rev=_LAST_SNP_REV))
 
-    @istest
-    def process_repository(self):
+    def test_process_repository(self):
         """Process updated repository should yield new objects
 
         """
@@ -303,16 +273,16 @@ class SvnLoaderITest4(BaseSvnLoaderTest):
             last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
-        self.assertRevisionsOk(expected_revisions)
+        self.assertRevisionsContain(expected_revisions)
 
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderITTest5(BaseSvnLoaderTest):
+class SvnLoaderTest5(BaseSvnLoaderTest):
     """Context:
 
        - Repository already injected with successful data
@@ -321,11 +291,10 @@ class SvnLoaderITTest5(BaseSvnLoaderTest):
     """
     def setUp(self):
         # the svn repository pkg-gourmet has been updated with changes
-        super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
-        self.loader = SvnLoaderUpdateNoStorage()
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz',
+                      loader=SvnLoaderTest(last_snp_rev=_LAST_SNP_REV))
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Load an existing repository from scratch yields same swh objects
 
         """
@@ -355,33 +324,24 @@ class SvnLoaderITTest5(BaseSvnLoaderTest):
             '171dc35522bfd17dda4e90a542a0377fb2fc707a': 'fd24a76c87a3207428e06612b49860fc78e9f6dc',  # noqa
         }
 
-        self.assertRevisionsOk(expected_revisions)
+        self.assertRevisionsContain(expected_revisions)
 
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderWithPreviousRevisionNoStorage(LoaderNoStorage, LoaderWithState,
-                                             SvnLoader):
-    """An SVNLoader with no persistence.
-
-    Context: Load a known svn repository using the swh policy with its
-    history altered so we do not update it.
+class SvnLoaderTest6(BaseSvnLoaderTest):
+    """Context:
+       - repository already visited with load successful
+       - Changes on existing repository
+       - New Visit done with successful new data
 
     """
-    def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
-        """Avoid the storage persistence call and return the expected previous
-        revision for that repository.
-
-        Check the following for explanation about the hashes:
-        - test_loader.org for (swh policy).
-        - cf. SvnLoaderITTest
-
-        """
-        return {
+    def setUp(self):
+        last_snp_rev = {
             'snapshot': None,
             'revision': {
                 'id': hashutil.hash_to_bytes(
@@ -399,21 +359,10 @@ class SvnLoaderWithPreviousRevisionNoStorage(LoaderNoStorage, LoaderWithState,
                 }
             }
         }
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz',
+                      loader=SvnLoaderTest(last_snp_rev=last_snp_rev))
 
-
-class SvnLoaderITTest6(BaseSvnLoaderTest):
-    """Context:
-       - repository already visited with load successful
-       - Changes on existing repository
-       - New Visit done with successful new data
-
-    """
-    def setUp(self):
-        super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
-        self.loader = SvnLoaderWithPreviousRevisionNoStorage()
-
-    @istest
-    def load(self):
+    def test_load(self):
         """Load from partial previous visit result in new changes
 
         """
@@ -440,15 +389,15 @@ class SvnLoaderITTest6(BaseSvnLoaderTest):
             last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
-        self.assertRevisionsOk(expected_revisions)
+        self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderITest7(BaseSvnLoaderTest):
+class SvnLoaderTest7(BaseSvnLoaderTest):
     """Context:
        - repository already visited with load successful
        - Changes on existing repository
@@ -456,11 +405,10 @@ class SvnLoaderITest7(BaseSvnLoaderTest):
 
     """
     def setUp(self):
-        super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
-        self.loader = SvnLoaderUpdateNoStorage()
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz',
+                      loader=SvnLoaderTest(last_snp_rev=_LAST_SNP_REV))
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Load known and partial repository should start from last visit
 
         """
@@ -504,31 +452,24 @@ class SvnLoaderITest7(BaseSvnLoaderTest):
             last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
-        self.assertRevisionsOk(expected_revisions)
+        self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderUpdateLessRecentNoStorage(LoaderNoStorage, LoaderWithState,
-                                         SvnLoader):
+class SvnLoaderTest8(BaseSvnLoaderTest):
     """Context:
-        Load a known svn repository.  The last visit seen is less
-        recent than a previous unfinished crawl.
+
+       - Previous visit on existing repository done
+       - Starting the loading from the last unfinished visit
+       - New objects are created (1 new snapshot)
 
     """
-    def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
-        """Avoid the storage persistence call and return the expected previous
-        revision for that repository.
-
-        Check the following for explanation about the hashes:
-        - test_loader.org for (swh policy).
-        - cf. SvnLoaderITTest
-
-        """
-        return {
+    def setUp(self):
+        last_snp_rev = {
             'snapshot': None,
             'revision': {
                 'id': hashutil.hash_to_bytes(
@@ -547,22 +488,10 @@ class SvnLoaderUpdateLessRecentNoStorage(LoaderNoStorage, LoaderWithState,
                 }
             }
         }
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz',
+                      loader=SvnLoaderTest(last_snp_rev=last_snp_rev))
 
-
-class SvnLoaderITest8(BaseSvnLoaderTest):
-    """Context:
-
-       - Previous visit on existing repository done
-       - Starting the loading from the last unfinished visit
-       - New objects are created (1 new snapshot)
-
-    """
-    def setUp(self):
-        super().setUp(archive_name='pkg-gourmet-with-updates.tgz')
-        self.loader = SvnLoaderUpdateLessRecentNoStorage()
-
-    @istest
-    def load(self):
+    def test_load(self):
         """Load repository should yield revisions starting from last visit
 
         """
@@ -605,10 +534,10 @@ class SvnLoaderITest8(BaseSvnLoaderTest):
             last_revision:                              'fd24a76c87a3207428e06612b49860fc78e9f6dc'   # noqa
         }
 
-        self.assertRevisionsOk(expected_revisions)
+        self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
@@ -623,10 +552,8 @@ class SvnLoaderTTest9(BaseSvnLoaderTest):
     def setUp(self):
         super().setUp(archive_name='mediawiki-repo-r407-eol-native-crlf.tgz',
                       filename='mediawiki-repo-r407-eol-native-crlf')
-        self.loader = SvnLoaderNoStorage()
 
-    @istest
-    def process_repository(self):
+    def test_process_repository(self):
         """Load repository with CRLF endings (svn:eol-style: native) is ok
 
         """ # noqa
@@ -637,15 +564,15 @@ class SvnLoaderTTest9(BaseSvnLoaderTest):
         expected_revisions = {
             '7da4975c363101b819756d33459f30a866d01b1b': 'f63637223ee0f7d4951ffd2d4d9547a4882c5d8b' # noqa
         }
-        self.assertRevisionsOk(expected_revisions)
+        self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderITest10(BaseSvnLoaderTest): # noqa
+class SvnLoaderTest10(BaseSvnLoaderTest): # noqa
     """Check that a svn repo containing a versioned file with mixed
     CRLF/LF line endings with svn:eol-style property set to 'native'
     (this is a violation of svn specification as mixed line endings
@@ -657,10 +584,8 @@ class SvnLoaderITest10(BaseSvnLoaderTest): # noqa
         super().setUp(
             archive_name='pyang-repo-r343-eol-native-mixed-lf-crlf.tgz',
             filename='pyang-repo-r343-eol-native-mixed-lf-crlf')
-        self.loader = SvnLoaderNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Load repo with mixed CRLF/LF endings (svn:eol-style:native) is ok
 
         """
@@ -671,15 +596,15 @@ class SvnLoaderITest10(BaseSvnLoaderTest): # noqa
             '9c6962eeb9164a636c374be700672355e34a98a7': '16aa6b6271f3456d4643999d234cf39fe3d0cc5a' # noqa
         }
 
-        self.assertRevisionsOk(expected_revisions)
+        self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
-        # self.assertEquals(self.loader.all_snapshots[0], {})
+        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderITest11(BaseSvnLoaderTest):
+class SvnLoaderTest11(BaseSvnLoaderTest):
     """Context:
 
        - Repository with svn:external (which is not deal with for now)
@@ -688,10 +613,8 @@ class SvnLoaderITest11(BaseSvnLoaderTest):
     """
     def setUp(self):
         super().setUp(archive_name='pkg-gourmet-with-external-id.tgz')
-        self.loader = SvnLoaderNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Repository with svn:externals property, will stop raising an error
 
         """
@@ -735,14 +658,14 @@ class SvnLoaderITest11(BaseSvnLoaderTest):
         }
 
         # The last revision being the one used later to start back from
-        self.assertRevisionsOk(expected_revisions)
+        self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'partial')
 
 
-class SvnLoaderITest12(BaseSvnLoaderTest):
+class SvnLoaderTest12(BaseSvnLoaderTest):
     """Edge cases:
        - first create a file and commit it.
          Remove it, then add folder holding the same name, commit.
@@ -752,10 +675,8 @@ class SvnLoaderITest12(BaseSvnLoaderTest):
     def setUp(self):
         super().setUp(
             archive_name='pkg-gourmet-with-edge-case-links-and-files.tgz')
-        self.loader = SvnLoaderNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """File/Link removed prior to folder with same name creation is ok
 
         """
@@ -795,14 +716,14 @@ class SvnLoaderITest12(BaseSvnLoaderTest):
             last_revision:                              '6b1e0243768ff9ac060064b2eeade77e764ffc82',  # noqa
         }
 
-        self.assertRevisionsOk(expected_revisions)
+        self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderITTest13(BaseSvnLoaderTest):
+class SvnLoaderTest13(BaseSvnLoaderTest):
     """Edge cases:
        - wrong symbolic link
        - wrong symbolic link with empty space names
@@ -811,10 +732,8 @@ class SvnLoaderITTest13(BaseSvnLoaderTest):
     def setUp(self):
         super().setUp(
             archive_name='pkg-gourmet-with-wrong-link-cases.tgz')
-        self.loader = SvnLoaderNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Wrong link or empty space-named link should be ok
 
         """
@@ -854,59 +773,48 @@ class SvnLoaderITTest13(BaseSvnLoaderTest):
             last_revision:                              'd853d9628f6f0008d324fed27dadad00ce48bc62',  # noqa
         }
 
-        self.assertRevisionsOk(expected_revisions)
+        self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
         # FIXME: Check the snapshot's state
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
 
-class SvnLoaderFromRemoteDumpNoStorage(LoaderNoStorage, LoaderWithState,
-                                       SvnLoaderFromRemoteDump):
-    """A SvnLoaderFromRemoteDump with no persistence.
-
-    Context:
-        Load a remote svn repository from a generated dump file.
-
-    """
-
-    def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
-        """We do not know this repository so no revision.
-
-        """
-        return {}
+class SvnLoaderTestFromRemoteDump(SvnLoaderTest, SvnLoaderFromRemoteDump):
+    pass
 
 
-class SvnLoaderFromRemoteDump(BaseSvnLoaderTest):
+class SvnLoaderFromRemoteDumpTest(BaseSvnLoaderTest):
     """
     Check that the results obtained with the remote svn dump loader
     and the base svn loader are the same.
     """
     def setUp(self):
-        super().setUp(archive_name='pkg-gourmet.tgz')
+        super().setUp(archive_name='pkg-gourmet.tgz',
+                      loader=SvnLoaderTestFromRemoteDump())
 
-    @istest
-    def load(self):
+    def test_load(self):
         """
         Compare results of remote dump loader and base loader
         """
-        dump_loader = SvnLoaderFromRemoteDumpNoStorage()
+        dump_loader = self.loader
         dump_loader.load(svn_url=self.svn_mirror_url)
 
-        base_loader = SvnLoaderNoStorage()
+        self.assertCountContents(19)
+        self.assertCountDirectories(17)
+        self.assertCountRevisions(6)
+        self.assertCountSnapshots(1)
+
+        base_loader = SvnLoaderTest()
         base_loader.load(svn_url=self.svn_mirror_url)
 
-        self.assertEqual(dump_loader.state('content'),
-                         base_loader.state('content'))
-        self.assertEqual(dump_loader.state('directory'),
-                         base_loader.state('directory'))
-        self.assertEqual(dump_loader.state('revision'),
-                         base_loader.state('revision'))
-        self.assertEqual(dump_loader.state('snapshot'),
-                         base_loader.state('snapshot'))
+        dump_storage_stat = dump_loader.storage.stat_counters()
+        base_storage_stat = base_loader.storage.stat_counters()
+
+        self.assertEqual(dump_storage_stat, base_storage_stat)
 
 
-class SvnLoaderITTest14(BaseSvnLoaderTest):
+class SvnLoaderTest14(BaseSvnLoaderTest):
     """Edge cases: The repository held some user defined svn-properties
        with special encodings, this prevented the repository from
        being loaded even though we do not ingest those information.
@@ -914,10 +822,8 @@ class SvnLoaderITTest14(BaseSvnLoaderTest):
     """
     def setUp(self):
         super().setUp(archive_name='httthttt.tgz', filename='httthttt')
-        self.loader = SvnLoaderNoStorage()
 
-    @istest
-    def load(self):
+    def test_load(self):
         """Decoding user defined svn properties error should not fail loading
 
         """
@@ -941,7 +847,7 @@ class SvnLoaderITTest14(BaseSvnLoaderTest):
             last_revision: 'f051d60256b2d89a0ca2704d6f91ad1b0ab44e02',
         }
 
-        self.assertRevisionsOk(expected_revisions)
+        self.assertRevisionsContain(expected_revisions)
 
         expected_snapshot_id = '70487267f682c07e52a2371061369b6cf5bffa47'
         expected_branches = {
@@ -951,7 +857,7 @@ class SvnLoaderITTest14(BaseSvnLoaderTest):
             }
         }
 
-        self.assertSnapshotOk(expected_snapshot_id, expected_branches)
+        self.assertSnapshotEqual(expected_snapshot_id, expected_branches)
 
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')

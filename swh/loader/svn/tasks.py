@@ -58,7 +58,7 @@ def mount_load_svn(archive_path, origin_url=None, visit_date=None,
 
 
 @app.task(name=__name__ + '.DumpMountAndLoadSvnRepository')
-def dump_mount_load_svn(self, *, svn_url, origin_url=None, visit_date=None,
+def dump_mount_load_svn(svn_url, origin_url=None, visit_date=None,
                         start_from_scratch=False):
     """1. Mount an svn dump from archive as a local svn repository.
        2. Load it through the svn loader.

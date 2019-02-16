@@ -20,7 +20,7 @@ from swh.model import hashutil
 from swh.model.from_disk import Directory
 from swh.model.identifiers import identifier_to_bytes, revision_identifier
 from swh.model.identifiers import snapshot_identifier
-from swh.loader.core.loader import SWHLoader
+from swh.loader.core.loader import BufferedLoader
 from swh.loader.core.utils import clean_dangling_folders
 
 from . import svn, converters
@@ -56,7 +56,7 @@ def build_swh_snapshot(revision_id, branch=DEFAULT_BRANCH):
 TEMPORARY_DIR_PREFIX_PATTERN = 'swh.loader.svn.'
 
 
-class SvnLoader(SWHLoader):
+class SvnLoader(BufferedLoader):
     """Swh svn loader.
 
     The repository is either remote or local.  The loader deals with
@@ -341,7 +341,7 @@ Local repository not cleaned up for investigation: %s''' % (
                 # that repository
                 revision_parents[revision_start] = [swh_rev['id']]
 
-        if revision_start > revision_end and revision_start is not 1:
+        if revision_start > revision_end and revision_start != 1:
             msg = '%s@%s already injected.' % (self.svnrepo.remote_url,
                                                revision_end)
             raise SvnLoaderUneventful(msg)
@@ -469,7 +469,7 @@ Local repository not cleaned up for investigation: %s''' % (
             self.swh_revision_gen = self.process_svn_revisions(
                 self.svnrepo, revision_start, revision_end, revision_parents)
         except SvnLoaderUneventful as e:
-            self.log.warn(e)
+            self.log.warning(e)
             if self.latest_snapshot and 'snapshot' in self.latest_snapshot:
                 self._snapshot = self.latest_snapshot['snapshot']
             self.done = True

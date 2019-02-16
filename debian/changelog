@@ -1,8 +1,22 @@
-swh-loader-svn (0.0.42-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-loader-svn (0.0.44-1~swh3) unstable-swh; urgency=low
 
-  * Rebuild for stretch-backports.
+  * New upstream release (fixing the distribution)
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Thu, 11 Oct 2018 14:52:53 +0200
+ -- Antoine Romain Dumont <antoine.romain.dumont@gmail.com>  Sat, 16 Feb 2019 02:43:37 +0100
+
+swh-loader-svn (0.0.44-1~swh2) unstable; urgency=low
+
+  * New upstream release to fix debian packaging
+
+ -- Antoine Romain Dumont <antoine.romain.dumont@gmail.com>  Sat, 16 Feb 2019 02:19:27 +0100
+
+swh-loader-svn (0.0.44-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.0.44     - (tagged by David Douard
+    <david.douard@sdfa3.org> on 2019-02-07 17:35:43 +0100)
+  * Upstream changes:     - v0.0.44
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 07 Feb 2019 16:41:45 +0000
 
 swh-loader-svn (0.0.42-1~swh1) unstable-swh; urgency=medium
 

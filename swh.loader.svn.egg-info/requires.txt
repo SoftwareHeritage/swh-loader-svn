@@ -1,13 +1,13 @@
+vcversioner
 click
-python-dateutil
 retrying
+python-dateutil
 subvertpy>=0.9.4
 swh.core>=0.0.19
-swh.loader.core>=0.0.34
+swh.storage>=0.0.114
 swh.model>=0.0.18
-swh.scheduler>=0.0.14
-swh.storage>=0.0.83
-vcversioner
+swh.scheduler>=0.0.39
+swh.loader.core>=0.0.37
 
 [testing]
-nose
+pytest

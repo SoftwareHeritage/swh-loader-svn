@@ -1,3 +1,9 @@
+swh-loader-svn (0.0.44-1~swh2) unstable; urgency=low
+
+  * New upstream release to fix debian packaging
+
+ -- Antoine Romain Dumont <antoine.romain.dumont@gmail.com>  Sat, 16 Feb 2019 02:19:27 +0100
+
 swh-loader-svn (0.0.44-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.0.44     - (tagged by David Douard

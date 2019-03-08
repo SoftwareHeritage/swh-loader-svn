@@ -7,14 +7,14 @@
 swh-storage.
 
 """
-
 import os
+import pty
 import re
 import shutil
 import tempfile
 
 from mmap import mmap, ACCESS_WRITE
-from subprocess import run, PIPE
+from subprocess import Popen
 
 from swh.model import hashutil
 from swh.model.from_disk import Directory
@@ -25,7 +25,8 @@ from swh.loader.core.utils import clean_dangling_folders
 
 from . import svn, converters
 from .utils import (
-    init_svn_repo_from_dump, init_svn_repo_from_archive_dump
+    init_svn_repo_from_dump, init_svn_repo_from_archive_dump,
+    OutputStream
 )
 from .exception import SvnLoaderUneventful
 from .exception import SvnLoaderHistoryAltered
@@ -650,9 +651,21 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         dump_temp_dir = tempfile.mkdtemp(dir=self.temp_dir)
         dump_name = ''.join(c for c in svn_url if c.isalnum())
         dump_path = '%s/%s.svndump' % (dump_temp_dir, dump_name)
+        stderr_lines = []
         self.log.debug('Executing %s' % ' '.join(svnrdump_cmd))
         with open(dump_path, 'wb') as dump_file:
-            svnrdump = run(svnrdump_cmd, stdout=dump_file, stderr=PIPE)
+            stderr_r, stderr_w = pty.openpty()
+            svnrdump = Popen(svnrdump_cmd, stdout=dump_file, stderr=stderr_w)
+            os.close(stderr_w)
+            stderr_stream = OutputStream(stderr_r)
+            readable = True
+            while readable:
+                lines, readable = stderr_stream.read_lines()
+                stderr_lines += lines
+                for line in lines:
+                    self.log.debug(line)
+            svnrdump.wait()
+            os.close(stderr_r)
 
         if svnrdump.returncode == 0:
             return dump_path
@@ -661,14 +674,13 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         # can be loaded.
 
         # Get the stderr line with latest dumped revision
-        stderr_lines = svnrdump.stderr.split(b'\n')
         last_dumped_rev = None
         if len(stderr_lines) > 1:
             last_dumped_rev = stderr_lines[-2]
 
         if last_dumped_rev:
             # Get the latest dumped revision number
-            matched_rev = re.search(b'.*revision ([0-9]+)', last_dumped_rev)
+            matched_rev = re.search('.*revision ([0-9]+)', last_dumped_rev)
             last_dumped_rev = int(matched_rev.group(1)) if matched_rev else -1
             # Check if revisions inside the dump file can be loaded anyway
             if last_dumped_rev > last_loaded_svn_rev:

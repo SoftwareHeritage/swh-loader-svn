@@ -1,1 +1,2 @@
 pytest
+swh.core[http] >= 0.0.61

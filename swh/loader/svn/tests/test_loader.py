@@ -76,7 +76,7 @@ class SvnLoaderTest(SvnLoader):
     def parse_config_file(self, *args, **kwargs):
         return _LOADER_TEST_CONFIG
 
-    def swh_latest_snapshot_revision(self, origin_id, prev_swh_revision=None):
+    def swh_latest_snapshot_revision(self, origin_url, prev_swh_revision=None):
         """Avoid the storage persistence call and return the expected previous
         revision for that repository.
 

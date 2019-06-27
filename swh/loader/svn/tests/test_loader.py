@@ -556,7 +556,7 @@ class SvnLoaderTTest9(BaseSvnLoaderTest):
     def test_process_repository(self):
         """Load repository with CRLF endings (svn:eol-style: native) is ok
 
-        """ # noqa
+        """
         # when
         self.loader.load(svn_url=self.svn_mirror_url,
                          destination_path=self.destination_path)

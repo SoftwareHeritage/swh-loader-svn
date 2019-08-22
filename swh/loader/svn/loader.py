@@ -76,6 +76,8 @@ class SvnLoader(BufferedLoader):
         }),
     }
 
+    visit_type = 'svn'
+
     def __init__(self):
         super().__init__(logging_class='swh.loader.svn.SvnLoader')
         self.origin_url = None
@@ -446,7 +448,7 @@ Local repository not cleaned up for investigation: %s''' % (
                              origin_url=None, **kwargs):
         self.origin = {
             'url': origin_url if origin_url else svn_url,
-            'type': 'svn',
+            'type': self.visit_type,
         }
         self.visit_date = visit_date
 

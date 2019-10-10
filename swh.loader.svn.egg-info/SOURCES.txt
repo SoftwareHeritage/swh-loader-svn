@@ -16,6 +16,7 @@ swh/loader/svn/__init__.py
 swh/loader/svn/converters.py
 swh/loader/svn/exception.py
 swh/loader/svn/loader.py
+swh/loader/svn/py.typed
 swh/loader/svn/ra.py
 swh/loader/svn/svn.py
 swh/loader/svn/tasks.py

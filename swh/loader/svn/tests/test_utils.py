@@ -3,7 +3,11 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import os
+import pty
 import unittest
+
+from subprocess import Popen
 
 from swh.loader.svn import utils
 
@@ -25,3 +29,18 @@ class TestUtils(unittest.TestCase):
                          utils.strdate_to_timestamp(''))
         self.assertEqual({'seconds': 0, 'microseconds': 0},
                          utils.strdate_to_timestamp(None))
+
+    def test_outputstream(self):
+        stdout_r, stdout_w = pty.openpty()
+        echo = Popen(['echo', '-e', 'foo\nbar\nbaz'], stdout=stdout_w)
+        os.close(stdout_w)
+        stdout_stream = utils.OutputStream(stdout_r)
+        lines = []
+        while True:
+            current_lines, readable = stdout_stream.read_lines()
+            lines += current_lines
+            if not readable:
+                break
+        echo.wait()
+        os.close(stdout_r)
+        self.assertEqual(lines, ['foo', 'bar', 'baz'])

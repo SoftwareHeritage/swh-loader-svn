@@ -30,13 +30,13 @@ class SvnRepo:
 
     Args:
         remote_url (str):
-        origin_id (int): Associated origin identifier
+        origin_url (str): Associated origin identifier
         local_dirname (str): Path to write intermediary svn action results
 
     """
-    def __init__(self, remote_url, origin_id, local_dirname):
+    def __init__(self, remote_url, origin_url, local_dirname):
         self.remote_url = remote_url.rstrip('/')
-        self.origin_id = origin_id
+        self.origin_url = origin_url
 
         auth = Auth([get_username_provider()])
         # one connection for log iteration
@@ -56,7 +56,7 @@ class SvnRepo:
 
     def __str__(self):
         return str({
-            'swh-origin': self.origin_id,
+            'swh-origin': self.origin_url,
             'remote_url': self.remote_url,
             'local_url': self.local_url,
             'uuid': self.uuid,

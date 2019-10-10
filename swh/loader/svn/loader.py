@@ -7,14 +7,14 @@
 swh-storage.
 
 """
-
 import os
+import pty
 import re
 import shutil
 import tempfile
 
 from mmap import mmap, ACCESS_WRITE
-from subprocess import run, PIPE
+from subprocess import Popen
 
 from swh.model import hashutil
 from swh.model.from_disk import Directory
@@ -22,10 +22,12 @@ from swh.model.identifiers import identifier_to_bytes, revision_identifier
 from swh.model.identifiers import snapshot_identifier
 from swh.loader.core.loader import BufferedLoader
 from swh.loader.core.utils import clean_dangling_folders
+from swh.storage.algos.snapshot import snapshot_get_all_branches
 
 from . import svn, converters
 from .utils import (
-    init_svn_repo_from_dump, init_svn_repo_from_archive_dump
+    init_svn_repo_from_dump, init_svn_repo_from_archive_dump,
+    OutputStream
 )
 from .exception import SvnLoaderUneventful
 from .exception import SvnLoaderHistoryAltered
@@ -39,7 +41,7 @@ def _revision_id(revision):
 
 
 def build_swh_snapshot(revision_id, branch=DEFAULT_BRANCH):
-    """Build a swh snapshot from the revision id, origin id, and visit.
+    """Build a swh snapshot from the revision id, origin url, and visit.
 
     """
     return {
@@ -74,9 +76,11 @@ class SvnLoader(BufferedLoader):
         }),
     }
 
+    visit_type = 'svn'
+
     def __init__(self):
         super().__init__(logging_class='swh.loader.svn.SvnLoader')
-        self.origin_id = None
+        self.origin_url = None
         self.debug = self.config['debug']
         self.last_seen_revision = None
         self.temp_directory = self.config['temp_directory']
@@ -134,28 +138,28 @@ Local repository not cleaned up for investigation: %s''' % (
         self.svnrepo.clean_fs(local_dirname)
         return h
 
-    def get_svn_repo(self, svn_url, local_dirname, origin_id):
+    def get_svn_repo(self, svn_url, local_dirname, origin_url):
         """Instantiates the needed svnrepo collaborator to permit reading svn
         repository.
 
         Args:
             svn_url (str): the svn repository url to read from
             local_dirname (str): the local path on disk to compute data
-            origin_id (int): the corresponding origin id
+            origin_url (str): the corresponding origin url
 
         Returns:
             Instance of :mod:`swh.loader.svn.svn` clients
 
         """
         return svn.SvnRepo(svn_url,
-                           local_dirname=local_dirname, origin_id=origin_id)
+                           local_dirname=local_dirname, origin_url=origin_url)
 
-    def swh_latest_snapshot_revision(self, origin_id,
+    def swh_latest_snapshot_revision(self, origin_url,
                                      previous_swh_revision=None):
         """Look for latest snapshot revision and returns it if any.
 
         Args:
-            origin_id (int): Origin identifier
+            origin_url (str): Origin identifier
             previous_swh_revision: (optional) id of a possible
                                    previous swh revision
 
@@ -170,18 +174,24 @@ Local repository not cleaned up for investigation: %s''' % (
         """
         storage = self.storage
         if not previous_swh_revision:  # check latest snapshot's revision
-            latest_snap = storage.snapshot_get_latest(origin_id)
-            if latest_snap:
-                branches = latest_snap.get('branches')
-                if not branches:
+            visit = storage.origin_visit_get_latest(
+                origin_url, require_snapshot=True)
+            if visit:
+                latest_snap = snapshot_get_all_branches(
+                    storage, visit['snapshot'])
+                if latest_snap:
+                    branches = latest_snap.get('branches')
+                    if not branches:
+                        return {}
+                    branch = branches.get(DEFAULT_BRANCH)
+                    if not branch:
+                        return {}
+                    target_type = branch['target_type']
+                    if target_type != 'revision':
+                        return {}
+                    previous_swh_revision = branch['target']
+                else:
                     return {}
-                branch = branches.get(DEFAULT_BRANCH)
-                if not branch:
-                    return {}
-                target_type = branch['target_type']
-                if target_type != 'revision':
-                    return {}
-                previous_swh_revision = branch['target']
             else:
                 return {}
 
@@ -438,7 +448,7 @@ Local repository not cleaned up for investigation: %s''' % (
                              origin_url=None, **kwargs):
         self.origin = {
             'url': origin_url if origin_url else svn_url,
-            'type': 'svn',
+            'type': self.visit_type,
         }
         self.visit_date = visit_date
 
@@ -451,7 +461,7 @@ Local repository not cleaned up for investigation: %s''' % (
             self.last_known_swh_revision = None
 
         self.latest_snapshot = self.swh_latest_snapshot_revision(
-            self.origin_id, self.last_known_swh_revision)
+            self.origin_url, self.last_known_swh_revision)
 
         if destination_path:
             local_dirname = destination_path
@@ -462,7 +472,7 @@ Local repository not cleaned up for investigation: %s''' % (
                 dir=self.temp_directory)
 
         self.svnrepo = self.get_svn_repo(
-            svn_url, local_dirname, self.origin_id)
+            svn_url, local_dirname, self.origin_url)
         try:
             revision_start, revision_end, revision_parents = self.start_from(
                 self.last_known_swh_revision, self.start_from_scratch)
@@ -627,7 +637,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             origin = \
                 self.storage.origin_get({'type': 'svn', 'url': svn_url})
             last_swh_rev = \
-                self.swh_latest_snapshot_revision(origin['id'])['revision']
+                self.swh_latest_snapshot_revision(origin['url'])['revision']
             last_swh_rev_headers = \
                 dict(last_swh_rev['metadata']['extra_headers'])
             last_loaded_svn_rev = int(last_swh_rev_headers['svn_revision'])
@@ -650,9 +660,21 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         dump_temp_dir = tempfile.mkdtemp(dir=self.temp_dir)
         dump_name = ''.join(c for c in svn_url if c.isalnum())
         dump_path = '%s/%s.svndump' % (dump_temp_dir, dump_name)
+        stderr_lines = []
         self.log.debug('Executing %s' % ' '.join(svnrdump_cmd))
         with open(dump_path, 'wb') as dump_file:
-            svnrdump = run(svnrdump_cmd, stdout=dump_file, stderr=PIPE)
+            stderr_r, stderr_w = pty.openpty()
+            svnrdump = Popen(svnrdump_cmd, stdout=dump_file, stderr=stderr_w)
+            os.close(stderr_w)
+            stderr_stream = OutputStream(stderr_r)
+            readable = True
+            while readable:
+                lines, readable = stderr_stream.read_lines()
+                stderr_lines += lines
+                for line in lines:
+                    self.log.debug(line)
+            svnrdump.wait()
+            os.close(stderr_r)
 
         if svnrdump.returncode == 0:
             return dump_path
@@ -661,14 +683,13 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         # can be loaded.
 
         # Get the stderr line with latest dumped revision
-        stderr_lines = svnrdump.stderr.split(b'\n')
         last_dumped_rev = None
         if len(stderr_lines) > 1:
             last_dumped_rev = stderr_lines[-2]
 
         if last_dumped_rev:
             # Get the latest dumped revision number
-            matched_rev = re.search(b'.*revision ([0-9]+)', last_dumped_rev)
+            matched_rev = re.search('.*revision ([0-9]+)', last_dumped_rev)
             last_dumped_rev = int(matched_rev.group(1)) if matched_rev else -1
             # Check if revisions inside the dump file can be loaded anyway
             if last_dumped_rev > last_loaded_svn_rev:

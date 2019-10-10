@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import errno
 import os
 import tempfile
 import shutil
@@ -31,6 +32,48 @@ def strdate_to_timestamp(strdate):
     else:  # epoch
         ts = {'seconds': 0, 'microseconds': 0}
     return ts
+
+
+class OutputStream:
+    """Helper class to read lines from a program output while
+    it is running
+
+    Args:
+        fileno (int): File descriptor of a program output stream
+            opened in text mode
+    """
+
+    def __init__(self, fileno):
+        self._fileno = fileno
+        self._buffer = ''
+
+    def read_lines(self):
+        """
+        Read available lines from the output stream and return them.
+
+        Returns:
+            Tuple[List[str], bool]: A tuple whose first member is the read
+                lines and second member a boolean indicating if there are
+                still some other lines available to read.
+        """
+        try:
+            output = os.read(self._fileno, 1000).decode()
+        except OSError as e:
+            if e.errno != errno.EIO:
+                raise
+            output = ''
+        output = output.replace('\r\n', '\n')
+        lines = output.split('\n')
+        lines[0] = self._buffer + lines[0]
+
+        if output:
+            self._buffer = lines[-1]
+            return (lines[:-1], True)
+        else:
+            self._buffer = ''
+            if len(lines) == 1 and not lines[0]:
+                lines = []
+            return (lines, False)
 
 
 def init_svn_repo_from_dump(dump_path, prefix=None, suffix=None,

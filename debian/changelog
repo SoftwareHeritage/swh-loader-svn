@@ -1,8 +1,19 @@
-swh-loader-svn (0.0.44-1~swh3~bpo10+1) buster-swh; urgency=medium
+swh-loader-svn (0.0.45-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 0.0.45     - (tagged by Stefano Zacchiroli
+    <zack@upsilon.cc> on 2019-10-10 14:43:18 +0200)
+  * Upstream changes:     - v0.0.45     - * typing: minimal changes to
+    make a no-op mypy run pass     - * tox.ini: Fix py3 environment to
+    use packaged tests     - * Add attribute visit_type.     - * Fix
+    warning about pytest.mark.fs.     - * add code of conduct document
+    - * CONTRIBUTORS: add Ishan Bhanuka     - * Remove unnecessary noqa
+    - * Update dependency on swh-storage.     - * Update argument name.
+    - * Use origin urls instead of origin ids.     - * update
+    requirements     - * Update coverage gitignore     - *
+    SvnLoaderFromRemoteDump: Add some debug output when svnrdump is
+    running     - * Remove debian packaging from master branch
 
- -- Nicolas Dandrimont <olasd@debian.org>  Thu, 11 Jul 2019 14:56:45 +0200
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 10 Oct 2019 12:46:37 +0000
 
 swh-loader-svn (0.0.44-1~swh3) unstable-swh; urgency=low
 

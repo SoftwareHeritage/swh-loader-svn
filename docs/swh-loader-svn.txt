@@ -180,7 +180,7 @@ Send the occurrence pointing to the last revision seen
 
 ## Note
 
-There could be margin for improvment in the actual implementation
+There could be margin for improvement in the actual implementation
 here.
 
 We apply the diff on files first and then open the file to compute its

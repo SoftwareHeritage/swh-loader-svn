@@ -42,10 +42,10 @@ def load_svn(url=None,
 
 
 @app.task(name=__name__ + '.MountAndLoadSvnRepository')
-def mount_load_svn(url=None,
-                   archive_path=None,
-                   visit_date=None,
-                   start_from_scratch=False):
+def load_svn_from_archive(url=None,
+                          archive_path=None,
+                          visit_date=None,
+                          start_from_scratch=False):
     """1. Mount an svn dump from archive as a local svn repository
        2. Load it through the svn loader
        3. Clean up mounted svn repository archive
@@ -60,10 +60,10 @@ def mount_load_svn(url=None,
 
 
 @app.task(name=__name__ + '.DumpMountAndLoadSvnRepository')
-def dump_mount_load_svn(url=None,
-                        origin_url=None,
-                        visit_date=None,
-                        start_from_scratch=False):
+def load_svn_from_remote_dump(url=None,
+                              origin_url=None,
+                              visit_date=None,
+                              start_from_scratch=False):
     """1. Mount a remote svn dump as a local svn repository.
        2. Load it through the svn loader.
        3. Clean up mounted svn repository archive.

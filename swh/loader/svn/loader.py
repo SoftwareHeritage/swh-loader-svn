@@ -78,12 +78,14 @@ class SvnLoader(BufferedLoader):
 
     visit_type = 'svn'
 
-    def __init__(self, url, svn_url=None, visit_date=None,
+    def __init__(self, url, origin_url=None, visit_date=None,
                  destination_path=None, swh_revision=None,
                  start_from_scratch=False):
         super().__init__(logging_class='swh.loader.svn.SvnLoader')
-        self.origin_url = url
-        self.svn_url = svn_url if svn_url else self.origin_url
+        # technical svn uri to act on svn repository
+        self.svn_url = url
+        # origin url as unique identifier for origin in swh archive
+        self.origin_url = origin_url if origin_url else self.svn_url
         self.debug = self.config['debug']
         self.last_seen_revision = None
         self.temp_directory = self.config['temp_directory']
@@ -587,13 +589,15 @@ class SvnLoaderFromDumpArchive(SvnLoader):
 
     """
     def __init__(self, url, archive_path,
-                 svn_url=None, destination_path=None,
-                 swh_revision=None, start_from_scratch=None):
-        super().__init__(url, svn_url=svn_url,
+                 origin_url=None, destination_path=None,
+                 swh_revision=None, start_from_scratch=None,
+                 visit_date=None):
+        super().__init__(url,
+                         origin_url=origin_url,
                          destination_path=destination_path,
                          swh_revision=swh_revision,
-                         start_from_scratch=start_from_scratch)
-        self.svn_url = svn_url
+                         start_from_scratch=start_from_scratch,
+                         visit_date=visit_date)
         self.archive_path = archive_path
         self.temp_dir = None
         self.repo_path = None
@@ -622,12 +626,13 @@ class SvnLoaderFromRemoteDump(SvnLoader):
     Create a subversion repository dump using the svnrdump utility,
     mount it locally and load the repository from it.
     """
-    def __init__(self, url, svn_url=None, destination_path=None,
-                 swh_revision=None, start_from_scratch=False):
-        super().__init__(url, svn_url=svn_url,
+    def __init__(self, url, origin_url=None, destination_path=None,
+                 swh_revision=None, start_from_scratch=False, visit_date=None):
+        super().__init__(url, origin_url=origin_url,
                          destination_path=destination_path,
                          swh_revision=swh_revision,
-                         start_from_scratch=start_from_scratch)
+                         start_from_scratch=start_from_scratch,
+                         visit_date=visit_date)
         self.temp_dir = tempfile.mkdtemp(dir=self.temp_directory)
         self.repo_path = None
         self.truncated_dump = False

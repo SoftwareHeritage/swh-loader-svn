@@ -11,59 +11,67 @@ from .loader import (
 
 
 @app.task(name=__name__ + '.LoadSvnRepository')
-def load_svn(svn_url,
+def load_svn(url=None,
+             origin_url=None,
              destination_path=None,
              swh_revision=None,
-             origin_url=None,
              visit_date=None,
-             start_from_scratch=None):
+             start_from_scratch=False):
     """Import a svn repository
 
     Args:
         args: ordered arguments (expected None)
         kwargs: Dictionary with the following expected keys:
 
-          - svn_url (str): (mandatory) svn's repository url
-          - destination_path (str): (mandatory) root directory to
-            locally retrieve svn's data
+          - url (str): (mandatory) svn's repository url
           - origin_url (str): Optional original url override
+          - destination_path (str): (optional) root directory to
+            locally retrieve svn's data
           - swh_revision (dict): (optional) extra revision hex to
             start from.  see swh.loader.svn.SvnLoader.process
             docstring
 
     """
-    return SvnLoader(origin_url).load(
-        svn_url=svn_url,
-        destination_path=destination_path,
-        swh_revision=swh_revision,
-        visit_date=visit_date,
-        start_from_scratch=start_from_scratch)
+    loader = SvnLoader(url,
+                       origin_url=origin_url,
+                       destination_path=destination_path,
+                       swh_revision=swh_revision,
+                       visit_date=visit_date,
+                       start_from_scratch=start_from_scratch)
+    return loader.load()
 
 
 @app.task(name=__name__ + '.MountAndLoadSvnRepository')
-def mount_load_svn(archive_path, origin_url=None, visit_date=None,
+def mount_load_svn(url=None,
+                   archive_path=None,
+                   visit_date=None,
                    start_from_scratch=False):
     """1. Mount an svn dump from archive as a local svn repository
        2. Load it through the svn loader
        3. Clean up mounted svn repository archive
 
     """
-    return SvnLoaderFromDumpArchive(origin_url, archive_path).load(
-        svn_url=None,
-        visit_date=visit_date,
+    loader = SvnLoaderFromDumpArchive(
+        url,
         archive_path=archive_path,
+        visit_date=visit_date,
         start_from_scratch=start_from_scratch)
+    return loader.load()
 
 
 @app.task(name=__name__ + '.DumpMountAndLoadSvnRepository')
-def dump_mount_load_svn(svn_url, origin_url=None, visit_date=None,
+def dump_mount_load_svn(url=None,
+                        origin_url=None,
+                        visit_date=None,
                         start_from_scratch=False):
-    """1. Mount an svn dump from archive as a local svn repository.
+    """1. Mount a remote svn dump as a local svn repository.
        2. Load it through the svn loader.
        3. Clean up mounted svn repository archive.
 
     """
-    return SvnLoaderFromRemoteDump(origin_url).load(
-        svn_url=svn_url,
+    loader = SvnLoaderFromRemoteDump(
+        url,
+        origin_url=origin_url,
         visit_date=visit_date,
         start_from_scratch=start_from_scratch)
+    return loader.load()

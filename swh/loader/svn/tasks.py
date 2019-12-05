@@ -32,10 +32,9 @@ def load_svn(svn_url,
             docstring
 
     """
-    return SvnLoader().load(
+    return SvnLoader(origin_url).load(
         svn_url=svn_url,
         destination_path=destination_path,
-        origin_url=origin_url,
         swh_revision=swh_revision,
         visit_date=visit_date,
         start_from_scratch=start_from_scratch)
@@ -49,9 +48,8 @@ def mount_load_svn(archive_path, origin_url=None, visit_date=None,
        3. Clean up mounted svn repository archive
 
     """
-    return SvnLoaderFromDumpArchive(archive_path).load(
+    return SvnLoaderFromDumpArchive(origin_url, archive_path).load(
         svn_url=None,
-        origin_url=origin_url,
         visit_date=visit_date,
         archive_path=archive_path,
         start_from_scratch=start_from_scratch)
@@ -65,8 +63,7 @@ def dump_mount_load_svn(svn_url, origin_url=None, visit_date=None,
        3. Clean up mounted svn repository archive.
 
     """
-    return SvnLoaderFromRemoteDump().load(
+    return SvnLoaderFromRemoteDump(origin_url).load(
         svn_url=svn_url,
-        origin_url=origin_url,
         visit_date=visit_date,
         start_from_scratch=start_from_scratch)

@@ -60,12 +60,14 @@ class SvnLoaderTest(SvnLoader):
         Load a new svn repository using the swh policy (so no update).
 
     """
-    def __init__(self, last_snp_rev={}):
-        super().__init__()
+    def __init__(self, url, last_snp_rev={}, destination_path=None,
+                 start_from_scratch=False, swh_revision=None):
+        super().__init__(url, destination_path=destination_path,
+                         start_from_scratch=start_from_scratch,
+                         swh_revision=swh_revision)
         self.origin = {
             'id': 1,
-            'url': '/dev/null',
-            'type': 'svn',
+            'url': url,
         }
         self.visit = {
             'origin': 1,
@@ -95,12 +97,34 @@ class BaseSvnLoaderTest(BaseLoaderTest):
 
     """
     def setUp(self, archive_name='pkg-gourmet.tgz', filename='pkg-gourmet',
-              loader=None):
+              loader=None, snapshot=None, type='default',
+              start_from_scratch=False, swh_revision=None):
         super().setUp(archive_name=archive_name, filename=filename,
                       prefix_tmp_folder_name='swh.loader.svn.',
                       start_path=os.path.dirname(__file__))
         self.svn_mirror_url = self.repo_url
-        self.loader = loader or SvnLoaderTest()
+        if type == 'default':
+            loader_test_class = SvnLoaderTest
+        else:
+            loader_test_class = SvnLoaderTestFromRemoteDump
+
+        if loader:
+            self.loader = loader
+        elif snapshot:
+            self.loader = loader_test_class(
+                self.svn_mirror_url,
+                destination_path=self.destination_path,
+                start_from_scratch=start_from_scratch,
+                swh_revision=swh_revision,
+                last_snp_rev=snapshot,
+            )
+        else:
+            self.loader = loader_test_class(
+                self.svn_mirror_url,
+                destination_path=self.destination_path,
+                start_from_scratch=start_from_scratch,
+                swh_revision=swh_revision
+            )
         self.storage = self.loader.storage
 
 
@@ -113,9 +137,7 @@ class SvnLoaderTest1(BaseSvnLoaderTest):
 
         """
         # when
-        self.loader.load(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path)
+        self.loader.load()
 
         # then
         self.assertCountRevisions(6)
@@ -172,16 +194,14 @@ class SvnLoaderTest2(BaseSvnLoaderTest):
 
     """
     def setUp(self):
-        super().setUp(loader=SvnLoaderTest(last_snp_rev=_LAST_SNP_REV))
+        super().setUp(snapshot=_LAST_SNP_REV)
 
     def test_load(self):
         """Load a repository without new changes results in same snapshot
 
         """
         # when
-        self.loader.load(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path)
+        self.loader.load()
 
         # then
 
@@ -212,15 +232,14 @@ class SvnLoaderTest3(BaseSvnLoaderTest):
             hashutil.hash_to_bytes('badbadbadbadf708f7466dddf547567b65f6c39d')
         # the svn repository pkg-gourmet has been updated with changes
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz',
-                      loader=SvnLoaderTest(last_snp_rev=last_snp_rev))
+                      snapshot=last_snp_rev)
 
     def test_load(self):
         """Load known repository with history altered should do nothing
 
         """
         # when
-        self.loader.load(svn_url=self.svn_mirror_url,
-                         destination_path=self.destination_path)
+        self.loader.load()
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -245,15 +264,14 @@ class SvnLoaderTest4(BaseSvnLoaderTest):
     def setUp(self):
         # the svn repository pkg-gourmet has been updated with changes
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz',
-                      loader=SvnLoaderTest(last_snp_rev=_LAST_SNP_REV))
+                      snapshot=_LAST_SNP_REV)
 
     def test_process_repository(self):
         """Process updated repository should yield new objects
 
         """
         # when
-        self.loader.load(svn_url=self.svn_mirror_url,
-                         destination_path=self.destination_path)
+        self.loader.load()
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -292,16 +310,15 @@ class SvnLoaderTest5(BaseSvnLoaderTest):
     def setUp(self):
         # the svn repository pkg-gourmet has been updated with changes
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz',
-                      loader=SvnLoaderTest(last_snp_rev=_LAST_SNP_REV))
+                      snapshot=_LAST_SNP_REV,
+                      start_from_scratch=True)
 
     def test_load(self):
         """Load an existing repository from scratch yields same swh objects
 
         """
         # when
-        self.loader.load(svn_url=self.svn_mirror_url,
-                         destination_path=self.destination_path,
-                         start_from_scratch=True)
+        self.loader.load()
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -360,16 +377,14 @@ class SvnLoaderTest6(BaseSvnLoaderTest):
             }
         }
         super().setUp(archive_name='pkg-gourmet-with-updates.tgz',
-                      loader=SvnLoaderTest(last_snp_rev=last_snp_rev))
+                      snapshot=last_snp_rev)
 
     def test_load(self):
         """Load from partial previous visit result in new changes
 
         """
         # when
-        self.loader.load(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path)
+        self.loader.load()
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -405,13 +420,6 @@ class SvnLoaderTest7(BaseSvnLoaderTest):
 
     """
     def setUp(self):
-        super().setUp(archive_name='pkg-gourmet-with-updates.tgz',
-                      loader=SvnLoaderTest(last_snp_rev=_LAST_SNP_REV))
-
-    def test_load(self):
-        """Load known and partial repository should start from last visit
-
-        """
         previous_unfinished_revision = {
             'id': hashutil.hash_to_bytes(
                 'a3a577948fdbda9d1061913b77a1588695eadb41'),
@@ -427,12 +435,17 @@ class SvnLoaderTest7(BaseSvnLoaderTest):
                 ]
             }
         }
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz',
+                      snapshot=_LAST_SNP_REV,
+                      swh_revision=previous_unfinished_revision)
+
+    def test_load(self):
+        """Load known and partial repository should start from last visit
+
+        """
 
         # when
-        self.loader.load(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            swh_revision=previous_unfinished_revision)
+        self.loader.load()
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -488,13 +501,6 @@ class SvnLoaderTest8(BaseSvnLoaderTest):
                 }
             }
         }
-        super().setUp(archive_name='pkg-gourmet-with-updates.tgz',
-                      loader=SvnLoaderTest(last_snp_rev=last_snp_rev))
-
-    def test_load(self):
-        """Load repository should yield revisions starting from last visit
-
-        """
         previous_unfinished_revision = {
             'id': hashutil.hash_to_bytes(
                 '4876cb10aec6f708f7466dddf547567b65f6c39c'),
@@ -510,11 +516,16 @@ class SvnLoaderTest8(BaseSvnLoaderTest):
                 ]
             }
         }
+        super().setUp(archive_name='pkg-gourmet-with-updates.tgz',
+                      snapshot=last_snp_rev,
+                      swh_revision=previous_unfinished_revision)
+
+    def test_load(self):
+        """Load repository should yield revisions starting from last visit
+
+        """
         # when
-        self.loader.load(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            swh_revision=previous_unfinished_revision)
+        self.loader.load()
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -558,8 +569,7 @@ class SvnLoaderTTest9(BaseSvnLoaderTest):
 
         """
         # when
-        self.loader.load(svn_url=self.svn_mirror_url,
-                         destination_path=self.destination_path)
+        self.loader.load()
 
         expected_revisions = {
             '7da4975c363101b819756d33459f30a866d01b1b': 'f63637223ee0f7d4951ffd2d4d9547a4882c5d8b' # noqa
@@ -589,8 +599,7 @@ class SvnLoaderTest10(BaseSvnLoaderTest): # noqa
         """Load repo with mixed CRLF/LF endings (svn:eol-style:native) is ok
 
         """
-        self.loader.load(svn_url=self.svn_mirror_url,
-                         destination_path=self.destination_path)
+        self.loader.load()
 
         expected_revisions = {
             '9c6962eeb9164a636c374be700672355e34a98a7': '16aa6b6271f3456d4643999d234cf39fe3d0cc5a' # noqa
@@ -612,19 +621,17 @@ class SvnLoaderTest11(BaseSvnLoaderTest):
 
     """
     def setUp(self):
-        super().setUp(archive_name='pkg-gourmet-with-external-id.tgz')
+        previous_unfinished_revision = None
+        super().setUp(archive_name='pkg-gourmet-with-external-id.tgz',
+                      swh_revision=previous_unfinished_revision)
 
     def test_load(self):
         """Repository with svn:externals property, will stop raising an error
 
         """
-        previous_unfinished_revision = None
 
         # when
-        self.loader.load(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            swh_revision=previous_unfinished_revision)
+        self.loader.load()
 
         # then repositories holds 21 revisions, but the last commit
         # one holds an 'svn:externals' property which will make the
@@ -673,20 +680,18 @@ class SvnLoaderTest12(BaseSvnLoaderTest):
 
     """
     def setUp(self):
+        previous_unfinished_revision = None
         super().setUp(
-            archive_name='pkg-gourmet-with-edge-case-links-and-files.tgz')
+            archive_name='pkg-gourmet-with-edge-case-links-and-files.tgz',
+            swh_revision=previous_unfinished_revision)
 
     def test_load(self):
         """File/Link removed prior to folder with same name creation is ok
 
         """
-        previous_unfinished_revision = None
 
         # when
-        self.loader.load(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path,
-            swh_revision=previous_unfinished_revision)
+        self.loader.load()
 
         # then repositories holds 14 revisions, but the last commit
         self.assertCountRevisions(19)
@@ -738,9 +743,7 @@ class SvnLoaderTest13(BaseSvnLoaderTest):
 
         """
         # when
-        self.loader.load(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path)
+        self.loader.load()
 
         # then repositories holds 14 revisions, but the last commit
         self.assertCountRevisions(21)
@@ -790,27 +793,26 @@ class SvnLoaderFromRemoteDumpTest(BaseSvnLoaderTest):
     and the base svn loader are the same.
     """
     def setUp(self):
-        super().setUp(archive_name='pkg-gourmet.tgz',
-                      loader=SvnLoaderTestFromRemoteDump())
+        _LOADER_TEST_CONFIG['debug'] = True  # to avoid cleanup in between load
+        super().setUp(archive_name='pkg-gourmet.tgz', type='remote')
 
     def test_load(self):
         """
         Compare results of remote dump loader and base loader
         """
         dump_loader = self.loader
-        dump_loader.load(svn_url=self.svn_mirror_url)
+        dump_loader.load()
 
         self.assertCountContents(19)
         self.assertCountDirectories(17)
         self.assertCountRevisions(6)
         self.assertCountSnapshots(1)
 
-        base_loader = SvnLoaderTest()
-        base_loader.load(svn_url=self.svn_mirror_url)
+        base_loader = SvnLoaderTest(self.svn_mirror_url)
+        base_loader.load()
 
         dump_storage_stat = dump_loader.storage.stat_counters()
         base_storage_stat = base_loader.storage.stat_counters()
-
         self.assertEqual(dump_storage_stat, base_storage_stat)
 
 
@@ -828,9 +830,7 @@ class SvnLoaderTest14(BaseSvnLoaderTest):
 
         """
         # when
-        self.loader.load(
-            svn_url=self.svn_mirror_url,
-            destination_path=self.destination_path)
+        self.loader.load()
 
         self.assertCountRevisions(7, '7 svn commits')
         self.assertCountReleases(0)

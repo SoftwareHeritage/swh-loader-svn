@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2018  The Software Heritage developers
+# Copyright (C) 2015-2019  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -78,9 +78,12 @@ class SvnLoader(BufferedLoader):
 
     visit_type = 'svn'
 
-    def __init__(self):
+    def __init__(self, url, svn_url=None, visit_date=None,
+                 destination_path=None, swh_revision=None,
+                 start_from_scratch=False):
         super().__init__(logging_class='swh.loader.svn.SvnLoader')
-        self.origin_url = None
+        self.origin_url = url
+        self.svn_url = svn_url if svn_url else self.origin_url
         self.debug = self.config['debug']
         self.last_seen_revision = None
         self.temp_directory = self.config['temp_directory']
@@ -100,6 +103,10 @@ class SvnLoader(BufferedLoader):
         self._last_revision = None
         self._visit_status = 'full'
         self._load_status = 'uneventful'
+        self.visit_date = visit_date
+        self.destination_path = destination_path
+        self.start_from_scratch = start_from_scratch
+        self.swh_revision = swh_revision
 
     def pre_cleanup(self):
         """Cleanup potential dangling files from prior runs (e.g. OOM killed
@@ -444,27 +451,22 @@ Local repository not cleaned up for investigation: %s''' % (
 
             yield _contents, _directories, swh_revision
 
-    def prepare_origin_visit(self, *, svn_url, visit_date=None,
-                             origin_url=None, **kwargs):
+    def prepare_origin_visit(self, *args, **kwargs):
         self.origin = {
-            'url': origin_url if origin_url else svn_url,
-            'type': self.visit_type,
+            'url': self.origin_url if self.origin_url else self.svn_url,
         }
-        self.visit_date = visit_date
 
-    def prepare(self, *, svn_url, destination_path=None,
-                swh_revision=None, start_from_scratch=False, **kwargs):
-        self.start_from_scratch = start_from_scratch
-        if swh_revision:
-            self.last_known_swh_revision = swh_revision
+    def prepare(self, *args, **kwargs):
+        if self.swh_revision:
+            self.last_known_swh_revision = self.swh_revision
         else:
             self.last_known_swh_revision = None
 
         self.latest_snapshot = self.swh_latest_snapshot_revision(
             self.origin_url, self.last_known_swh_revision)
 
-        if destination_path:
-            local_dirname = destination_path
+        if self.destination_path:
+            local_dirname = self.destination_path
         else:
             local_dirname = tempfile.mkdtemp(
                 suffix='-%s' % os.getpid(),
@@ -472,7 +474,7 @@ Local repository not cleaned up for investigation: %s''' % (
                 dir=self.temp_directory)
 
         self.svnrepo = self.get_svn_repo(
-            svn_url, local_dirname, self.origin_url)
+            self.svn_url, local_dirname, self.origin_url)
         try:
             revision_start, revision_end, revision_parents = self.start_from(
                 self.last_known_swh_revision, self.start_from_scratch)
@@ -584,26 +586,26 @@ class SvnLoaderFromDumpArchive(SvnLoader):
        an svn repository and load said repository.
 
     """
-    def __init__(self, archive_path):
-        super().__init__()
+    def __init__(self, url, archive_path,
+                 svn_url=None, destination_path=None,
+                 swh_revision=None, start_from_scratch=None):
+        super().__init__(url, svn_url=svn_url,
+                         destination_path=destination_path,
+                         swh_revision=swh_revision,
+                         start_from_scratch=start_from_scratch)
+        self.svn_url = svn_url
         self.archive_path = archive_path
         self.temp_dir = None
         self.repo_path = None
 
-    def prepare(self, *, svn_url, destination_path=None,
-                swh_revision=None, start_from_scratch=False, **kwargs):
+    def prepare(self, *args, **kwargs):
         self.log.info('Archive to mount and load %s' % self.archive_path)
         self.temp_dir, self.repo_path = init_svn_repo_from_archive_dump(
             self.archive_path,
             prefix=TEMPORARY_DIR_PREFIX_PATTERN,
             suffix='-%s' % os.getpid(),
             root_dir=self.temp_directory)
-        if not svn_url:
-            svn_url = 'file://%s' % self.repo_path
-        super().prepare(svn_url=svn_url, destination_path=destination_path,
-                        swh_revision=swh_revision,
-                        start_from_scratch=start_from_scratch,
-                        **kwargs)
+        super().prepare(*args, **kwargs)
 
     def cleanup(self):
         super().cleanup()
@@ -620,8 +622,12 @@ class SvnLoaderFromRemoteDump(SvnLoader):
     Create a subversion repository dump using the svnrdump utility,
     mount it locally and load the repository from it.
     """
-    def __init__(self):
-        super().__init__()
+    def __init__(self, url, svn_url=None, destination_path=None,
+                 swh_revision=None, start_from_scratch=False):
+        super().__init__(url, svn_url=svn_url,
+                         destination_path=destination_path,
+                         swh_revision=swh_revision,
+                         start_from_scratch=start_from_scratch)
         self.temp_dir = tempfile.mkdtemp(dir=self.temp_directory)
         self.repo_path = None
         self.truncated_dump = False
@@ -635,7 +641,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         last_loaded_svn_rev = -1
         try:
             origin = \
-                self.storage.origin_get({'type': 'svn', 'url': svn_url})
+                self.storage.origin_get({'url': svn_url})
             last_swh_rev = \
                 self.swh_latest_snapshot_revision(origin['url'])['revision']
             last_swh_rev_headers = \
@@ -723,15 +729,14 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         raise Exception('An error occurred when running svnrdump and '
                         'no exploitable dump file has been generated.')
 
-    def prepare(self, *, svn_url, destination_path=None,
-                swh_revision=None, start_from_scratch=False, **kwargs):
+    def prepare(self, *args, **kwargs):
         # First, check if previous revisions have been loaded for the
         # subversion origin and get the number of the last one
-        last_loaded_svn_rev = self.get_last_loaded_svn_rev(svn_url)
+        last_loaded_svn_rev = self.get_last_loaded_svn_rev(self.svn_url)
 
         # Then try to generate a dump file containing relevant svn revisions
         # to load, an exception will be thrown if something wrong happened
-        dump_path = self.dump_svn_revisions(svn_url, last_loaded_svn_rev)
+        dump_path = self.dump_svn_revisions(self.svn_url, last_loaded_svn_rev)
 
         # Finally, mount the dump and load the repository
         self.log.debug('Mounting dump file with "svnadmin load".')
@@ -740,11 +745,8 @@ class SvnLoaderFromRemoteDump(SvnLoader):
                                     prefix=TEMPORARY_DIR_PREFIX_PATTERN,
                                     suffix='-%s' % os.getpid(),
                                     root_dir=self.temp_dir)
-        super().prepare(svn_url='file://%s' % self.repo_path,
-                        destination_path=destination_path,
-                        swh_revision=swh_revision,
-                        start_from_scratch=start_from_scratch,
-                        **kwargs)
+        self.svn_url = 'file://%s' % self.repo_path
+        super().prepare(*args, **kwargs)
 
     def cleanup(self):
         super().cleanup()

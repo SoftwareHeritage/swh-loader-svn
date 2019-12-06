@@ -540,9 +540,9 @@ Local repository not cleaned up for investigation: %s''' % (
            This also resets the internal instance variable state.
 
         """
-        self.maybe_load_contents(self._contents)
-        self.maybe_load_directories(self._directories)
-        self.maybe_load_revisions(self._revisions)
+        self.send_contents(self._contents)
+        self.send_directories(self._directories)
+        self.send_revisions(self._revisions)
 
         if self.done:  # finish line, snapshot!
             self.generate_and_load_snapshot(revision=self._last_revision,
@@ -572,7 +572,7 @@ Local repository not cleaned up for investigation: %s''' % (
         else:
             return None
         self.log.debug('snapshot: %s' % snap)
-        self.maybe_load_snapshot(snap)
+        self.send_snapshot(snap)
 
     def load_status(self):
         return {

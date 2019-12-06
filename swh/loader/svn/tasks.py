@@ -1,16 +1,16 @@
-# Copyright (C) 2015-2018  The Software Heritage developers
+# Copyright (C) 2015-2019  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from celery import current_app as app
+from celery import shared_task
 
 from .loader import (
     SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump
 )
 
 
-@app.task(name=__name__ + '.LoadSvnRepository')
+@shared_task(name=__name__ + '.LoadSvnRepository')
 def load_svn(url=None,
              origin_url=None,
              destination_path=None,
@@ -41,7 +41,7 @@ def load_svn(url=None,
     return loader.load()
 
 
-@app.task(name=__name__ + '.MountAndLoadSvnRepository')
+@shared_task(name=__name__ + '.MountAndLoadSvnRepository')
 def load_svn_from_archive(url=None,
                           archive_path=None,
                           visit_date=None,
@@ -59,7 +59,7 @@ def load_svn_from_archive(url=None,
     return loader.load()
 
 
-@app.task(name=__name__ + '.DumpMountAndLoadSvnRepository')
+@shared_task(name=__name__ + '.DumpMountAndLoadSvnRepository')
 def load_svn_from_remote_dump(url=None,
                               origin_url=None,
                               visit_date=None,

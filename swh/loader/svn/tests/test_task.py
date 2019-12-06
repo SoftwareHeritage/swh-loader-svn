@@ -3,12 +3,9 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from unittest.mock import patch
 
-
-@patch('swh.loader.svn.loader.SvnLoader.load')
-def test_svn_loader(
-        mock_loader, swh_app, celery_session_worker, swh_config):
+def test_svn_loader(mocker, swh_app, celery_session_worker, swh_config):
+    mock_loader = mocker.patch('swh.loader.svn.loader.SvnLoader.load')
     mock_loader.return_value = {'status': 'eventful'}
 
     res = swh_app.send_task(
@@ -21,9 +18,10 @@ def test_svn_loader(
     assert res.result == {'status': 'eventful'}
 
 
-@patch('swh.loader.svn.loader.SvnLoaderFromDumpArchive.load')
 def test_svn_loader_from_dump(
-        mock_loader, swh_app, celery_session_worker, swh_config):
+        mocker, swh_app, celery_session_worker, swh_config):
+    mock_loader = mocker.patch(
+        'swh.loader.svn.loader.SvnLoaderFromDumpArchive.load')
     mock_loader.return_value = {'status': 'eventful'}
 
     res = swh_app.send_task(
@@ -36,9 +34,10 @@ def test_svn_loader_from_dump(
     assert res.result == {'status': 'eventful'}
 
 
-@patch('swh.loader.svn.loader.SvnLoaderFromRemoteDump.load')
 def test_svn_loader_from_remote_dump(
-        mock_loader, swh_app, celery_session_worker, swh_config):
+        mocker, swh_app, celery_session_worker, swh_config):
+    mock_loader = mocker.patch(
+        'swh.loader.svn.loader.SvnLoaderFromRemoteDump.load')
     mock_loader.return_value = {'status': 'eventful'}
 
     res = swh_app.send_task(

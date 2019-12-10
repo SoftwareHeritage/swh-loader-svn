@@ -10,4 +10,5 @@ swh.loader.core>=0.0.37
 
 [testing]
 pytest
+pytest-mock
 swh.core[http]>=0.0.61

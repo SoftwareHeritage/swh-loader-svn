@@ -2,6 +2,7 @@ MANIFEST.in
 Makefile
 README.md
 requirements-swh.txt
+requirements-test.txt
 requirements.txt
 setup.py
 version.txt
@@ -9,6 +10,7 @@ swh/__init__.py
 swh.loader.svn.egg-info/PKG-INFO
 swh.loader.svn.egg-info/SOURCES.txt
 swh.loader.svn.egg-info/dependency_links.txt
+swh.loader.svn.egg-info/entry_points.txt
 swh.loader.svn.egg-info/requires.txt
 swh.loader.svn.egg-info/top_level.txt
 swh/loader/__init__.py
@@ -22,8 +24,10 @@ swh/loader/svn/svn.py
 swh/loader/svn/tasks.py
 swh/loader/svn/utils.py
 swh/loader/svn/tests/__init__.py
+swh/loader/svn/tests/conftest.py
 swh/loader/svn/tests/test_converters.py
 swh/loader/svn/tests/test_loader.py
+swh/loader/svn/tests/test_task.py
 swh/loader/svn/tests/test_utils.py
 swh/loader/svn/tests/resources/httthttt.tgz
 swh/loader/svn/tests/resources/mediawiki-repo-r407-eol-native-crlf.tgz

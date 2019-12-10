@@ -1,0 +1,4 @@
+
+        [swh.workers]
+        loader.svn=swh.loader.svn:register
+    

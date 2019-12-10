@@ -1,3 +1,20 @@
+swh-loader-svn (0.0.46-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.0.46     - (tagged by Antoine R. Dumont
+    (@ardumont) <antoine.romain.dumont@gmail.com> on 2019-12-10 10:30:35
+    +0100)
+  * Upstream changes:     - v0.0.46     - tests: Migrate to use pytest-
+    mock's mocker fixture     - tasks: Use celery's shared_task
+    decorator     - loader.svn: Register svn worker     - svn.tasks:
+    Rename tasks according to production's     - tasks: Adapt tasks
+    according to the constructor unification     - svn: Unify loader
+    constructor with url as parameter     - Fix a typo reported by
+    codespell     - Add a pre-commit config file     - Migrate tox.ini
+    to extras = xxx instead of deps = .[testing]     - De-specify
+    testenv:py3     - Include all requirements in MANIFEST.in
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Tue, 10 Dec 2019 09:38:45 +0000
+
 swh-loader-svn (0.0.45-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.0.45     - (tagged by Stefano Zacchiroli

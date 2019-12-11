@@ -11,7 +11,7 @@ from .loader import (
 
 
 @shared_task(name=__name__ + '.LoadSvnRepository')
-def load_svn(url=None,
+def load_svn(*, url=None,
              origin_url=None,
              destination_path=None,
              swh_revision=None,
@@ -42,7 +42,7 @@ def load_svn(url=None,
 
 
 @shared_task(name=__name__ + '.MountAndLoadSvnRepository')
-def load_svn_from_archive(url=None,
+def load_svn_from_archive(*, url=None,
                           archive_path=None,
                           visit_date=None,
                           start_from_scratch=False):
@@ -60,7 +60,7 @@ def load_svn_from_archive(url=None,
 
 
 @shared_task(name=__name__ + '.DumpMountAndLoadSvnRepository')
-def load_svn_from_remote_dump(url=None,
+def load_svn_from_remote_dump(*, url=None,
                               origin_url=None,
                               visit_date=None,
                               start_from_scratch=False):

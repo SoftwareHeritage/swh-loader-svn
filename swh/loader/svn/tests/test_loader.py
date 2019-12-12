@@ -30,26 +30,33 @@ class TestSnapshot(TestCase):
 
 _LOADER_TEST_CONFIG = {
     'check_revision': {'limit': 100, 'status': False},
-    'content_packet_block_size_bytes': 104857600,
-    'content_packet_size': 10000,
-    'content_packet_size_bytes': 1073741824,
-    'content_size_limit': 104857600,
     'debug': False,
-    'directory_packet_size': 2500,
     'log_db': 'dbname=softwareheritage-log',
-    'occurrence_packet_size': 1000,
-    'release_packet_size': 1000,
-    'revision_packet_size': 10,
     'save_data': False,
     'save_data_path': '',
-    'send_contents': True,
-    'send_directories': True,
-    'send_occurrences': True,
-    'send_releases': True,
-    'send_revisions': True,
-    'send_snapshot': True,
-    'storage': {'args': {}, 'cls': 'memory'},
-    'temp_directory': '/tmp'
+    'temp_directory': '/tmp',
+    'max_content_size': 100 * 1024 * 1024,
+    'storage': {
+        'cls': 'pipeline',
+        'steps': [
+            {
+                'cls': 'filter'
+            },
+            {
+                'cls': 'buffer',
+                'min_batch_size': {
+                    'content': 10000,
+                    'content_bytes': 1073741824,
+                    'directory': 2500,
+                    'revision': 10,
+                    'release': 100,
+                },
+            },
+            {
+                'cls': 'memory'
+            },
+        ]
+    },
 }
 
 

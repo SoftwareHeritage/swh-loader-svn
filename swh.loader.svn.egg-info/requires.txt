@@ -6,7 +6,7 @@ subvertpy>=0.9.4
 swh.storage>=0.0.143
 swh.model>=0.0.18
 swh.scheduler>=0.0.39
-swh.loader.core>=0.0.37
+swh.loader.core>=0.0.67
 
 [testing]
 pytest

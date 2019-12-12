@@ -1,8 +1,12 @@
-swh-loader-svn (0.0.46-1~swh2~bpo10+1) buster-swh; urgency=medium
+swh-loader-svn (0.0.47-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 0.0.47     - (tagged by Antoine R. Dumont
+    (@ardumont) <antoine.romain.dumont@gmail.com> on 2019-12-12 11:18:45
+    +0100)
+  * Upstream changes:     - v0.0.47     - tasks: Enforce kwargs use in
+    task message
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Wed, 11 Dec 2019 11:30:20 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 12 Dec 2019 10:21:55 +0000
 
 swh-loader-svn (0.0.46-1~swh2) unstable-swh; urgency=medium
 

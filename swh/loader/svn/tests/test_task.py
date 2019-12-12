@@ -10,7 +10,7 @@ def test_svn_loader(mocker, swh_app, celery_session_worker, swh_config):
 
     res = swh_app.send_task(
         'swh.loader.svn.tasks.LoadSvnRepository',
-        (), dict(url='some-technical-url', origin_url='origin-url'))
+        kwargs=dict(url='some-technical-url', origin_url='origin-url'))
     assert res
     res.wait()
     assert res.successful()
@@ -26,7 +26,7 @@ def test_svn_loader_from_dump(
 
     res = swh_app.send_task(
         'swh.loader.svn.tasks.MountAndLoadSvnRepository',
-        (), dict(url='some-url', archive_path='some-path'))
+        kwargs=dict(url='some-url', archive_path='some-path'))
     assert res
     res.wait()
     assert res.successful()
@@ -42,7 +42,7 @@ def test_svn_loader_from_remote_dump(
 
     res = swh_app.send_task(
         'swh.loader.svn.tasks.DumpMountAndLoadSvnRepository',
-        (), dict(url='some-remote-dump-url', origin_url='origin-url'))
+        kwargs=dict(url='some-remote-dump-url', origin_url='origin-url'))
     assert res
     res.wait()
     assert res.successful()

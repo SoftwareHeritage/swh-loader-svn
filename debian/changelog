@@ -1,3 +1,13 @@
+swh-loader-svn (0.0.49-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.0.49     - (tagged by Antoine R. Dumont
+    (@ardumont) <antoine.romain.dumont@gmail.com> on 2020-01-15 15:59:52
+    +0100)
+  * Upstream changes:     - v0.0.49     - svn.loader: Adapt according to
+    latest loader-core simplification
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Wed, 15 Jan 2020 15:03:50 +0000
+
 swh-loader-svn (0.0.48-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.0.48     - (tagged by Antoine R. Dumont

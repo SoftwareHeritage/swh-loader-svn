@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2019  The Software Heritage developers
+# Copyright (C) 2015-2020  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -20,7 +20,8 @@ from swh.model import hashutil
 from swh.model.from_disk import Directory
 from swh.model.identifiers import identifier_to_bytes, revision_identifier
 from swh.model.identifiers import snapshot_identifier
-from swh.loader.core.loader import BufferedLoader
+from swh.loader.core.converters import content_for_storage
+from swh.loader.core.loader import BaseLoader
 from swh.loader.core.utils import clean_dangling_folders
 from swh.storage.algos.snapshot import snapshot_get_all_branches
 
@@ -58,7 +59,7 @@ def build_swh_snapshot(revision_id, branch=DEFAULT_BRANCH):
 TEMPORARY_DIR_PREFIX_PATTERN = 'swh.loader.svn.'
 
 
-class SvnLoader(BufferedLoader):
+class SvnLoader(BaseLoader):
     """Swh svn loader.
 
     The repository is either remote or local.  The loader deals with
@@ -540,9 +541,14 @@ Local repository not cleaned up for investigation: %s''' % (
            This also resets the internal instance variable state.
 
         """
-        self.send_contents(self._contents)
-        self.send_directories(self._directories)
-        self.send_revisions(self._revisions)
+        contents = [
+            content_for_storage(c, max_content_size=self.max_content_size,
+                                origin_url=self.origin['url'])
+            for c in self._contents
+        ]
+        self.storage.content_add(contents)
+        self.storage.directory_add(self._directories)
+        self.storage.revision_add(self._revisions)
 
         if self.done:  # finish line, snapshot!
             self.generate_and_load_snapshot(revision=self._last_revision,
@@ -572,7 +578,7 @@ Local repository not cleaned up for investigation: %s''' % (
         else:
             return None
         self.log.debug('snapshot: %s' % snap)
-        self.send_snapshot(snap)
+        self.storage.snapshot_add([snap])
 
     def load_status(self):
         return {

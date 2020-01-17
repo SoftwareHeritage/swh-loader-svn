@@ -29,13 +29,16 @@ _eol_style = {
 
 
 def _normalize_line_endings(lines, eol_style='native'):
-    """Normalize line endings to unix (\n), windows (\r\n) or mac (\r).
+    r"""Normalize line endings to unix (\\n), windows (\\r\\n) or mac (\\r).
+
     Args:
         lines (bytes): The lines to normalize
+
         line_ending (str): The line ending format as defined for
             svn:eol-style property. Acceptable values are 'native',
             'CRLF', 'LF' and 'CR'
-    Returns
+
+    Returns:
         bytes: lines with endings normalized
     """
     lines = lines.replace(_eol_style['CRLF'], _eol_style['LF'])\
@@ -92,7 +95,7 @@ def is_file_an_svnlink_p(fullpath):
     Args:
         fullpath (str/bytes): Full path to the potential symlink to check
 
-    Return:
+    Returns:
         boolean value to determine if it's indeed a symlink (as per
         svn) or not.
 

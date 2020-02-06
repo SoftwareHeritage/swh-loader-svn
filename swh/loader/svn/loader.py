@@ -20,7 +20,7 @@ from swh.model import hashutil
 from swh.model.from_disk import Directory
 from swh.model.identifiers import identifier_to_bytes, revision_identifier
 from swh.model.identifiers import snapshot_identifier
-from swh.loader.core.converters import content_for_storage
+from swh.loader.core.converters import prepare_contents
 from swh.loader.core.loader import BaseLoader
 from swh.loader.core.utils import clean_dangling_folders
 from swh.storage.algos.snapshot import snapshot_get_all_branches
@@ -541,11 +541,10 @@ Local repository not cleaned up for investigation: %s''' % (
            This also resets the internal instance variable state.
 
         """
-        contents = [
-            content_for_storage(c, max_content_size=self.max_content_size,
-                                origin_url=self.origin['url'])
-            for c in self._contents
-        ]
+        contents, skipped_contents = prepare_contents(
+            self._contents, max_content_size=self.max_content_size,
+            origin_url=self.origin['url'])
+        self.storage.skipped_content_add(skipped_contents)
         self.storage.content_add(contents)
         self.storage.directory_add(self._directories)
         self.storage.revision_add(self._revisions)

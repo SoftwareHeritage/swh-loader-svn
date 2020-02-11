@@ -32,6 +32,9 @@ def swh_loader_config() -> Dict[str, Any]:
                     },
                 },
                 {
+                    'cls': 'validate'
+                },
+                {
                     'cls': 'memory'
                 },
             ]

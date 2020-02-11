@@ -56,6 +56,9 @@ _LOADER_TEST_CONFIG = {
                 },
             },
             {
+                'cls': 'validate'
+            },
+            {
                 'cls': 'memory'
             },
         ]

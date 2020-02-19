@@ -1,8 +1,12 @@
-swh-loader-svn (0.0.50-1~swh1~bpo10+1) buster-swh; urgency=medium
+swh-loader-svn (0.0.51-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 0.0.51     - (tagged by Nicolas Dandrimont
+    <nicolas@dandrimont.eu> on 2020-02-19 20:01:31 +0100)
+  * Upstream changes:     - Release swh.loader.svn v0.0.51     - Ensure
+    snapshots are properly linked by origin_visits     - Update tests
+    for swh.storage v0.0.174
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 06 Feb 2020 17:58:43 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Wed, 19 Feb 2020 19:20:03 +0000
 
 swh-loader-svn (0.0.50-1~swh1) unstable-swh; urgency=medium
 

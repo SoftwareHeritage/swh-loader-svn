@@ -5,7 +5,6 @@
 
 import copy
 import os
-from unittest import TestCase
 
 from swh.loader.core.tests import BaseLoaderTest
 from swh.loader.svn.loader import (DEFAULT_BRANCH, SvnLoader,
@@ -13,19 +12,16 @@ from swh.loader.svn.loader import (DEFAULT_BRANCH, SvnLoader,
 from swh.model import hashutil
 
 
-class TestSnapshot(TestCase):
-    def test_build_swh_snapshot(self):
-        actual_snap = build_swh_snapshot('revision-id')
-
-        self.assertEqual(actual_snap, {
-            'id': None,
-            'branches': {
-                DEFAULT_BRANCH: {
-                    'target': 'revision-id',
-                    'target_type': 'revision',
-                }
+def test_build_swh_snapshot():
+    assert build_swh_snapshot('revision-id') == {
+        'id': None,
+        'branches': {
+            DEFAULT_BRANCH: {
+                'target': 'revision-id',
+                'target_type': 'revision',
             }
-        })
+        }
+    }
 
 
 _LOADER_TEST_CONFIG = {

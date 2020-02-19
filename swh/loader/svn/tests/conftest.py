@@ -19,6 +19,9 @@ def swh_loader_config() -> Dict[str, Any]:
             'cls': 'pipeline',
             'steps': [
                 {
+                    'cls': 'validate'
+                },
+                {
                     'cls': 'filter'
                 },
                 {
@@ -30,9 +33,6 @@ def swh_loader_config() -> Dict[str, Any]:
                         'revision': 10,
                         'release': 100,
                     },
-                },
-                {
-                    'cls': 'validate'
                 },
                 {
                     'cls': 'memory'

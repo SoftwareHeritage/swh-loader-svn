@@ -40,6 +40,9 @@ _LOADER_TEST_CONFIG = {
         'cls': 'pipeline',
         'steps': [
             {
+                'cls': 'validate'
+            },
+            {
                 'cls': 'retry',
             },
             {
@@ -54,9 +57,6 @@ _LOADER_TEST_CONFIG = {
                     'revision': 10,
                     'release': 100,
                 },
-            },
-            {
-                'cls': 'validate'
             },
             {
                 'cls': 'memory'

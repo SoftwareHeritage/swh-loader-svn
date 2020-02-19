@@ -550,9 +550,13 @@ Local repository not cleaned up for investigation: %s''' % (
         self.storage.revision_add(self._revisions)
 
         if self.done:  # finish line, snapshot!
-            self.generate_and_load_snapshot(revision=self._last_revision,
-                                            snapshot=self._snapshot)
+            snapshot = self.generate_and_load_snapshot(
+                revision=self._last_revision,
+                snapshot=self._snapshot
+            )
             self.flush()
+            self.storage.origin_visit_update(self.origin['url'], self.visit,
+                                             snapshot=snapshot['id'])
 
         self._contents = []
         self._directories = []
@@ -568,6 +572,9 @@ Local repository not cleaned up for investigation: %s''' % (
             revision (dict): Last revision seen if any (None by default)
             snapshot (dict): Snapshot to use if any (None by default)
 
+        Returns:
+            dict: The newly created snapshot
+
         """
         if revision:  # Priority to the revision
             snap = build_swh_snapshot(revision['id'])
@@ -578,6 +585,7 @@ Local repository not cleaned up for investigation: %s''' % (
             return None
         self.log.debug('snapshot: %s' % snap)
         self.storage.snapshot_add([snap])
+        return snap
 
     def load_status(self):
         return {

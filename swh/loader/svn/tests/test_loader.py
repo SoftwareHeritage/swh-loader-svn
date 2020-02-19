@@ -65,6 +65,38 @@ _LOADER_TEST_CONFIG = {
     },
 }
 
+GOURMET_SNAPSHOT = hashutil.hash_to_bytes(
+    '889cacc2731e3312abfb2b1a0c18ade82a949e07'
+)
+
+GOURMET_FLAG_SNAPSHOT = hashutil.hash_to_bytes(
+    '0011223344556677889900112233445566778899'
+)
+
+GOURMET_UPDATES_SNAPSHOT = hashutil.hash_to_bytes(
+    '11086d15317014e43d2438b7ffc712c44f1b8afe'
+)
+
+GOURMET_EXTERNALS_SNAPSHOT = hashutil.hash_to_bytes(
+    '19cb68d0a3f22372e2b7017ea5e2a2ea5ae3e09a'
+)
+
+GOURMET_EDGE_CASES_SNAPSHOT = hashutil.hash_to_bytes(
+    '18e60982fe521a2546ab8c3c73a535d80462d9d0'
+)
+
+GOURMET_WRONG_LINKS_SNAPSHOT = hashutil.hash_to_bytes(
+    'b17f38acabb90f066dedd30c29f01a02af88a5c4'
+)
+
+MEDIAWIKI_SNAPSHOT = hashutil.hash_to_bytes(
+    'd6d6e9703f157c5702d9a4a5dec878926ed4ab76'
+)
+
+PYANG_SNAPSHOT = hashutil.hash_to_bytes(
+    '6d9590de11b00a5801de0ff3297c5b44bbbf7d24'
+)
+
 
 class SvnLoaderTest(SvnLoader):
     """An SVNLoader with no persistence.
@@ -171,17 +203,18 @@ class SvnLoaderTest1(BaseSvnLoaderTest):
 
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        # FIXME: Check the snapshot's state
-        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
+
+        visit = self.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], GOURMET_SNAPSHOT)
 
 
 _LAST_SNP_REV = {
     'snapshot': {
-        'id': 'something',
+        'id': GOURMET_FLAG_SNAPSHOT,
         'branches': {}
-    },  # need a snapshot of sort
+    },
     'revision': {
         'id': hashutil.hash_to_bytes(
             '4876cb10aec6f708f7466dddf547567b65f6c39c'),
@@ -223,10 +256,10 @@ class SvnLoaderTest2(BaseSvnLoaderTest):
         self.assertCountRevisions(0)
         self.assertCountReleases(0)
         self.assertCountSnapshots(1)
-        # FIXME: Check the snapshot's state
-        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'uneventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
+        visit = self.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], GOURMET_FLAG_SNAPSHOT)
 
 
 class SvnLoaderTest3(BaseSvnLoaderTest):
@@ -262,10 +295,11 @@ class SvnLoaderTest3(BaseSvnLoaderTest):
         self.assertCountRevisions(0)
         self.assertCountReleases(0)
         self.assertCountSnapshots(0)
-        # FIXME: Check the snapshot's state
-        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'uneventful'})
         self.assertEqual(self.loader.visit_status(), 'partial')
+
+        visit = self.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], None)
 
 
 class SvnLoaderTest4(BaseSvnLoaderTest):
@@ -307,10 +341,11 @@ class SvnLoaderTest4(BaseSvnLoaderTest):
         self.assertRevisionsContain(expected_revisions)
 
         self.assertCountSnapshots(1)
-        # FIXME: Check the snapshot's state
-        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
+
+        visit = self.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], GOURMET_UPDATES_SNAPSHOT)
 
 
 class SvnLoaderTest5(BaseSvnLoaderTest):
@@ -357,10 +392,11 @@ class SvnLoaderTest5(BaseSvnLoaderTest):
         self.assertRevisionsContain(expected_revisions)
 
         self.assertCountSnapshots(1)
-        # FIXME: Check the snapshot's state
-        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
+
+        visit = self.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], GOURMET_UPDATES_SNAPSHOT)
 
 
 class SvnLoaderTest6(BaseSvnLoaderTest):
@@ -419,10 +455,11 @@ class SvnLoaderTest6(BaseSvnLoaderTest):
 
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        # FIXME: Check the snapshot's state
-        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
+
+        visit = self.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], GOURMET_UPDATES_SNAPSHOT)
 
 
 class SvnLoaderTest7(BaseSvnLoaderTest):
@@ -480,10 +517,11 @@ class SvnLoaderTest7(BaseSvnLoaderTest):
 
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        # FIXME: Check the snapshot's state
-        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
+
+        visit = self.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], GOURMET_UPDATES_SNAPSHOT)
 
 
 class SvnLoaderTest8(BaseSvnLoaderTest):
@@ -560,13 +598,14 @@ class SvnLoaderTest8(BaseSvnLoaderTest):
 
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        # FIXME: Check the snapshot's state
-        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
 
+        visit = self.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], GOURMET_UPDATES_SNAPSHOT)
 
-class SvnLoaderTTest9(BaseSvnLoaderTest):
+
+class SvnLoaderTest9(BaseSvnLoaderTest):
     """Check that a svn repo containing a versioned file with CRLF line
        endings with svn:eol-style property set to 'native' (this is a
        violation of svn specification as the file should have been
@@ -589,10 +628,11 @@ class SvnLoaderTTest9(BaseSvnLoaderTest):
         }
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        # FIXME: Check the snapshot's state
-        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
+
+        visit = self.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], MEDIAWIKI_SNAPSHOT)
 
 
 class SvnLoaderTest10(BaseSvnLoaderTest): # noqa
@@ -620,10 +660,11 @@ class SvnLoaderTest10(BaseSvnLoaderTest): # noqa
 
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        # FIXME: Check the snapshot's state
-        # self.assertEqual(self.loader.all_snapshots[0], {})
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
+
+        visit = self.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], PYANG_SNAPSHOT)
 
 
 class SvnLoaderTest11(BaseSvnLoaderTest):
@@ -680,9 +721,11 @@ class SvnLoaderTest11(BaseSvnLoaderTest):
         # The last revision being the one used later to start back from
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        # FIXME: Check the snapshot's state
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'partial')
+
+        visit = self.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], GOURMET_EXTERNALS_SNAPSHOT)
 
 
 class SvnLoaderTest12(BaseSvnLoaderTest):
@@ -736,9 +779,11 @@ class SvnLoaderTest12(BaseSvnLoaderTest):
 
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        # FIXME: Check the snapshot's state
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
+
+        visit = self.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], GOURMET_EDGE_CASES_SNAPSHOT)
 
 
 class SvnLoaderTest13(BaseSvnLoaderTest):
@@ -791,9 +836,11 @@ class SvnLoaderTest13(BaseSvnLoaderTest):
 
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        # FIXME: Check the snapshot's state
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
+
+        visit = self.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], GOURMET_WRONG_LINKS_SNAPSHOT)
 
 
 class SvnLoaderTestFromRemoteDump(SvnLoaderTest, SvnLoaderFromRemoteDump):
@@ -827,6 +874,12 @@ class SvnLoaderFromRemoteDumpTest(BaseSvnLoaderTest):
         dump_storage_stat = dump_loader.storage.stat_counters()
         base_storage_stat = base_loader.storage.stat_counters()
         self.assertEqual(dump_storage_stat, base_storage_stat)
+
+        visit = dump_loader.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], GOURMET_SNAPSHOT)
+
+        visit = base_loader.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'], GOURMET_SNAPSHOT)
 
 
 class SvnLoaderTest14(BaseSvnLoaderTest):
@@ -874,3 +927,7 @@ class SvnLoaderTest14(BaseSvnLoaderTest):
 
         self.assertEqual(self.loader.load_status(), {'status': 'eventful'})
         self.assertEqual(self.loader.visit_status(), 'full')
+
+        visit = self.storage.origin_visit_get_latest(self.repo_url)
+        self.assertEqual(visit['snapshot'],
+                         hashutil.hash_to_bytes(expected_snapshot_id))

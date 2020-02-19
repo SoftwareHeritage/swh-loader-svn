@@ -19,6 +19,9 @@ def swh_loader_config() -> Dict[str, Any]:
             'cls': 'pipeline',
             'steps': [
                 {
+                    'cls': 'validate'
+                },
+                {
                     'cls': 'filter'
                 },
                 {

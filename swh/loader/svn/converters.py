@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2018  The Software Heritage developers
+# Copyright (C) 2015-2020  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -6,27 +6,6 @@
 from email import utils
 
 from .utils import strdate_to_timestamp
-
-
-def svn_date_to_gitsvn_date(strdate):
-    """Convert a string date to an swh one.
-
-    Args:
-        strdate: A string formatted for .utils.strdate_to_timestamp
-        to do its jobs
-
-    Returns:
-        An swh date format with an integer timestamp.
-
-    """
-    ts = strdate_to_timestamp(strdate)
-    return {
-        'timestamp': {
-            'seconds': ts['seconds'],
-            'microseconds': 0,
-        },
-        'offset': 0
-    }
 
 
 def svn_date_to_swh_date(strdate):

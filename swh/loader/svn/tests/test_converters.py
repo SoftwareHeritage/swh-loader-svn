@@ -107,62 +107,6 @@ class TestRevisionConverters(unittest.TestCase):
         })
 
 
-class TestGitSvnRevisionConverters(unittest.TestCase):
-    def test_build_gitsvn_swh_revision_default(self):
-        """This should build the swh revision without the swh revision's extra
-        headers about the repository.
-
-        """
-        actual_swh_revision = converters.build_gitsvn_swh_revision(
-            dir_id='dir-id',
-            commit={
-                'author_name': {
-                    'name': b'theo',
-                    'email': b'theo@uuid',
-                    'fullname': b'theo <theo@uuid>'
-                },
-                'message': b'commit message',
-                'author_date': {
-                    'timestamp': {
-                        'seconds': 1088108379,
-                        'microseconds': 0,
-                    },
-                    'offset': 0
-                }
-            },
-            rev=10,
-            parents=['123'])
-
-        date = {
-            'timestamp': {
-                'seconds': 1088108379,
-                'microseconds': 0,
-            },
-            'offset': 0,
-        }
-
-        self.assertEqual(actual_swh_revision, {
-            'date': date,
-            'committer_date': date,
-            'type': 'svn',
-            'directory': 'dir-id',
-            'message': b'commit message',
-            'author': {
-                'name': b'theo',
-                'email': b'theo@uuid',
-                'fullname': b'theo <theo@uuid>'
-            },
-            'committer': {
-                'name': b'theo',
-                'email': b'theo@uuid',
-                'fullname': b'theo <theo@uuid>'
-            },
-            'synthetic': True,
-            'metadata': None,
-            'parents': ['123'],
-        })
-
-
 class ConvertDate(unittest.TestCase):
     def test_svn_date_to_swh_date(self):
         """The timestamp should not be tampered with and include the

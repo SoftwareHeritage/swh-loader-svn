@@ -55,42 +55,6 @@ def svn_author_to_swh_person(author):
     return {'fullname': author, 'email': None, 'name': author}
 
 
-def svn_author_to_gitsvn_person(author, repo_uuid):
-    """Convert an svn author to a person suitable for insertion.
-
-    Default policy: If no email is found, the email is created using
-    the author and the repo_uuid.
-
-    Args:
-        author (string): the svn author (in bytes)
-        repo_uuid (bytes): the repository's uuid
-
-    Returns: a dictionary with keys:
-        fullname: the author's associated fullname
-        name: the author's associated name
-        email: None (no email in svn)
-
-    """
-    if not author:
-        author = '(no author)'
-
-    author = author.encode('utf-8')
-    if b'<' in author and b'>' in author:
-        name, email = utils.parseaddr(author.decode('utf-8'))
-        return {
-            'fullname': author,
-            'name': name.encode('utf-8'),
-            'email': email.encode('utf-8')
-        }
-
-    # we'll construct the author's fullname the same way git svn does
-    # 'user <user@repo-uuid>'
-
-    email = b'@'.join([author, repo_uuid])
-    return {
-        'fullname': b''.join([author, b' ', b'<', email, b'>']),
-        'name': author,
-        'email': email,
     }
 
 
@@ -132,35 +96,5 @@ def build_swh_revision(rev, commit, repo_uuid, dir_id, parents):
         'committer': author,
         'synthetic': True,
         'metadata': metadata,
-        'parents': parents,
-    }
-
-
-def build_gitsvn_swh_revision(rev, commit, dir_id, parents):
-    """Given a svn revision, build a swh revision.
-
-    Args:
-        - rev: the svn revision number
-        - commit: the commit metadata
-        - dir_id: the tree's hash identifier
-        - parents: the revision's parents identifier
-
-    Returns:
-        The swh revision dictionary.
-    """
-    author = commit['author_name']
-    msg = commit['message']
-    date = commit['author_date']
-
-    return {
-        'date': date,
-        'committer_date': date,
-        'type': 'svn',
-        'directory': dir_id,
-        'message': msg,
-        'author': author,
-        'committer': author,
-        'synthetic': True,
-        'metadata': None,
         'parents': parents,
     }

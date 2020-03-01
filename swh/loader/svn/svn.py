@@ -221,7 +221,7 @@ class SvnRepo:
         """
         for commit in self.logs(start_revision, end_revision):
             rev = commit['rev']
-            objects = self.swhreplay.compute_hashes(rev)
+            objects = self.swhreplay.compute_objects(rev)
 
             if rev == end_revision:
                 nextrev = None

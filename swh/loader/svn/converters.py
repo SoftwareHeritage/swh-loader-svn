@@ -3,12 +3,20 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from typing import Any, Dict, List, Optional, Union
+
 from email import utils
+
+from swh.model.model import (
+    Person, Revision, RevisionType, TimestampWithTimezone
+)
+from swh.loader.package.utils import EMPTY_AUTHOR
 
 from .utils import strdate_to_timestamp
 
 
-def svn_date_to_swh_date(strdate):
+def svn_date_to_swh_date(
+        strdate: Optional[str]) -> TimestampWithTimezone:
     """Convert a string date to an swh one.
 
     Args:
@@ -19,46 +27,45 @@ def svn_date_to_swh_date(strdate):
         An swh date format
 
     """
-    return {
-        'timestamp': strdate_to_timestamp(strdate),
-        'offset': 0
-    }
+    return TimestampWithTimezone(
+        timestamp=strdate_to_timestamp(strdate),
+        offset=0,
+        negative_utc=False,
+    )
 
 
-def svn_author_to_swh_person(author):
+def svn_author_to_swh_person(author: Union[str, bytes]) -> Person:
     """Convert an svn author to an swh person.
     Default policy: No information is added.
 
     Args:
         author (string): the svn author (in bytes)
 
-    Returns: a dictionary with keys:
-        fullname: the author's associated fullname
-        name: the author's associated name
-        email: None (no email in svn)
+    Returns:
+        a Person
 
     """
+    # TODO: Align this function and move it up as library helper function
     if not author:
-        return {'fullname': b'', 'name': None, 'email': None}
+        return EMPTY_AUTHOR
 
     if isinstance(author, str):
         author = author.encode('utf-8')
 
     if b'<' in author and b'>' in author:
         name, email = utils.parseaddr(author.decode('utf-8'))
-        return {
-            'fullname': author,
-            'name': name.encode('utf-8'),
-            'email': email.encode('utf-8')
-        }
+        return Person(
+            fullname=author,
+            name=name.encode('utf-8'),
+            email=email.encode('utf-8')
+        )
 
-    return {'fullname': author, 'email': None, 'name': author}
-
-
-    }
+    return Person(fullname=author, name=author, email=None)
 
 
-def build_swh_revision(rev, commit, repo_uuid, dir_id, parents):
+def build_swh_revision(
+        rev: int, commit: Dict, repo_uuid: str, dir_id: bytes,
+        parents: List[bytes]) -> Revision:
     """Given a svn revision, build a swh revision.
 
     This adds an ['metadata']['extra-headers'] entry with the
@@ -79,22 +86,22 @@ def build_swh_revision(rev, commit, repo_uuid, dir_id, parents):
     msg = commit['message']
     date = commit['author_date']
 
-    metadata = {
+    metadata: Dict[str, Any] = {
         'extra_headers': [
             ['svn_repo_uuid', repo_uuid],
             ['svn_revision', str(rev).encode('utf-8')]
         ]
     }
 
-    return {
-        'date': date,
-        'committer_date': date,
-        'type': 'svn',
-        'directory': dir_id,
-        'message': msg,
-        'author': author,
-        'committer': author,
-        'synthetic': True,
-        'metadata': metadata,
-        'parents': parents,
-    }
+    return Revision(
+        type=RevisionType.SUBVERSION,
+        date=date,
+        committer_date=date,
+        directory=dir_id,
+        message=msg,
+        author=author,
+        committer=author,
+        synthetic=True,
+        metadata=metadata,
+        parents=parents,
+    )

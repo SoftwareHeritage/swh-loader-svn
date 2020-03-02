@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2018  The Software Heritage developers
+# Copyright (C) 2016-2020  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -13,11 +13,14 @@ import os
 import shutil
 import tempfile
 
+from typing import List, Tuple
+
 from subvertpy import delta, properties
 from subvertpy.ra import RemoteAccess, Auth, get_username_provider
 
 from swh.model import hashutil
-from swh.model.from_disk import Content, Directory
+from swh.model import from_disk
+from swh.model.model import Content, Directory, SkippedContent
 
 
 _eol_style = {
@@ -245,11 +248,11 @@ class FileEditor:
                 data = f.read()
                 data = _normalize_line_endings(data, eol_style)
                 mode = os.lstat(self.fullpath).st_mode
-                self.directory[self.path] = Content.from_bytes(mode=mode,
-                                                               data=data)
+                self.directory[self.path] = from_disk.Content.from_bytes(
+                    mode=mode, data=data)
         else:
-            self.directory[self.path] = Content.from_file(path=self.fullpath,
-                                                          data=True)
+            self.directory[self.path] = from_disk.Content.from_file(
+                path=self.fullpath)
 
 
 class BaseDirEditor:
@@ -319,7 +322,7 @@ class BaseDirEditor:
 
         """
         path = os.fsencode(args[0])
-        self.directory[path] = Content()
+        self.directory[path] = from_disk.Content()
         return FileEditor(self.directory, rootpath=self.rootpath, path=path)
 
     def add_file(self, path, copyfrom_path=None, copyfrom_rev=-1):
@@ -327,7 +330,7 @@ class BaseDirEditor:
 
         """
         path = os.fsencode(path)
-        self.directory[path] = Content()
+        self.directory[path] = from_disk.Content()
         return FileEditor(self.directory, self.rootpath, path)
 
     def change_prop(self, key, value):
@@ -379,7 +382,7 @@ class DirEditor(BaseDirEditor):
         """
         path = os.fsencode(path)
         os.makedirs(os.path.join(self.rootpath, path), exist_ok=True)
-        self.directory[path] = Directory()
+        self.directory[path] = from_disk.Directory()
         return self
 
 
@@ -415,7 +418,7 @@ class Replay:
         self.conn = conn
         self.rootpath = rootpath
         if directory is None:
-            directory = Directory()
+            directory = from_disk.Directory()
         self.directory = directory
         self.editor = Editor(rootpath=rootpath, directory=directory)
 
@@ -434,8 +437,9 @@ class Replay:
         codecs.register_error("strict", codecs.strict_errors)
         return self.editor.directory
 
-    def compute_hashes(self, rev):
-        """Compute hashes at revisions rev.
+    def compute_objects(self, rev: int) -> Tuple[
+            List[Content], List[SkippedContent], List[Directory]]:
+        """Compute objects at revisions rev.
         Expects the state to be at previous revision's objects.
 
         Args:
@@ -447,7 +451,24 @@ class Replay:
 
         """
         self.replay(rev)
-        return self.directory.collect()
+        # TODO: Move this listing up in swh.model
+        contents: List[Content] = []
+        skipped_contents: List[SkippedContent] = []
+        directories: List[Directory] = []
+        for obj in self.directory.iter_tree():
+            obj = obj.to_model()
+            if isinstance(obj, Content):
+                obj = obj.with_data()
+                contents.append(obj)
+            elif isinstance(obj, SkippedContent):
+                skipped_contents.append(obj)
+            elif isinstance(obj, Directory):
+                directories.append(obj)
+            else:
+                raise TypeError(
+                    f'Unexpected content type from disk: {obj}')
+
+        return contents, skipped_contents, directories
 
 
 @click.command()
@@ -488,12 +509,13 @@ def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
         replay = Replay(conn, rootpath)
 
         for rev in range(revision_start, revision_end+1):
-            objects = replay.compute_hashes(rev)
+            contents, skipped_contents, directories = replay.compute_objects(
+                rev)
             print("r%s %s (%s new contents, %s new directories)" % (
                 rev,
                 hashutil.hash_to_hex(replay.directory.hash),
-                len(objects.get('content', {})),
-                len(objects.get('directory', {})),
+                len(contents) + len(skipped_contents),
+                len(directories),
             ))
 
         if debug:

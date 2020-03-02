@@ -10,18 +10,27 @@ from swh.loader.core.tests import BaseLoaderTest
 from swh.loader.svn.loader import (DEFAULT_BRANCH, SvnLoader,
                                    SvnLoaderFromRemoteDump, build_swh_snapshot)
 from swh.model import hashutil
+from swh.model.model import (
+    Origin, Snapshot
+)
 
 
 def test_build_swh_snapshot():
-    assert build_swh_snapshot('revision-id') == {
-        'id': None,
+    rev_id = hashutil.hash_to_bytes(
+        '3f51abf3b3d466571be0855dfa67e094f9ceff1b')
+    snap = build_swh_snapshot(rev_id)
+
+    assert isinstance(snap, Snapshot)
+
+    expected_snapshot = Snapshot.from_dict({
         'branches': {
             DEFAULT_BRANCH: {
-                'target': 'revision-id',
+                'target': rev_id,
                 'target_type': 'revision',
             }
         }
-    }
+    })
+    assert snap == expected_snapshot
 
 
 _LOADER_TEST_CONFIG = {
@@ -35,9 +44,6 @@ _LOADER_TEST_CONFIG = {
     'storage': {
         'cls': 'pipeline',
         'steps': [
-            {
-                'cls': 'validate'
-            },
             {
                 'cls': 'retry',
             },
@@ -106,14 +112,7 @@ class SvnLoaderTest(SvnLoader):
         super().__init__(url, destination_path=destination_path,
                          start_from_scratch=start_from_scratch,
                          swh_revision=swh_revision)
-        self.origin = {
-            'id': 1,
-            'url': url,
-        }
-        self.visit = {
-            'origin': 1,
-            'visit': 1,
-        }
+        self.origin = Origin(url=url)
         self.last_snp_rev = last_snp_rev
 
     def parse_config_file(self, *args, **kwargs):
@@ -207,10 +206,10 @@ class SvnLoaderTest1(BaseSvnLoaderTest):
 
 
 _LAST_SNP_REV = {
-    'snapshot': {
+    'snapshot': Snapshot.from_dict({
         'id': GOURMET_FLAG_SNAPSHOT,
         'branches': {}
-    },
+    }),
     'revision': {
         'id': hashutil.hash_to_bytes(
             '4876cb10aec6f708f7466dddf547567b65f6c39c'),

@@ -1,3 +1,15 @@
+swh-loader-svn (0.0.52-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.0.52     - (tagged by Antoine R. Dumont
+    (@ardumont) <antoine.romain.dumont@gmail.com> on 2020-03-02 15:39:28
+    +0100)
+  * Upstream changes:     - v0.0.52     - loader.svn: Use swh.model
+    objects within the loader     - tox.ini: Add debugging dev tool in
+    dedicated environment     - converters: Clean up some more dead code
+    - converters: Clean up dead code
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Mon, 02 Mar 2020 14:42:36 +0000
+
 swh-loader-svn (0.0.51-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.0.51     - (tagged by Nicolas Dandrimont

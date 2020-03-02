@@ -1,4 +1,4 @@
-# Copyright (C) 2016  The Software Heritage developers
+# Copyright (C) 2016-2020  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -11,8 +11,10 @@ import shutil
 from dateutil import parser
 from subprocess import PIPE, Popen, call
 
+from swh.model.model import Optional, Timestamp
 
-def strdate_to_timestamp(strdate):
+
+def strdate_to_timestamp(strdate: Optional[str]) -> Timestamp:
     """Convert a string date to an int timestamp.
 
     Args:
@@ -24,6 +26,7 @@ def strdate_to_timestamp(strdate):
 
     """
     if strdate:
+        # TODO: Migrate to iso8601 if possible
         dt = parser.parse(strdate)
         ts = {
             'seconds': int(dt.timestamp()),
@@ -31,7 +34,7 @@ def strdate_to_timestamp(strdate):
         }
     else:  # epoch
         ts = {'seconds': 0, 'microseconds': 0}
-    return ts
+    return Timestamp.from_dict(ts)
 
 
 class OutputStream:

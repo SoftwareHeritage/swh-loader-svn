@@ -15,12 +15,14 @@ import tempfile
 
 from mmap import mmap, ACCESS_WRITE
 from subprocess import Popen
+from typing import Iterator, List, Tuple
 
 from swh.model import hashutil
-from swh.model.from_disk import Directory
-from swh.model.identifiers import identifier_to_bytes, revision_identifier
-from swh.model.identifiers import snapshot_identifier
-from swh.loader.core.converters import prepare_contents
+from swh.model.model import (
+    Content, Directory, Origin, SkippedContent, Revision, Snapshot,
+    SnapshotBranch, TargetType
+)
+from swh.model import from_disk
 from swh.loader.core.loader import BaseLoader
 from swh.loader.core.utils import clean_dangling_folders
 from swh.storage.algos.snapshot import snapshot_get_all_branches
@@ -37,23 +39,14 @@ from .exception import SvnLoaderHistoryAltered
 DEFAULT_BRANCH = b'HEAD'
 
 
-def _revision_id(revision):
-    return identifier_to_bytes(revision_identifier(revision))
-
-
 def build_swh_snapshot(revision_id, branch=DEFAULT_BRANCH):
     """Build a swh snapshot from the revision id, origin url, and visit.
 
     """
-    return {
-        'id': None,
-        'branches': {
-            branch: {
-                'target': revision_id,
-                'target_type': 'revision',
-            }
-        }
-    }
+    return Snapshot(branches={
+        branch: SnapshotBranch(
+            target=revision_id, target_type=TargetType.REVISION)
+    })
 
 
 TEMPORARY_DIR_PREFIX_PATTERN = 'swh.loader.svn.'
@@ -100,6 +93,7 @@ class SvnLoader(BaseLoader):
             self.check_revision = None
         # internal state used to store swh objects
         self._contents = []
+        self._skipped_contents = []
         self._directories = []
         self._revisions = []
         self._snapshot = None
@@ -110,6 +104,7 @@ class SvnLoader(BaseLoader):
         self.destination_path = destination_path
         self.start_from_scratch = start_from_scratch
         self.swh_revision = swh_revision
+        self.max_content_length = self.config['max_content_size']
 
     def pre_cleanup(self):
         """Cleanup potential dangling files from prior runs (e.g. OOM killed
@@ -144,25 +139,9 @@ Local repository not cleaned up for investigation: %s''' % (
 
         """
         local_dirname, local_url = self.svnrepo.export_temporary(revision)
-        h = Directory.from_disk(path=local_url).hash
+        h = from_disk.Directory.from_disk(path=local_url).hash
         self.svnrepo.clean_fs(local_dirname)
         return h
-
-    def get_svn_repo(self, svn_url, local_dirname, origin_url):
-        """Instantiates the needed svnrepo collaborator to permit reading svn
-        repository.
-
-        Args:
-            svn_url (str): the svn repository url to read from
-            local_dirname (str): the local path on disk to compute data
-            origin_url (str): the corresponding origin url
-
-        Returns:
-            Instance of :mod:`swh.loader.svn.svn` clients
-
-        """
-        return svn.SvnRepo(svn_url,
-                           local_dirname=local_dirname, origin_url=origin_url)
 
     def swh_latest_snapshot_revision(self, origin_url,
                                      previous_swh_revision=None):
@@ -252,12 +231,9 @@ Local repository not cleaned up for investigation: %s''' % (
         rev, _, commit, _, root_dir = list(hash_data_per_revs)[0]
 
         dir_id = root_dir.hash
-        swh_revision = self.build_swh_revision(rev,
-                                               commit,
-                                               dir_id,
-                                               parents)
-        swh_revision_id = _revision_id(swh_revision)
-
+        swh_revision = self.build_swh_revision(
+            rev, commit, dir_id, parents)
+        swh_revision_id = swh_revision.id
         return swh_revision_id == revision_id
 
     def _init_from(self, partial_swh_revision, previous_swh_revision):
@@ -403,8 +379,14 @@ Local repository not cleaned up for investigation: %s''' % (
                           hashutil.hash_to_hex(checked_dir_id))
                 raise ValueError(err)
 
-    def process_svn_revisions(self, svnrepo, revision_start, revision_end,
-                              revision_parents):
+    def process_svn_revisions(
+            self, svnrepo, revision_start, revision_end,
+            revision_parents) -> Iterator[
+                Tuple[
+                    List[Content], List[SkippedContent], List[Directory],
+                    Revision
+                ]
+            ]:
         """Process svn revisions from revision_start to revision_end.
 
         At each svn revision, apply new diffs and simultaneously
@@ -431,33 +413,30 @@ Local repository not cleaned up for investigation: %s''' % (
         for rev, nextrev, commit, new_objects, root_directory in gen_revs:
             count += 1
             # Send the associated contents/directories
-            _contents = new_objects.get('content', {}).values()
-            _directories = new_objects.get('directory', {}).values()
+            _contents, _skipped_contents, _directories = new_objects
 
             # compute the fs tree's checksums
             dir_id = root_directory.hash
             swh_revision = self.build_swh_revision(
                 rev, commit, dir_id, revision_parents[rev])
 
-            swh_revision['id'] = _revision_id(swh_revision)
-
             self.log.debug('rev: %s, swhrev: %s, dir: %s' % (
                 rev,
-                hashutil.hash_to_hex(swh_revision['id']),
+                hashutil.hash_to_hex(swh_revision.id),
                 hashutil.hash_to_hex(dir_id)))
 
             if self.check_revision:
                 self._check_revision_divergence(count, rev, dir_id)
 
             if nextrev:
-                revision_parents[nextrev] = [swh_revision['id']]
+                revision_parents[nextrev] = [swh_revision.id]
 
-            yield _contents, _directories, swh_revision
+            yield _contents, _skipped_contents, _directories, swh_revision
 
     def prepare_origin_visit(self, *args, **kwargs):
-        self.origin = {
-            'url': self.origin_url if self.origin_url else self.svn_url,
-        }
+        self.origin = Origin(
+            url=self.origin_url if self.origin_url else self.svn_url
+        )
 
     def prepare(self, *args, **kwargs):
         if self.swh_revision:
@@ -476,8 +455,10 @@ Local repository not cleaned up for investigation: %s''' % (
                 prefix=TEMPORARY_DIR_PREFIX_PATTERN,
                 dir=self.temp_directory)
 
-        self.svnrepo = self.get_svn_repo(
-            self.svn_url, local_dirname, self.origin_url)
+        self.svnrepo = svn.SvnRepo(
+            self.svn_url, local_dirname, self.origin_url,
+            self.max_content_length)
+
         try:
             revision_start, revision_end, revision_parents = self.start_from(
                 self.last_known_swh_revision, self.start_from_scratch)
@@ -527,10 +508,11 @@ Local repository not cleaned up for investigation: %s''' % (
             self.done = True
             self._visit_status = 'partial'
             return False  # Stopping iteration
-        self._contents, self._directories, revision = data
-        if revision:
+        self._contents, self._skipped_contents, self._directories, rev = data
+        if rev:
+            revision = rev
             self._last_revision = revision
-        self._revisions.append(revision)
+            self._revisions.append(revision)
         return True  # next svn revision
 
     def store_data(self):
@@ -541,11 +523,8 @@ Local repository not cleaned up for investigation: %s''' % (
            This also resets the internal instance variable state.
 
         """
-        contents, skipped_contents = prepare_contents(
-            self._contents, max_content_size=self.max_content_size,
-            origin_url=self.origin['url'])
-        self.storage.skipped_content_add(skipped_contents)
-        self.storage.content_add(contents)
+        self.storage.skipped_content_add(self._skipped_contents)
+        self.storage.content_add(self._contents)
         self.storage.directory_add(self._directories)
         self.storage.revision_add(self._revisions)
 
@@ -555,8 +534,8 @@ Local repository not cleaned up for investigation: %s''' % (
                 snapshot=self._snapshot
             )
             self.flush()
-            self.storage.origin_visit_update(self.origin['url'], self.visit,
-                                             snapshot=snapshot['id'])
+            self.storage.origin_visit_update(
+                self.origin.url, self.visit, snapshot=snapshot.id)
 
         self._contents = []
         self._directories = []
@@ -577,8 +556,7 @@ Local repository not cleaned up for investigation: %s''' % (
 
         """
         if revision:  # Priority to the revision
-            snap = build_swh_snapshot(revision['id'])
-            snap['id'] = identifier_to_bytes(snapshot_identifier(snap))
+            snap = build_swh_snapshot(revision.id)
         elif snapshot:  # Fallback to prior snapshot
             snap = snapshot
         else:

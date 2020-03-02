@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2018  The Software Heritage developers
+# Copyright (C) 2015-2020  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -34,7 +34,8 @@ class SvnRepo:
         local_dirname (str): Path to write intermediary svn action results
 
     """
-    def __init__(self, remote_url, origin_url, local_dirname):
+    def __init__(self, remote_url, origin_url, local_dirname,
+                 max_content_length):
         self.remote_url = remote_url.rstrip('/')
         self.origin_url = origin_url
 
@@ -53,6 +54,7 @@ class SvnRepo:
 
         self.uuid = self.conn.get_uuid().encode('utf-8')
         self.swhreplay = ra.Replay(conn=self.conn, rootpath=self.local_url)
+        self.max_content_length = max_content_length
 
     def __str__(self):
         return str({
@@ -219,7 +221,7 @@ class SvnRepo:
         """
         for commit in self.logs(start_revision, end_revision):
             rev = commit['rev']
-            objects = self.swhreplay.compute_hashes(rev)
+            objects = self.swhreplay.compute_objects(rev)
 
             if rev == end_revision:
                 nextrev = None
@@ -237,8 +239,9 @@ class SvnRepo:
         # Update the disk at revision
         self.export(revision)
         # Compute the current hashes on disk
-        directory = Directory.from_disk(path=os.fsencode(self.local_url),
-                                        save_path=True)
+        directory = Directory.from_disk(
+            path=os.fsencode(self.local_url),
+            max_content_length=self.max_content_length)
 
         # Update the replay collaborator with the right state
         self.swhreplay = ra.Replay(

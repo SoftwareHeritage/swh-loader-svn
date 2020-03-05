@@ -533,8 +533,9 @@ Local repository not cleaned up for investigation: %s''' % (
                 snapshot=self._snapshot
             )
             self.flush()
-            self.storage.origin_visit_update(
-                self.origin.url, self.visit.visit, snapshot=snapshot.id)
+            if snapshot:
+                self.storage.origin_visit_update(
+                    self.origin.url, self.visit.visit, snapshot=snapshot.id)
 
         # reset internal state for next iteration
         self._revisions = []
@@ -550,7 +551,7 @@ Local repository not cleaned up for investigation: %s''' % (
             snapshot (dict): Snapshot to use if any (None by default)
 
         Returns:
-            dict: The newly created snapshot
+            Optional[Snapshot] The newly created snapshot
 
         """
         if revision:  # Priority to the revision

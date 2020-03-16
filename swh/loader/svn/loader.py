@@ -510,9 +510,8 @@ Local repository not cleaned up for investigation: %s''' % (
             return False  # Stopping iteration
         self._contents, self._skipped_contents, self._directories, rev = data
         if rev:
-            revision = rev
-            self._last_revision = revision
-            self._revisions.append(revision)
+            self._last_revision = rev
+            self._revisions.append(rev)
         return True  # next svn revision
 
     def store_data(self):
@@ -535,10 +534,9 @@ Local repository not cleaned up for investigation: %s''' % (
             )
             self.flush()
             self.storage.origin_visit_update(
-                self.origin.url, self.visit, snapshot=snapshot.id)
+                self.origin.url, self.visit.visit, snapshot=snapshot.id)
 
-        self._contents = []
-        self._directories = []
+        # reset internal state for next iteration
         self._revisions = []
 
     def generate_and_load_snapshot(self, revision=None, snapshot=None):

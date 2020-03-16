@@ -13,10 +13,10 @@ Build-Depends: debhelper (>= 9),
                python3-setuptools,
                python3-subvertpy (>= 0.9.4~),
                python3-swh.core (>= 0.0.19~),
-               python3-swh.loader.core (>= 0.0.78~),
-               python3-swh.model (>= 0.0.18~),
+               python3-swh.loader.core (>= 0.0.81~),
+               python3-swh.model (>= 0.0.60~),
                python3-swh.scheduler (>= 0.0.39~),
-               python3-swh.storage (>= 0.0.114~),
+               python3-swh.storage (>= 0.0.178~),
                python3-vcversioner,
                subversion
 Standards-Version: 3.9.6
@@ -26,10 +26,10 @@ Package: python3-swh.loader.svn
 Architecture: all
 Depends: gzip,
          python3-swh.core (>= 0.0.19~),
-         python3-swh.loader.core (>= 0.0.78~),
-         python3-swh.model (>= 0.0.18~),
+         python3-swh.loader.core (>= 0.0.81~),
+         python3-swh.model (>= 0.0.60~),
          python3-swh.scheduler (>= 0.0.39~),
-         python3-swh.storage (>= 0.0.114~),
+         python3-swh.storage (>= 0.0.178~),
          subversion,
          ${misc:Depends},
          ${python3:Depends}

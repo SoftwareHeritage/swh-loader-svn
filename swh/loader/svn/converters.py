@@ -3,14 +3,11 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from typing import Any, Dict, List, Optional, Union
-
-from email import utils
+from typing import Any, Dict, List, Optional
 
 from swh.model.model import (
     Person, Revision, RevisionType, TimestampWithTimezone
 )
-from swh.loader.package.utils import EMPTY_AUTHOR
 
 from .utils import strdate_to_timestamp
 
@@ -34,33 +31,18 @@ def svn_date_to_swh_date(
     )
 
 
-def svn_author_to_swh_person(author: Union[str, bytes]) -> Person:
+def svn_author_to_swh_person(author: Optional[bytes]) -> Person:
     """Convert an svn author to an swh person.
     Default policy: No information is added.
 
     Args:
-        author (string): the svn author (in bytes)
+        author: the svn author (in bytes)
 
     Returns:
         a Person
 
     """
-    # TODO: Align this function and move it up as library helper function
-    if not author:
-        return EMPTY_AUTHOR
-
-    if isinstance(author, str):
-        author = author.encode('utf-8')
-
-    if b'<' in author and b'>' in author:
-        name, email = utils.parseaddr(author.decode('utf-8'))
-        return Person(
-            fullname=author,
-            name=name.encode('utf-8'),
-            email=email.encode('utf-8')
-        )
-
-    return Person(fullname=author, name=author, email=None)
+    return Person.from_fullname(author or b'')
 
 
 def build_swh_revision(

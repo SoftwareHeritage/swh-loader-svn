@@ -15,7 +15,7 @@ def test_svn_author_to_swh_person():
 
     """
     actual_person = converters.svn_author_to_swh_person(
-        'tony <ynot@dagobah>')
+        b'tony <ynot@dagobah>')
 
     assert actual_person == Person.from_dict({
         'fullname': b'tony <ynot@dagobah>',
@@ -28,7 +28,7 @@ def test_svn_author_to_swh_person_no_email():
     """The author and fullname should be the same as the input (author).
 
     """
-    actual_person = converters.svn_author_to_swh_person('tony')
+    actual_person = converters.svn_author_to_swh_person(b'tony')
     assert actual_person == Person.from_dict({
         'fullname': b'tony',
         'name': b'tony',
@@ -41,7 +41,7 @@ def test_svn_author_to_swh_person_empty_person():
     byte-string.
 
     """
-    actual_person = converters.svn_author_to_swh_person('')
+    actual_person = converters.svn_author_to_swh_person(b'')
     assert actual_person == Person.from_dict({
         'fullname': b'',
         'name': None,

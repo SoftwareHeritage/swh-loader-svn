@@ -106,19 +106,11 @@ class SvnRepo:
     def convert_commit_author(self, author):
         """Convert the commit author into an swh person.
 
-        The user becomes a dictionary of the form::
-
-            {
-              name: author,
-              email: '',
-              fullname: author
-            }
-
         Args:
             author (str): the commit author to convert.
 
         Returns:
-            The transformed author as dict.
+            Person: a model object
 
         """
         return converters.svn_author_to_swh_person(author)

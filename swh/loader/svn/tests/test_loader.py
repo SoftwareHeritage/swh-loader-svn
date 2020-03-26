@@ -203,6 +203,7 @@ class SvnLoaderTest1(BaseSvnLoaderTest):
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit['snapshot'], GOURMET_SNAPSHOT)
+        self.assertEqual(visit['status'], 'full')
 
 
 _LAST_SNP_REV = {
@@ -255,6 +256,7 @@ class SvnLoaderTest2(BaseSvnLoaderTest):
         self.assertEqual(self.loader.visit_status(), 'full')
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit['snapshot'], GOURMET_FLAG_SNAPSHOT)
+        self.assertEqual(visit['status'], 'full')
 
 
 class SvnLoaderTest3(BaseSvnLoaderTest):
@@ -295,6 +297,7 @@ class SvnLoaderTest3(BaseSvnLoaderTest):
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit['snapshot'], None)
+        self.assertEqual(visit['status'], 'partial')
 
 
 class SvnLoaderTest4(BaseSvnLoaderTest):
@@ -341,6 +344,7 @@ class SvnLoaderTest4(BaseSvnLoaderTest):
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit['snapshot'], GOURMET_UPDATES_SNAPSHOT)
+        self.assertEqual(visit['status'], 'full')
 
 
 class SvnLoaderTest5(BaseSvnLoaderTest):
@@ -392,6 +396,7 @@ class SvnLoaderTest5(BaseSvnLoaderTest):
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit['snapshot'], GOURMET_UPDATES_SNAPSHOT)
+        self.assertEqual(visit['status'], 'full')
 
 
 class SvnLoaderTest6(BaseSvnLoaderTest):
@@ -455,6 +460,7 @@ class SvnLoaderTest6(BaseSvnLoaderTest):
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit['snapshot'], GOURMET_UPDATES_SNAPSHOT)
+        self.assertEqual(visit['status'], 'full')
 
 
 class SvnLoaderTest7(BaseSvnLoaderTest):
@@ -517,6 +523,7 @@ class SvnLoaderTest7(BaseSvnLoaderTest):
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit['snapshot'], GOURMET_UPDATES_SNAPSHOT)
+        self.assertEqual(visit['status'], 'full')
 
 
 class SvnLoaderTest8(BaseSvnLoaderTest):
@@ -598,6 +605,7 @@ class SvnLoaderTest8(BaseSvnLoaderTest):
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit['snapshot'], GOURMET_UPDATES_SNAPSHOT)
+        self.assertEqual(visit['status'], 'full')
 
 
 class SvnLoaderTest9(BaseSvnLoaderTest):
@@ -628,6 +636,7 @@ class SvnLoaderTest9(BaseSvnLoaderTest):
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit['snapshot'], MEDIAWIKI_SNAPSHOT)
+        self.assertEqual(visit['status'], 'full')
 
 
 class SvnLoaderTest10(BaseSvnLoaderTest): # noqa
@@ -660,6 +669,7 @@ class SvnLoaderTest10(BaseSvnLoaderTest): # noqa
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit['snapshot'], PYANG_SNAPSHOT)
+        self.assertEqual(visit['status'], 'full')
 
 
 class SvnLoaderTest11(BaseSvnLoaderTest):
@@ -721,6 +731,7 @@ class SvnLoaderTest11(BaseSvnLoaderTest):
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit['snapshot'], GOURMET_EXTERNALS_SNAPSHOT)
+        self.assertEqual(visit['status'], 'partial')
 
 
 class SvnLoaderTest12(BaseSvnLoaderTest):
@@ -779,6 +790,7 @@ class SvnLoaderTest12(BaseSvnLoaderTest):
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit['snapshot'], GOURMET_EDGE_CASES_SNAPSHOT)
+        self.assertEqual(visit['status'], 'full')
 
 
 class SvnLoaderTest13(BaseSvnLoaderTest):
@@ -836,6 +848,7 @@ class SvnLoaderTest13(BaseSvnLoaderTest):
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit['snapshot'], GOURMET_WRONG_LINKS_SNAPSHOT)
+        self.assertEqual(visit['status'], 'full')
 
 
 class SvnLoaderTestFromRemoteDump(SvnLoaderTest, SvnLoaderFromRemoteDump):
@@ -926,3 +939,4 @@ class SvnLoaderTest14(BaseSvnLoaderTest):
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit['snapshot'],
                          hashutil.hash_to_bytes(expected_snapshot_id))
+        self.assertEqual(visit['status'], 'full')

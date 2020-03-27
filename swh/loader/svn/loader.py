@@ -15,11 +15,11 @@ import tempfile
 
 from mmap import mmap, ACCESS_WRITE
 from subprocess import Popen
-from typing import Iterator, List, Tuple
+from typing import Iterator, List, Optional, Tuple
 
 from swh.model import hashutil
 from swh.model.model import (
-    Content, Directory, Origin, SkippedContent, Revision, Snapshot,
+    Content, Directory, Origin, SkippedContent, Revision, Sha1Git, Snapshot,
     SnapshotBranch, TargetType
 )
 from swh.model import from_disk
@@ -105,6 +105,7 @@ class SvnLoader(BaseLoader):
         self.start_from_scratch = start_from_scratch
         self.swh_revision = swh_revision
         self.max_content_length = self.config['max_content_size']
+        self.snapshot = None
 
     def pre_cleanup(self):
         """Cleanup potential dangling files from prior runs (e.g. OOM killed
@@ -514,6 +515,9 @@ Local repository not cleaned up for investigation: %s''' % (
             self._revisions.append(rev)
         return True  # next svn revision
 
+    def get_snapshot_id(self) -> Optional[Sha1Git]:
+        return self.snapshot.id if self.snapshot else None
+
     def store_data(self):
         """We store the data accumulated in internal instance variable.  If
            the iteration over the svn revisions is done, we create the
@@ -528,13 +532,11 @@ Local repository not cleaned up for investigation: %s''' % (
         self.storage.revision_add(self._revisions)
 
         if self.done:  # finish line, snapshot!
-            snapshot = self.generate_and_load_snapshot(
+            self.snapshot = self.generate_and_load_snapshot(
                 revision=self._last_revision,
                 snapshot=self._snapshot
             )
             self.flush()
-            self.storage.origin_visit_update(
-                self.origin.url, self.visit.visit, snapshot=snapshot.id)
 
         # reset internal state for next iteration
         self._revisions = []
@@ -550,7 +552,7 @@ Local repository not cleaned up for investigation: %s''' % (
             snapshot (dict): Snapshot to use if any (None by default)
 
         Returns:
-            dict: The newly created snapshot
+            Optional[Snapshot] The newly created snapshot
 
         """
         if revision:  # Priority to the revision

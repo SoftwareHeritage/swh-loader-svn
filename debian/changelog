@@ -1,8 +1,13 @@
-swh-loader-svn (0.0.53-1~swh1~bpo10+1) buster-swh; urgency=medium
+swh-loader-svn (0.0.54-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 0.0.54     - (tagged by Antoine R. Dumont
+    (@ardumont) <antoine.romain.dumont@gmail.com> on 2020-03-27 07:52:30
+    +0100)
+  * Upstream changes:     - v0.0.54     - svn.loader: Let core loader
+    update snapshot & visit at the same time     - test_loader: Add
+    missing assertions on visit status     - Fix crash on None snapshot
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Mon, 16 Mar 2020 12:42:49 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 27 Mar 2020 06:57:15 +0000
 
 swh-loader-svn (0.0.53-1~swh1) unstable-swh; urgency=medium
 

@@ -22,7 +22,7 @@ from swh.model.from_disk import Directory
 from . import ra, converters
 
 # When log message contains empty data
-DEFAULT_AUTHOR_MESSAGE = ''
+DEFAULT_AUTHOR_MESSAGE = ""
 
 
 class SvnRepo:
@@ -34,9 +34,9 @@ class SvnRepo:
         local_dirname (str): Path to write intermediary svn action results
 
     """
-    def __init__(self, remote_url, origin_url, local_dirname,
-                 max_content_length):
-        self.remote_url = remote_url.rstrip('/')
+
+    def __init__(self, remote_url, origin_url, local_dirname, max_content_length):
+        self.remote_url = remote_url.rstrip("/")
         self.origin_url = origin_url
 
         auth = Auth([get_username_provider()])
@@ -49,20 +49,21 @@ class SvnRepo:
 
         self.local_dirname = local_dirname
         local_name = os.path.basename(self.remote_url)
-        self.local_url = os.path.join(self.local_dirname, local_name).encode(
-            'utf-8')
+        self.local_url = os.path.join(self.local_dirname, local_name).encode("utf-8")
 
-        self.uuid = self.conn.get_uuid().encode('utf-8')
+        self.uuid = self.conn.get_uuid().encode("utf-8")
         self.swhreplay = ra.Replay(conn=self.conn, rootpath=self.local_url)
         self.max_content_length = max_content_length
 
     def __str__(self):
-        return str({
-            'swh-origin': self.origin_url,
-            'remote_url': self.remote_url,
-            'local_url': self.local_url,
-            'uuid': self.uuid,
-        })
+        return str(
+            {
+                "swh-origin": self.origin_url,
+                "remote_url": self.remote_url,
+                "local_url": self.local_url,
+                "uuid": self.uuid,
+            }
+        )
 
     def head_revision(self):
         """Retrieve current head revision.
@@ -88,7 +89,7 @@ class SvnRepo:
         """
         if isinstance(msg, bytes):
             return msg
-        return msg.encode('utf-8')
+        return msg.encode("utf-8")
 
     def convert_commit_date(self, date):
         """Convert the message commit date into a timestamp in swh format.
@@ -119,20 +120,22 @@ class SvnRepo:
         changed_paths, rev, revprops, has_children = log_entry
 
         author_date = self.convert_commit_date(
-            revprops.get(properties.PROP_REVISION_DATE))
+            revprops.get(properties.PROP_REVISION_DATE)
+        )
 
         author = self.convert_commit_author(
-            revprops.get(properties.PROP_REVISION_AUTHOR))
+            revprops.get(properties.PROP_REVISION_AUTHOR)
+        )
 
         message = self.convert_commit_message(
-            revprops.get(properties.PROP_REVISION_LOG,
-                         DEFAULT_AUTHOR_MESSAGE))
+            revprops.get(properties.PROP_REVISION_LOG, DEFAULT_AUTHOR_MESSAGE)
+        )
 
         return {
-            'rev': rev,
-            'author_date': author_date,
-            'author_name': author,
-            'message': message,
+            "rev": rev,
+            "author_date": author_date,
+            "author_name": author,
+            "message": message,
         }
 
     def logs(self, revision_start, revision_end):
@@ -158,20 +161,24 @@ class SvnRepo:
                     - message: commit message
 
         """
-        for log_entry in self.conn_log.iter_log(paths=None,
-                                                start=revision_start,
-                                                end=revision_end,
-                                                discover_changed_paths=False):
+        for log_entry in self.conn_log.iter_log(
+            paths=None,
+            start=revision_start,
+            end=revision_end,
+            discover_changed_paths=False,
+        ):
             yield self.__to_entry(log_entry)
 
     def export(self, revision):
         """Export the repository to a given version.
 
         """
-        self.client.export(self.remote_url,
-                           to=self.local_url.decode('utf-8'),
-                           rev=revision,
-                           ignore_keywords=True)
+        self.client.export(
+            self.remote_url,
+            to=self.local_url.decode("utf-8"),
+            rev=revision,
+            ignore_keywords=True,
+        )
 
     def export_temporary(self, revision):
         """Export the repository to a given revision in a temporary location.
@@ -187,12 +194,13 @@ class SvnRepo:
 
         """
         local_dirname = tempfile.mkdtemp(
-            prefix='check-revision-%s.' % revision,
-            dir=self.local_dirname)
+            prefix="check-revision-%s." % revision, dir=self.local_dirname
+        )
         local_name = os.path.basename(self.remote_url)
         local_url = os.path.join(local_dirname, local_name)
         self.client.export(
-            self.remote_url, to=local_url, rev=revision, ignore_keywords=True)
+            self.remote_url, to=local_url, rev=revision, ignore_keywords=True
+        )
         return local_dirname, os.fsencode(local_url)
 
     def swh_hash_data_per_revision(self, start_revision, end_revision):
@@ -212,7 +220,7 @@ class SvnRepo:
 
         """
         for commit in self.logs(start_revision, end_revision):
-            rev = commit['rev']
+            rev = commit["rev"]
             objects = self.swhreplay.compute_objects(rev)
 
             if rev == end_revision:
@@ -232,14 +240,13 @@ class SvnRepo:
         self.export(revision)
         # Compute the current hashes on disk
         directory = Directory.from_disk(
-            path=os.fsencode(self.local_url),
-            max_content_length=self.max_content_length)
+            path=os.fsencode(self.local_url), max_content_length=self.max_content_length
+        )
 
         # Update the replay collaborator with the right state
         self.swhreplay = ra.Replay(
-            conn=self.conn,
-            rootpath=self.local_url,
-            directory=directory)
+            conn=self.conn, rootpath=self.local_url, directory=directory
+        )
 
         # Retrieve the commit information for revision
         commit = list(self.logs(revision, revision))[0]
@@ -257,5 +264,5 @@ class SvnRepo:
         """
         dirname = local_dirname if local_dirname else self.local_dirname
         if os.path.exists(dirname):
-            logging.debug('cleanup %s' % dirname)
+            logging.debug("cleanup %s" % dirname)
             shutil.rmtree(dirname)

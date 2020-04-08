@@ -9,6 +9,7 @@ class SvnLoaderEventful(ValueError):
        seen.
 
     """
+
     def __init__(self, e, swh_revision):
         super().__init__(e)
         self.swh_revision = swh_revision
@@ -18,6 +19,7 @@ class SvnLoaderUneventful(ValueError):
     """'Loading did nothing.
 
     """
+
     pass
 
 
@@ -25,4 +27,5 @@ class SvnLoaderHistoryAltered(ValueError):
     """History altered detected
 
     """
+
     pass

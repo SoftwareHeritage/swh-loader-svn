@@ -8,7 +8,8 @@ from typing import Any, Dict
 
 def register() -> Dict[str, Any]:
     from swh.loader.svn.loader import SvnLoader
+
     return {
-        'task_modules': ['%s.tasks' % __name__],
-        'loader': SvnLoader,
+        "task_modules": ["%s.tasks" % __name__],
+        "loader": SvnLoader,
     }

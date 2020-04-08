@@ -23,15 +23,10 @@ from swh.model import from_disk
 from swh.model.model import Content, Directory, SkippedContent
 
 
-_eol_style = {
-    'native': b'\n',
-    'CRLF': b'\r\n',
-    'LF': b'\n',
-    'CR': b'\r'
-}
+_eol_style = {"native": b"\n", "CRLF": b"\r\n", "LF": b"\n", "CR": b"\r"}
 
 
-def _normalize_line_endings(lines, eol_style='native'):
+def _normalize_line_endings(lines, eol_style="native"):
     r"""Normalize line endings to unix (\\n), windows (\\r\\n) or mac (\\r).
 
     Args:
@@ -44,10 +39,11 @@ def _normalize_line_endings(lines, eol_style='native'):
     Returns:
         bytes: lines with endings normalized
     """
-    lines = lines.replace(_eol_style['CRLF'], _eol_style['LF'])\
-                 .replace(_eol_style['CR'], _eol_style['LF'])
-    if _eol_style[eol_style] != _eol_style['LF']:
-        lines = lines.replace(_eol_style['LF'], _eol_style[eol_style])
+    lines = lines.replace(_eol_style["CRLF"], _eol_style["LF"]).replace(
+        _eol_style["CR"], _eol_style["LF"]
+    )
+    if _eol_style[eol_style] != _eol_style["LF"]:
+        lines = lines.replace(_eol_style["LF"], _eol_style[eol_style])
 
     return lines
 
@@ -67,12 +63,14 @@ def apply_txdelta_handler(sbuf, target_stream):
         Function to be called to apply txdelta windows
 
     """
+
     def apply_window(window, sbuf=sbuf, target_stream=target_stream):
         if window is None:
             target_stream.close()
             return  # Last call
         patch = delta.apply_txdelta_window(sbuf, window)
         target_stream.write(patch)
+
     return apply_window
 
 
@@ -86,7 +84,7 @@ def read_svn_link(data):
         The tuple of (filetype, destination path)
 
     """
-    split_byte = b' '
+    split_byte = b" "
     filetype, *src = data.split(split_byte)
     src = split_byte.join(src)
     return filetype, src
@@ -103,9 +101,9 @@ def is_file_an_svnlink_p(fullpath):
         svn) or not.
 
     """
-    with open(fullpath, 'rb') as f:
+    with open(fullpath, "rb") as f:
         filetype, src = read_svn_link(f.read())
-        return filetype == b'link', src
+        return filetype == b"link", src
 
 
 def _ra_codecs_error_handler(e):
@@ -118,14 +116,14 @@ def _ra_codecs_error_handler(e):
                                 properties decoding.
 
     """
-    return u"", e.end
+    return "", e.end
 
 
 DEFAULT_FLAG = 0
 EXEC_FLAG = 1
 NOEXEC_FLAG = 2
 
-SVN_PROPERTY_EOL = 'svn:eol-style'
+SVN_PROPERTY_EOL = "svn:eol-style"
 
 # EOL state check mess
 EOL_STYLE = {}
@@ -135,7 +133,8 @@ class FileEditor:
     """File Editor in charge of updating file on disk and memory objects.
 
     """
-    __slots__ = ['directory', 'path', 'fullpath', 'executable', 'link']
+
+    __slots__ = ["directory", "path", "fullpath", "executable", "link"]
 
     def __init__(self, directory, rootpath, path):
         self.directory = directory
@@ -188,8 +187,8 @@ class FileEditor:
         # to be able to patch the file on future commits
         src = os.readlink(self.fullpath)
         os.remove(self.fullpath)
-        sbuf = b'link ' + src
-        with open(self.fullpath, 'wb') as f:
+        sbuf = b"link " + src
+        with open(self.fullpath, "wb") as f:
             f.write(sbuf)
         return sbuf
 
@@ -202,12 +201,12 @@ class FileEditor:
                 sbuf = self.__make_svnlink()
                 self.link = True
             else:
-                with open(self.fullpath, 'rb') as f:
+                with open(self.fullpath, "rb") as f:
                     sbuf = f.read()
         else:
-            sbuf = b''
+            sbuf = b""
 
-        t = open(self.fullpath, 'wb')
+        t = open(self.fullpath, "wb")
         return apply_txdelta_handler(sbuf, target_stream=t)
 
     def close(self):
@@ -244,15 +243,15 @@ class FileEditor:
             # ensure to normalize line endings as defined by svn:eol-style
             # property to get the same file checksum as after an export
             # or checkout operation with subversion
-            with open(self.fullpath, 'rb') as f:
+            with open(self.fullpath, "rb") as f:
                 data = f.read()
                 data = _normalize_line_endings(data, eol_style)
                 mode = os.lstat(self.fullpath).st_mode
                 self.directory[self.path] = from_disk.Content.from_bytes(
-                    mode=mode, data=data)
+                    mode=mode, data=data
+                )
         else:
-            self.directory[self.path] = from_disk.Content.from_file(
-                path=self.fullpath)
+            self.directory[self.path] = from_disk.Content.from_file(path=self.fullpath)
 
 
 class BaseDirEditor:
@@ -274,7 +273,8 @@ class BaseDirEditor:
             # Add a new one.
 
     """
-    __slots__ = ['directory', 'rootpath']
+
+    __slots__ = ["directory", "rootpath"]
 
     def __init__(self, directory, rootpath):
         self.directory = directory
@@ -309,13 +309,13 @@ class BaseDirEditor:
             del EOL_STYLE[path]
 
     def update_checksum(self):
-        raise NotImplementedError('This should be implemented.')
+        raise NotImplementedError("This should be implemented.")
 
     def open_directory(self, *args):
-        raise NotImplementedError('This should be implemented.')
+        raise NotImplementedError("This should be implemented.")
 
     def add_directory(self, *args):
-        raise NotImplementedError('This should be implemented.')
+        raise NotImplementedError("This should be implemented.")
 
     def open_file(self, *args):
         """Updating existing file.
@@ -338,14 +338,13 @@ class BaseDirEditor:
 
         """
         if key == properties.PROP_EXTERNALS:
-            raise ValueError(
-                "Property '%s' detected. Not implemented yet." % key)
+            raise ValueError("Property '%s' detected. Not implemented yet." % key)
 
     def delete_entry(self, path, revision):
         """Remove a path.
 
         """
-        self.remove_child(path.encode('utf-8'))
+        self.remove_child(path.encode("utf-8"))
 
     def close(self):
         """Function called when we finish walking a repository.
@@ -360,6 +359,7 @@ class DirEditor(BaseDirEditor):
     This implementation includes empty folder in the hash computation.
 
     """
+
     def update_checksum(self):
         """Update the root path self.path's checksums according to the
         children's objects.
@@ -394,6 +394,7 @@ class Editor:
        computations.
 
     """
+
     def __init__(self, rootpath, directory):
         self.rootpath = rootpath
         self.directory = directory
@@ -414,6 +415,7 @@ class Editor:
 class Replay:
     """Replay class.
     """
+
     def __init__(self, conn, rootpath, directory=None):
         self.conn = conn
         self.rootpath = rootpath
@@ -433,12 +435,13 @@ class Replay:
 
         """
         codecs.register_error("strict", _ra_codecs_error_handler)
-        self.conn.replay(rev, rev+1, self.editor)
+        self.conn.replay(rev, rev + 1, self.editor)
         codecs.register_error("strict", codecs.strict_errors)
         return self.editor.directory
 
-    def compute_objects(self, rev: int) -> Tuple[
-            List[Content], List[SkippedContent], List[Directory]]:
+    def compute_objects(
+        self, rev: int
+    ) -> Tuple[List[Content], List[SkippedContent], List[Directory]]:
         """Compute objects at revisions rev.
         Expects the state to be at previous revision's objects.
 
@@ -465,36 +468,51 @@ class Replay:
             elif isinstance(obj, Directory):
                 directories.append(obj)
             else:
-                raise TypeError(
-                    f'Unexpected content type from disk: {obj}')
+                raise TypeError(f"Unexpected content type from disk: {obj}")
 
         return contents, skipped_contents, directories
 
 
 @click.command()
-@click.option('--local-url', default='/tmp',
-              help="local svn working copy")
-@click.option('--svn-url', default='file:///home/storage/svn/repos/pkg-fox',
-              help="svn repository's url.")
-@click.option('--revision-start', default=1, type=click.INT,
-              help="svn repository's starting revision.")
-@click.option('--revision-end', default=-1, type=click.INT,
-              help="svn repository's ending revision.")
-@click.option('--debug/--nodebug', default=True,
-              help="Indicates if the server should run in debug mode.")
-@click.option('--cleanup/--nocleanup', default=True,
-              help="Indicates whether to cleanup disk when done or not.")
+@click.option("--local-url", default="/tmp", help="local svn working copy")
+@click.option(
+    "--svn-url",
+    default="file:///home/storage/svn/repos/pkg-fox",
+    help="svn repository's url.",
+)
+@click.option(
+    "--revision-start",
+    default=1,
+    type=click.INT,
+    help="svn repository's starting revision.",
+)
+@click.option(
+    "--revision-end",
+    default=-1,
+    type=click.INT,
+    help="svn repository's ending revision.",
+)
+@click.option(
+    "--debug/--nodebug",
+    default=True,
+    help="Indicates if the server should run in debug mode.",
+)
+@click.option(
+    "--cleanup/--nocleanup",
+    default=True,
+    help="Indicates whether to cleanup disk when done or not.",
+)
 def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
     """Script to present how to use Replay class.
 
     """
-    conn = RemoteAccess(svn_url.encode('utf-8'),
-                        auth=Auth([get_username_provider()]))
+    conn = RemoteAccess(svn_url.encode("utf-8"), auth=Auth([get_username_provider()]))
 
     os.makedirs(local_url, exist_ok=True)
 
-    rootpath = tempfile.mkdtemp(prefix=local_url,
-                                suffix='-'+os.path.basename(svn_url))
+    rootpath = tempfile.mkdtemp(
+        prefix=local_url, suffix="-" + os.path.basename(svn_url)
+    )
 
     rootpath = os.fsencode(rootpath)
 
@@ -508,23 +526,25 @@ def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
     try:
         replay = Replay(conn, rootpath)
 
-        for rev in range(revision_start, revision_end+1):
-            contents, skipped_contents, directories = replay.compute_objects(
-                rev)
-            print("r%s %s (%s new contents, %s new directories)" % (
-                rev,
-                hashutil.hash_to_hex(replay.directory.hash),
-                len(contents) + len(skipped_contents),
-                len(directories),
-            ))
+        for rev in range(revision_start, revision_end + 1):
+            contents, skipped_contents, directories = replay.compute_objects(rev)
+            print(
+                "r%s %s (%s new contents, %s new directories)"
+                % (
+                    rev,
+                    hashutil.hash_to_hex(replay.directory.hash),
+                    len(contents) + len(skipped_contents),
+                    len(directories),
+                )
+            )
 
         if debug:
-            print('%s' % rootpath.decode('utf-8'))
+            print("%s" % rootpath.decode("utf-8"))
     finally:
         if cleanup:
             if os.path.exists(rootpath):
                 shutil.rmtree(rootpath)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

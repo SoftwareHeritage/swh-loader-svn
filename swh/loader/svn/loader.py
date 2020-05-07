@@ -474,7 +474,7 @@ Local repository not cleaned up for investigation: %s"""
             )
 
         self.svnrepo = svn.SvnRepo(
-            self.svn_url, local_dirname, self.origin_url, self.max_content_length
+            self.svn_url, self.origin_url, local_dirname, self.max_content_length
         )
 
         try:

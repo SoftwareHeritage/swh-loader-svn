@@ -15,7 +15,7 @@ import tempfile
 
 from mmap import mmap, ACCESS_WRITE
 from subprocess import Popen
-from typing import Iterator, List, Optional, Tuple
+from typing import Iterator, List, Tuple
 
 from swh.model import hashutil
 from swh.model.model import (
@@ -24,7 +24,6 @@ from swh.model.model import (
     Origin,
     SkippedContent,
     Revision,
-    Sha1Git,
     Snapshot,
     SnapshotBranch,
     TargetType,
@@ -534,9 +533,6 @@ Local repository not cleaned up for investigation: %s"""
             self._revisions.append(rev)
         return True  # next svn revision
 
-    def get_snapshot_id(self) -> Optional[Sha1Git]:
-        return self.snapshot.id if self.snapshot else None
-
     def store_data(self):
         """We store the data accumulated in internal instance variable.  If
            the iteration over the svn revisions is done, we create the
@@ -555,6 +551,7 @@ Local repository not cleaned up for investigation: %s"""
                 revision=self._last_revision, snapshot=self._snapshot
             )
             self.flush()
+            self.loaded_snapshot_id = self.snapshot.id
 
         # reset internal state for next iteration
         self._revisions = []

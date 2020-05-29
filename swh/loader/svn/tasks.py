@@ -16,7 +16,7 @@ def load_svn(
     destination_path=None,
     swh_revision=None,
     visit_date=None,
-    start_from_scratch=False
+    start_from_scratch=False,
 ):
     """Import a svn repository
 

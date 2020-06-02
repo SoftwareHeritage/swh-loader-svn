@@ -5,18 +5,19 @@
 
 from celery import shared_task
 
-from .loader import (
-    SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump
-)
+from .loader import SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump
 
 
-@shared_task(name=__name__ + '.LoadSvnRepository')
-def load_svn(*, url=None,
-             origin_url=None,
-             destination_path=None,
-             swh_revision=None,
-             visit_date=None,
-             start_from_scratch=False):
+@shared_task(name=__name__ + ".LoadSvnRepository")
+def load_svn(
+    *,
+    url=None,
+    origin_url=None,
+    destination_path=None,
+    swh_revision=None,
+    visit_date=None,
+    start_from_scratch=False,
+):
     """Import a svn repository
 
     Args:
@@ -32,20 +33,21 @@ def load_svn(*, url=None,
             docstring
 
     """
-    loader = SvnLoader(url,
-                       origin_url=origin_url,
-                       destination_path=destination_path,
-                       swh_revision=swh_revision,
-                       visit_date=visit_date,
-                       start_from_scratch=start_from_scratch)
+    loader = SvnLoader(
+        url,
+        origin_url=origin_url,
+        destination_path=destination_path,
+        swh_revision=swh_revision,
+        visit_date=visit_date,
+        start_from_scratch=start_from_scratch,
+    )
     return loader.load()
 
 
-@shared_task(name=__name__ + '.MountAndLoadSvnRepository')
-def load_svn_from_archive(*, url=None,
-                          archive_path=None,
-                          visit_date=None,
-                          start_from_scratch=False):
+@shared_task(name=__name__ + ".MountAndLoadSvnRepository")
+def load_svn_from_archive(
+    *, url=None, archive_path=None, visit_date=None, start_from_scratch=False
+):
     """1. Mount an svn dump from archive as a local svn repository
        2. Load it through the svn loader
        3. Clean up mounted svn repository archive
@@ -55,15 +57,15 @@ def load_svn_from_archive(*, url=None,
         url,
         archive_path=archive_path,
         visit_date=visit_date,
-        start_from_scratch=start_from_scratch)
+        start_from_scratch=start_from_scratch,
+    )
     return loader.load()
 
 
-@shared_task(name=__name__ + '.DumpMountAndLoadSvnRepository')
-def load_svn_from_remote_dump(*, url=None,
-                              origin_url=None,
-                              visit_date=None,
-                              start_from_scratch=False):
+@shared_task(name=__name__ + ".DumpMountAndLoadSvnRepository")
+def load_svn_from_remote_dump(
+    *, url=None, origin_url=None, visit_date=None, start_from_scratch=False
+):
     """1. Mount a remote svn dump as a local svn repository.
        2. Load it through the svn loader.
        3. Clean up mounted svn repository archive.
@@ -73,5 +75,6 @@ def load_svn_from_remote_dump(*, url=None,
         url,
         origin_url=origin_url,
         visit_date=visit_date,
-        start_from_scratch=start_from_scratch)
+        start_from_scratch=start_from_scratch,
+    )
     return loader.load()

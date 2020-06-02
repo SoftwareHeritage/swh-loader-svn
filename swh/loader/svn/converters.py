@@ -5,15 +5,12 @@
 
 from typing import Any, Dict, List, Optional
 
-from swh.model.model import (
-    Person, Revision, RevisionType, TimestampWithTimezone
-)
+from swh.model.model import Person, Revision, RevisionType, TimestampWithTimezone
 
 from .utils import strdate_to_timestamp
 
 
-def svn_date_to_swh_date(
-        strdate: Optional[str]) -> TimestampWithTimezone:
+def svn_date_to_swh_date(strdate: Optional[str]) -> TimestampWithTimezone:
     """Convert a string date to an swh one.
 
     Args:
@@ -25,9 +22,7 @@ def svn_date_to_swh_date(
 
     """
     return TimestampWithTimezone(
-        timestamp=strdate_to_timestamp(strdate),
-        offset=0,
-        negative_utc=False,
+        timestamp=strdate_to_timestamp(strdate), offset=0, negative_utc=False,
     )
 
 
@@ -42,12 +37,12 @@ def svn_author_to_swh_person(author: Optional[bytes]) -> Person:
         a Person
 
     """
-    return Person.from_fullname(author or b'')
+    return Person.from_fullname(author or b"")
 
 
 def build_swh_revision(
-        rev: int, commit: Dict, repo_uuid: str, dir_id: bytes,
-        parents: List[bytes]) -> Revision:
+    rev: int, commit: Dict, repo_uuid: str, dir_id: bytes, parents: List[bytes]
+) -> Revision:
     """Given a svn revision, build a swh revision.
 
     This adds an ['metadata']['extra-headers'] entry with the
@@ -64,14 +59,14 @@ def build_swh_revision(
         The swh revision dictionary.
 
     """
-    author = commit['author_name']
-    msg = commit['message']
-    date = commit['author_date']
+    author = commit["author_name"]
+    msg = commit["message"]
+    date = commit["author_date"]
 
     metadata: Dict[str, Any] = {
-        'extra_headers': [
-            ['svn_repo_uuid', repo_uuid],
-            ['svn_revision', str(rev).encode('utf-8')]
+        "extra_headers": [
+            ["svn_repo_uuid", repo_uuid],
+            ["svn_revision", str(rev).encode("utf-8")],
         ]
     }
 

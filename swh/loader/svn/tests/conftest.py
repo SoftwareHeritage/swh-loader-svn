@@ -15,50 +15,44 @@ from swh.scheduler.tests.conftest import swh_app  # noqa
 @pytest.fixture
 def swh_loader_config() -> Dict[str, Any]:
     return {
-        'storage': {
-            'cls': 'pipeline',
-            'steps': [
+        "storage": {
+            "cls": "pipeline",
+            "steps": [
+                {"cls": "validate"},
+                {"cls": "filter"},
                 {
-                    'cls': 'validate'
-                },
-                {
-                    'cls': 'filter'
-                },
-                {
-                    'cls': 'buffer',
-                    'min_batch_size': {
-                        'content': 10000,
-                        'content_bytes': 1073741824,
-                        'directory': 2500,
-                        'revision': 10,
-                        'release': 100,
+                    "cls": "buffer",
+                    "min_batch_size": {
+                        "content": 10000,
+                        "content_bytes": 1073741824,
+                        "directory": 2500,
+                        "revision": 10,
+                        "release": 100,
                     },
                 },
-                {
-                    'cls': 'memory'
-                },
-            ]
+                {"cls": "memory"},
+            ],
         },
-        'check_revision': {'limit': 100, 'status': False},
-        'debug': False,
-        'log_db': 'dbname=softwareheritage-log',
-        'save_data': False,
-        'save_data_path': '',
-        'temp_directory': '/tmp',
+        "check_revision": {"limit": 100, "status": False},
+        "debug": False,
+        "log_db": "dbname=softwareheritage-log",
+        "save_data": False,
+        "save_data_path": "",
+        "temp_directory": "/tmp",
     }
 
 
 @pytest.fixture
 def swh_config(swh_loader_config, monkeypatch, tmp_path):
-    conffile = os.path.join(str(tmp_path), 'loader.yml')
-    with open(conffile, 'w') as f:
+    conffile = os.path.join(str(tmp_path), "loader.yml")
+    with open(conffile, "w") as f:
         f.write(yaml.dump(swh_loader_config))
-    monkeypatch.setenv('SWH_CONFIG_FILENAME', conffile)
+    monkeypatch.setenv("SWH_CONFIG_FILENAME", conffile)
     return conffile
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def celery_includes():
     return [
-        'swh.loader.svn.tasks',
+        "swh.loader.svn.tasks",
     ]

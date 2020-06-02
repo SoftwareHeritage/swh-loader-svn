@@ -1,3 +1,13 @@
+swh-loader-svn (0.1.0-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.1.0     - (tagged by Nicolas Dandrimont
+    <nicolas@dandrimont.eu> on 2020-06-02 18:54:30 +0200)
+  * Upstream changes:     - Release swh.loader.svn v0.1.0     - Blacken
+    all files     - Fix compatibility with swh.loader.core v0.1.0     -
+    Fix parameter ordering for loader tasks
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Tue, 02 Jun 2020 16:58:55 +0000
+
 swh-loader-svn (0.0.54-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.0.54     - (tagged by Antoine R. Dumont

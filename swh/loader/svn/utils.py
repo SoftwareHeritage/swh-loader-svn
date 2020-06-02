@@ -29,11 +29,11 @@ def strdate_to_timestamp(strdate: Optional[str]) -> Timestamp:
         # TODO: Migrate to iso8601 if possible
         dt = parser.parse(strdate)
         ts = {
-            'seconds': int(dt.timestamp()),
-            'microseconds': dt.microsecond,
+            "seconds": int(dt.timestamp()),
+            "microseconds": dt.microsecond,
         }
     else:  # epoch
-        ts = {'seconds': 0, 'microseconds': 0}
+        ts = {"seconds": 0, "microseconds": 0}
     return Timestamp.from_dict(ts)
 
 
@@ -48,7 +48,7 @@ class OutputStream:
 
     def __init__(self, fileno):
         self._fileno = fileno
-        self._buffer = ''
+        self._buffer = ""
 
     def read_lines(self):
         """
@@ -64,23 +64,24 @@ class OutputStream:
         except OSError as e:
             if e.errno != errno.EIO:
                 raise
-            output = ''
-        output = output.replace('\r\n', '\n')
-        lines = output.split('\n')
+            output = ""
+        output = output.replace("\r\n", "\n")
+        lines = output.split("\n")
         lines[0] = self._buffer + lines[0]
 
         if output:
             self._buffer = lines[-1]
             return (lines[:-1], True)
         else:
-            self._buffer = ''
+            self._buffer = ""
             if len(lines) == 1 and not lines[0]:
                 lines = []
             return (lines, False)
 
 
-def init_svn_repo_from_dump(dump_path, prefix=None, suffix=None,
-                            root_dir='/tmp', gzip=False):
+def init_svn_repo_from_dump(
+    dump_path, prefix=None, suffix=None, root_dir="/tmp", gzip=False
+):
     """Given a path to a svn dump.
     Initialize an svn repository with the content of said dump.
 
@@ -102,32 +103,33 @@ def init_svn_repo_from_dump(dump_path, prefix=None, suffix=None,
         repo_path = os.path.join(temp_dir, project_name)
 
         # create the repository that will be loaded with the dump
-        cmd = ['svnadmin', 'create', repo_path]
+        cmd = ["svnadmin", "create", repo_path]
         r = call(cmd)
         if r != 0:
             raise ValueError(
-                'Failed to initialize empty svn repo for %s' %
-                project_name)
+                "Failed to initialize empty svn repo for %s" % project_name
+            )
 
-        read_dump_cmd = ['cat', dump_path]
+        read_dump_cmd = ["cat", dump_path]
         if gzip:
-            read_dump_cmd = ['gzip', '-dc', dump_path]
+            read_dump_cmd = ["gzip", "-dc", dump_path]
 
         with Popen(read_dump_cmd, stdout=PIPE) as dump:
-            cmd = ['svnadmin', 'load', '-q', repo_path]
+            cmd = ["svnadmin", "load", "-q", repo_path]
             r = call(cmd, stdin=dump.stdout)
             if r != 0:
                 raise ValueError(
-                    'Failed to mount the svn dump for project %s' %
-                    project_name)
+                    "Failed to mount the svn dump for project %s" % project_name
+                )
             return temp_dir, repo_path
     except Exception as e:
         shutil.rmtree(temp_dir)
         raise e
 
 
-def init_svn_repo_from_archive_dump(archive_path, prefix=None, suffix=None,
-                                    root_dir='/tmp'):
+def init_svn_repo_from_archive_dump(
+    archive_path, prefix=None, suffix=None, root_dir="/tmp"
+):
     """Given a path to an archive containing an svn dump.
     Initialize an svn repository with the content of said dump.
 
@@ -142,5 +144,6 @@ def init_svn_repo_from_archive_dump(archive_path, prefix=None, suffix=None,
         and load the dump.
 
     """
-    return init_svn_repo_from_dump(archive_path, prefix=prefix, suffix=suffix,
-                                   root_dir=root_dir, gzip=True)
+    return init_svn_repo_from_dump(
+        archive_path, prefix=prefix, suffix=suffix, root_dir=root_dir, gzip=True
+    )

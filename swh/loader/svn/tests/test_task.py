@@ -5,46 +5,47 @@
 
 
 def test_svn_loader(mocker, swh_app, celery_session_worker, swh_config):
-    mock_loader = mocker.patch('swh.loader.svn.loader.SvnLoader.load')
-    mock_loader.return_value = {'status': 'eventful'}
+    mock_loader = mocker.patch("swh.loader.svn.loader.SvnLoader.load")
+    mock_loader.return_value = {"status": "eventful"}
 
     res = swh_app.send_task(
-        'swh.loader.svn.tasks.LoadSvnRepository',
-        kwargs=dict(url='some-technical-url', origin_url='origin-url'))
+        "swh.loader.svn.tasks.LoadSvnRepository",
+        kwargs=dict(url="some-technical-url", origin_url="origin-url"),
+    )
     assert res
     res.wait()
     assert res.successful()
 
-    assert res.result == {'status': 'eventful'}
+    assert res.result == {"status": "eventful"}
 
 
-def test_svn_loader_from_dump(
-        mocker, swh_app, celery_session_worker, swh_config):
-    mock_loader = mocker.patch(
-        'swh.loader.svn.loader.SvnLoaderFromDumpArchive.load')
-    mock_loader.return_value = {'status': 'eventful'}
+def test_svn_loader_from_dump(mocker, swh_app, celery_session_worker, swh_config):
+    mock_loader = mocker.patch("swh.loader.svn.loader.SvnLoaderFromDumpArchive.load")
+    mock_loader.return_value = {"status": "eventful"}
 
     res = swh_app.send_task(
-        'swh.loader.svn.tasks.MountAndLoadSvnRepository',
-        kwargs=dict(url='some-url', archive_path='some-path'))
+        "swh.loader.svn.tasks.MountAndLoadSvnRepository",
+        kwargs=dict(url="some-url", archive_path="some-path"),
+    )
     assert res
     res.wait()
     assert res.successful()
 
-    assert res.result == {'status': 'eventful'}
+    assert res.result == {"status": "eventful"}
 
 
 def test_svn_loader_from_remote_dump(
-        mocker, swh_app, celery_session_worker, swh_config):
-    mock_loader = mocker.patch(
-        'swh.loader.svn.loader.SvnLoaderFromRemoteDump.load')
-    mock_loader.return_value = {'status': 'eventful'}
+    mocker, swh_app, celery_session_worker, swh_config
+):
+    mock_loader = mocker.patch("swh.loader.svn.loader.SvnLoaderFromRemoteDump.load")
+    mock_loader.return_value = {"status": "eventful"}
 
     res = swh_app.send_task(
-        'swh.loader.svn.tasks.DumpMountAndLoadSvnRepository',
-        kwargs=dict(url='some-remote-dump-url', origin_url='origin-url'))
+        "swh.loader.svn.tasks.DumpMountAndLoadSvnRepository",
+        kwargs=dict(url="some-remote-dump-url", origin_url="origin-url"),
+    )
     assert res
     res.wait()
     assert res.successful()
 
-    assert res.result == {'status': 'eventful'}
+    assert res.result == {"status": "eventful"}

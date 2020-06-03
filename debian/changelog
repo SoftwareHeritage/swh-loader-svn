@@ -1,3 +1,9 @@
+swh-loader-svn (0.1.1-1~swh2) unstable-swh; urgency=medium
+
+  * Force removing __init__.py files.
+
+ -- Nicolas Dandrimont <olasd@debian.org>  Wed, 03 Jun 2020 16:13:31 +0200
+
 swh-loader-svn (0.1.1-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.1.1     - (tagged by Antoine Lambert

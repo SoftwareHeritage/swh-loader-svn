@@ -19,8 +19,14 @@ from typing import Iterator, List, Optional, Tuple
 
 from swh.model import hashutil
 from swh.model.model import (
-    Content, Directory, Origin, SkippedContent, Revision, Sha1Git, Snapshot,
-    SnapshotBranch, TargetType
+    Content,
+    Directory,
+    Origin,
+    SkippedContent,
+    Revision,
+    Snapshot,
+    SnapshotBranch,
+    TargetType,
 )
 from swh.model import from_disk
 from swh.loader.core.loader import BaseLoader
@@ -29,27 +35,29 @@ from swh.storage.algos.snapshot import snapshot_get_all_branches
 
 from . import svn, converters
 from .utils import (
-    init_svn_repo_from_dump, init_svn_repo_from_archive_dump,
-    OutputStream
+    init_svn_repo_from_dump,
+    init_svn_repo_from_archive_dump,
+    OutputStream,
 )
 from .exception import SvnLoaderUneventful
 from .exception import SvnLoaderHistoryAltered
 
 
-DEFAULT_BRANCH = b'HEAD'
+DEFAULT_BRANCH = b"HEAD"
 
 
 def build_swh_snapshot(revision_id, branch=DEFAULT_BRANCH):
     """Build a swh snapshot from the revision id, origin url, and visit.
 
     """
-    return Snapshot(branches={
-        branch: SnapshotBranch(
-            target=revision_id, target_type=TargetType.REVISION)
-    })
+    return Snapshot(
+        branches={
+            branch: SnapshotBranch(target=revision_id, target_type=TargetType.REVISION)
+        }
+    )
 
 
-TEMPORARY_DIR_PREFIX_PATTERN = 'swh.loader.svn.'
+TEMPORARY_DIR_PREFIX_PATTERN = "swh.loader.svn."
 
 
 class SvnLoader(BaseLoader):
@@ -59,36 +67,46 @@ class SvnLoader(BaseLoader):
     update on an already previously loaded repository.
 
     """
-    CONFIG_BASE_FILENAME = 'loader/svn'
+
+    CONFIG_BASE_FILENAME = "loader/svn"
 
     ADDITIONAL_CONFIG = {
-        'temp_directory': ('str', '/tmp'),
-        'debug': ('bool', False),  # NOT FOR PRODUCTION, False for production
-        'check_revision': ('dict', {
-            'status': False,  # do we check the revision?
-            'limit': 1000,    # at which pace do we check it?
-        }),
+        "temp_directory": ("str", "/tmp"),
+        "debug": ("bool", False),  # NOT FOR PRODUCTION, False for production
+        "check_revision": (
+            "dict",
+            {
+                "status": False,  # do we check the revision?
+                "limit": 1000,  # at which pace do we check it?
+            },
+        ),
     }
 
-    visit_type = 'svn'
+    visit_type = "svn"
 
-    def __init__(self, url, origin_url=None, visit_date=None,
-                 destination_path=None, swh_revision=None,
-                 start_from_scratch=False):
-        super().__init__(logging_class='swh.loader.svn.SvnLoader')
+    def __init__(
+        self,
+        url,
+        origin_url=None,
+        visit_date=None,
+        destination_path=None,
+        swh_revision=None,
+        start_from_scratch=False,
+    ):
+        super().__init__(logging_class="swh.loader.svn.SvnLoader")
         # technical svn uri to act on svn repository
         self.svn_url = url
         # origin url as unique identifier for origin in swh archive
         self.origin_url = origin_url if origin_url else self.svn_url
-        self.debug = self.config['debug']
+        self.debug = self.config["debug"]
         self.last_seen_revision = None
-        self.temp_directory = self.config['temp_directory']
+        self.temp_directory = self.config["temp_directory"]
         self.done = False
         self.svnrepo = None
         # Revision check is configurable
-        check_revision = self.config['check_revision']
-        if check_revision['status']:
-            self.check_revision = check_revision['limit']
+        check_revision = self.config["check_revision"]
+        if check_revision["status"]:
+            self.check_revision = check_revision["limit"]
         else:
             self.check_revision = None
         # internal state used to store swh objects
@@ -98,13 +116,13 @@ class SvnLoader(BaseLoader):
         self._revisions = []
         self._snapshot = None
         self._last_revision = None
-        self._visit_status = 'full'
-        self._load_status = 'uneventful'
+        self._visit_status = "full"
+        self._load_status = "uneventful"
         self.visit_date = visit_date
         self.destination_path = destination_path
         self.start_from_scratch = start_from_scratch
         self.swh_revision = swh_revision
-        self.max_content_length = self.config['max_content_size']
+        self.max_content_length = self.config["max_content_size"]
         self.snapshot = None
 
     def pre_cleanup(self):
@@ -112,9 +130,11 @@ class SvnLoader(BaseLoader):
            tasks)
 
         """
-        clean_dangling_folders(self.temp_directory,
-                               pattern_check=TEMPORARY_DIR_PREFIX_PATTERN,
-                               log=self.log)
+        clean_dangling_folders(
+            self.temp_directory,
+            pattern_check=TEMPORARY_DIR_PREFIX_PATTERN,
+            log=self.log,
+        )
 
     def cleanup(self):
         """Clean up the svn repository's working representation on disk.
@@ -123,9 +143,11 @@ class SvnLoader(BaseLoader):
         if not self.svnrepo:  # could happen if `prepare` fails
             return
         if self.debug:
-            self.log.error('''NOT FOR PRODUCTION - debug flag activated
-Local repository not cleaned up for investigation: %s''' % (
-                self.svnrepo.local_url.decode('utf-8'), ))
+            self.log.error(
+                """NOT FOR PRODUCTION - debug flag activated
+Local repository not cleaned up for investigation: %s"""
+                % (self.svnrepo.local_url.decode("utf-8"),)
+            )
             return
         self.svnrepo.clean_fs()
 
@@ -144,8 +166,7 @@ Local repository not cleaned up for investigation: %s''' % (
         self.svnrepo.clean_fs(local_dirname)
         return h
 
-    def swh_latest_snapshot_revision(self, origin_url,
-                                     previous_swh_revision=None):
+    def swh_latest_snapshot_revision(self, origin_url, previous_swh_revision=None):
         """Look for latest snapshot revision and returns it if any.
 
         Args:
@@ -164,38 +185,33 @@ Local repository not cleaned up for investigation: %s''' % (
         """
         storage = self.storage
         if not previous_swh_revision:  # check latest snapshot's revision
-            visit = storage.origin_visit_get_latest(
-                origin_url, require_snapshot=True)
+            visit = storage.origin_visit_get_latest(origin_url, require_snapshot=True)
             if visit:
-                latest_snap = snapshot_get_all_branches(
-                    storage, visit['snapshot'])
+                latest_snap = snapshot_get_all_branches(storage, visit["snapshot"])
                 if latest_snap:
-                    branches = latest_snap.get('branches')
+                    branches = latest_snap.get("branches")
                     if not branches:
                         return {}
                     branch = branches.get(DEFAULT_BRANCH)
                     if not branch:
                         return {}
-                    target_type = branch['target_type']
-                    if target_type != 'revision':
+                    target_type = branch["target_type"]
+                    if target_type != "revision":
                         return {}
-                    previous_swh_revision = branch['target']
+                    previous_swh_revision = branch["target"]
                 else:
                     return {}
             else:
                 return {}
 
         if isinstance(previous_swh_revision, dict):
-            swh_id = previous_swh_revision['id']
+            swh_id = previous_swh_revision["id"]
         else:
             swh_id = previous_swh_revision
 
         revs = list(storage.revision_get([swh_id]))
         if revs:
-            return {
-                'snapshot': latest_snap,
-                'revision': revs[0]
-            }
+            return {"snapshot": latest_snap, "revision": revs[0]}
         return {}
 
     def build_swh_revision(self, rev, commit, dir_id, parents):
@@ -218,22 +234,22 @@ Local repository not cleaned up for investigation: %s''' % (
 
         """
         return converters.build_swh_revision(
-            rev, commit, self.svnrepo.uuid, dir_id, parents)
+            rev, commit, self.svnrepo.uuid, dir_id, parents
+        )
 
     def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
         """Given a svn repository, check if the history was not tampered with.
 
         """
-        revision_id = swh_rev['id']
-        parents = swh_rev['parents']
+        revision_id = swh_rev["id"]
+        parents = swh_rev["parents"]
         hash_data_per_revs = svnrepo.swh_hash_data_at_revision(revision_start)
 
         rev = revision_start
         rev, _, commit, _, root_dir = list(hash_data_per_revs)[0]
 
         dir_id = root_dir.hash
-        swh_revision = self.build_swh_revision(
-            rev, commit, dir_id, parents)
+        swh_revision = self.build_swh_revision(rev, commit, dir_id, parents)
         swh_revision_id = swh_revision.id
         return swh_revision_id == revision_id
 
@@ -259,20 +275,17 @@ Local repository not cleaned up for investigation: %s''' % (
             return previous_swh_revision
         if partial_swh_revision and previous_swh_revision:
             # will determine from which to start from
-            extra_headers1 = dict(
-                partial_swh_revision['metadata']['extra_headers'])
-            extra_headers2 = dict(
-                previous_swh_revision['metadata']['extra_headers'])
-            rev_start1 = int(extra_headers1['svn_revision'])
-            rev_start2 = int(extra_headers2['svn_revision'])
+            extra_headers1 = dict(partial_swh_revision["metadata"]["extra_headers"])
+            extra_headers2 = dict(previous_swh_revision["metadata"]["extra_headers"])
+            rev_start1 = int(extra_headers1["svn_revision"])
+            rev_start2 = int(extra_headers2["svn_revision"])
             if rev_start1 <= rev_start2:
                 return previous_swh_revision
             return partial_swh_revision
 
         return None
 
-    def start_from(self, last_known_swh_revision=None,
-                   start_from_scratch=False):
+    def start_from(self, last_known_swh_revision=None, start_from_scratch=False):
         """Determine from where to start the loading.
 
         Args:
@@ -297,54 +310,55 @@ Local repository not cleaned up for investigation: %s''' % (
             revision_start = self.svnrepo.initial_revision()
             revision_end = revision_head
 
-        revision_parents = {
-            revision_start: []
-        }
+        revision_parents = {revision_start: []}
 
         if not start_from_scratch:
             # Check if we already know a previous revision for that origin
             if self.latest_snapshot:
-                swh_rev = self.latest_snapshot['revision']
+                swh_rev = self.latest_snapshot["revision"]
             else:
                 swh_rev = None
 
             # Determine from which known revision to start
-            swh_rev = self._init_from(last_known_swh_revision,
-                                      previous_swh_revision=swh_rev)
+            swh_rev = self._init_from(
+                last_known_swh_revision, previous_swh_revision=swh_rev
+            )
 
             if swh_rev:  # Yes, we know a previous revision. Try and update it.
-                extra_headers = dict(swh_rev['metadata']['extra_headers'])
-                revision_start = int(extra_headers['svn_revision'])
+                extra_headers = dict(swh_rev["metadata"]["extra_headers"])
+                revision_start = int(extra_headers["svn_revision"])
                 revision_parents = {
-                    revision_start: swh_rev['parents'],
+                    revision_start: swh_rev["parents"],
                 }
 
-                self.log.debug('svn export --ignore-keywords %s@%s' % (
-                    self.svnrepo.remote_url,
-                    revision_start))
+                self.log.debug(
+                    "svn export --ignore-keywords %s@%s"
+                    % (self.svnrepo.remote_url, revision_start)
+                )
 
                 if swh_rev and not self.check_history_not_altered(
-                        self.svnrepo,
+                    self.svnrepo, revision_start, swh_rev
+                ):
+                    msg = "History of svn %s@%s altered. " "Skipping..." % (
+                        self.svnrepo.remote_url,
                         revision_start,
-                        swh_rev):
-                    msg = 'History of svn %s@%s altered. ' \
-                          'Skipping...' % (
-                              self.svnrepo.remote_url, revision_start)
+                    )
                     raise SvnLoaderHistoryAltered(msg)
 
                 # now we know history is ok, we start at next revision
                 revision_start = revision_start + 1
                 # and the parent become the latest know revision for
                 # that repository
-                revision_parents[revision_start] = [swh_rev['id']]
+                revision_parents[revision_start] = [swh_rev["id"]]
 
         if revision_start > revision_end and revision_start != 1:
-            msg = '%s@%s already injected.' % (self.svnrepo.remote_url,
-                                               revision_end)
+            msg = "%s@%s already injected." % (self.svnrepo.remote_url, revision_end)
             raise SvnLoaderUneventful(msg)
 
-        self.log.info('Processing revisions [%s-%s] for %s' % (
-            revision_start, revision_end, self.svnrepo))
+        self.log.info(
+            "Processing revisions [%s-%s] for %s"
+            % (revision_start, revision_end, self.svnrepo)
+        )
 
         return revision_start, revision_end, revision_parents
 
@@ -369,25 +383,24 @@ Local repository not cleaned up for investigation: %s''' % (
 
         """
         if (count % self.check_revision) == 0:  # hash computation check
-            self.log.debug('Checking hash computations on revision %s...' %
-                           rev)
-            checked_dir_id = self.swh_revision_hash_tree_at_svn_revision(
-                rev)
+            self.log.debug("Checking hash computations on revision %s..." % rev)
+            checked_dir_id = self.swh_revision_hash_tree_at_svn_revision(rev)
             if checked_dir_id != dir_id:
-                err = 'Hash tree computation divergence detected ' \
-                      '(%s != %s), stopping!' % (
-                          hashutil.hash_to_hex(dir_id),
-                          hashutil.hash_to_hex(checked_dir_id))
+                err = (
+                    "Hash tree computation divergence detected "
+                    "(%s != %s), stopping!"
+                    % (
+                        hashutil.hash_to_hex(dir_id),
+                        hashutil.hash_to_hex(checked_dir_id),
+                    )
+                )
                 raise ValueError(err)
 
     def process_svn_revisions(
-            self, svnrepo, revision_start, revision_end,
-            revision_parents) -> Iterator[
-                Tuple[
-                    List[Content], List[SkippedContent], List[Directory],
-                    Revision
-                ]
-            ]:
+        self, svnrepo, revision_start, revision_end, revision_parents
+    ) -> Iterator[
+        Tuple[List[Content], List[SkippedContent], List[Directory], Revision]
+    ]:
         """Process svn revisions from revision_start to revision_end.
 
         At each svn revision, apply new diffs and simultaneously
@@ -406,9 +419,7 @@ Local repository not cleaned up for investigation: %s''' % (
             ValueError in case of a hash divergence detection
 
         """
-        gen_revs = svnrepo.swh_hash_data_per_revision(
-            revision_start,
-            revision_end)
+        gen_revs = svnrepo.swh_hash_data_per_revision(revision_start, revision_end)
         swh_revision = None
         count = 0
         for rev, nextrev, commit, new_objects, root_directory in gen_revs:
@@ -419,12 +430,17 @@ Local repository not cleaned up for investigation: %s''' % (
             # compute the fs tree's checksums
             dir_id = root_directory.hash
             swh_revision = self.build_swh_revision(
-                rev, commit, dir_id, revision_parents[rev])
+                rev, commit, dir_id, revision_parents[rev]
+            )
 
-            self.log.debug('rev: %s, swhrev: %s, dir: %s' % (
-                rev,
-                hashutil.hash_to_hex(swh_revision.id),
-                hashutil.hash_to_hex(dir_id)))
+            self.log.debug(
+                "rev: %s, swhrev: %s, dir: %s"
+                % (
+                    rev,
+                    hashutil.hash_to_hex(swh_revision.id),
+                    hashutil.hash_to_hex(dir_id),
+                )
+            )
 
             if self.check_revision:
                 self._check_revision_divergence(count, rev, dir_id)
@@ -435,9 +451,7 @@ Local repository not cleaned up for investigation: %s''' % (
             yield _contents, _skipped_contents, _directories, swh_revision
 
     def prepare_origin_visit(self, *args, **kwargs):
-        self.origin = Origin(
-            url=self.origin_url if self.origin_url else self.svn_url
-        )
+        self.origin = Origin(url=self.origin_url if self.origin_url else self.svn_url)
 
     def prepare(self, *args, **kwargs):
         if self.swh_revision:
@@ -446,34 +460,38 @@ Local repository not cleaned up for investigation: %s''' % (
             self.last_known_swh_revision = None
 
         self.latest_snapshot = self.swh_latest_snapshot_revision(
-            self.origin_url, self.last_known_swh_revision)
+            self.origin_url, self.last_known_swh_revision
+        )
 
         if self.destination_path:
             local_dirname = self.destination_path
         else:
             local_dirname = tempfile.mkdtemp(
-                suffix='-%s' % os.getpid(),
+                suffix="-%s" % os.getpid(),
                 prefix=TEMPORARY_DIR_PREFIX_PATTERN,
-                dir=self.temp_directory)
+                dir=self.temp_directory,
+            )
 
         self.svnrepo = svn.SvnRepo(
-            self.svn_url, local_dirname, self.origin_url,
-            self.max_content_length)
+            self.svn_url, self.origin_url, local_dirname, self.max_content_length
+        )
 
         try:
             revision_start, revision_end, revision_parents = self.start_from(
-                self.last_known_swh_revision, self.start_from_scratch)
+                self.last_known_swh_revision, self.start_from_scratch
+            )
             self.swh_revision_gen = self.process_svn_revisions(
-                self.svnrepo, revision_start, revision_end, revision_parents)
+                self.svnrepo, revision_start, revision_end, revision_parents
+            )
         except SvnLoaderUneventful as e:
             self.log.warning(e)
-            if self.latest_snapshot and 'snapshot' in self.latest_snapshot:
-                self._snapshot = self.latest_snapshot['snapshot']
+            if self.latest_snapshot and "snapshot" in self.latest_snapshot:
+                self._snapshot = self.latest_snapshot["snapshot"]
             self.done = True
         except SvnLoaderHistoryAltered as e:
             self.log.error(e)
             self.done = True
-            self._visit_status = 'partial'
+            self._visit_status = "partial"
 
     def fetch_data(self):
         """Fetching svn revision information.
@@ -499,24 +517,21 @@ Local repository not cleaned up for investigation: %s''' % (
 
         try:
             data = next(self.swh_revision_gen)
-            self._load_status = 'eventful'
+            self._load_status = "eventful"
         except StopIteration:
             self.done = True
-            self._visit_status = 'full'
+            self._visit_status = "full"
             return False  # Stopping iteration
         except Exception as e:  # svn:external, hash divergence, i/o error...
             self.log.exception(e)
             self.done = True
-            self._visit_status = 'partial'
+            self._visit_status = "partial"
             return False  # Stopping iteration
         self._contents, self._skipped_contents, self._directories, rev = data
         if rev:
             self._last_revision = rev
             self._revisions.append(rev)
         return True  # next svn revision
-
-    def get_snapshot_id(self) -> Optional[Sha1Git]:
-        return self.snapshot.id if self.snapshot else None
 
     def store_data(self):
         """We store the data accumulated in internal instance variable.  If
@@ -533,15 +548,17 @@ Local repository not cleaned up for investigation: %s''' % (
 
         if self.done:  # finish line, snapshot!
             self.snapshot = self.generate_and_load_snapshot(
-                revision=self._last_revision,
-                snapshot=self._snapshot
+                revision=self._last_revision, snapshot=self._snapshot
             )
             self.flush()
+            self.loaded_snapshot_id = self.snapshot.id
 
         # reset internal state for next iteration
         self._revisions = []
 
-    def generate_and_load_snapshot(self, revision=None, snapshot=None):
+    def generate_and_load_snapshot(
+        self, revision: Optional[Revision] = None, snapshot: Optional[Snapshot] = None
+    ) -> Snapshot:
         """Create the snapshot either from existing revision or snapshot.
 
         Revision (supposedly new) has priority over the snapshot
@@ -560,14 +577,16 @@ Local repository not cleaned up for investigation: %s''' % (
         elif snapshot:  # Fallback to prior snapshot
             snap = snapshot
         else:
-            return None
-        self.log.debug('snapshot: %s' % snap)
+            raise ValueError(
+                "generate_and_load_snapshot called with null revision and snapshot!"
+            )
+        self.log.debug("snapshot: %s" % snap)
         self.storage.snapshot_add([snap])
         return snap
 
     def load_status(self):
         return {
-            'status': self._load_status,
+            "status": self._load_status,
         }
 
     def visit_status(self):
@@ -579,35 +598,47 @@ class SvnLoaderFromDumpArchive(SvnLoader):
        an svn repository and load said repository.
 
     """
-    def __init__(self, url, archive_path,
-                 origin_url=None, destination_path=None,
-                 swh_revision=None, start_from_scratch=None,
-                 visit_date=None):
-        super().__init__(url,
-                         origin_url=origin_url,
-                         destination_path=destination_path,
-                         swh_revision=swh_revision,
-                         start_from_scratch=start_from_scratch,
-                         visit_date=visit_date)
+
+    def __init__(
+        self,
+        url,
+        archive_path,
+        origin_url=None,
+        destination_path=None,
+        swh_revision=None,
+        start_from_scratch=None,
+        visit_date=None,
+    ):
+        super().__init__(
+            url,
+            origin_url=origin_url,
+            destination_path=destination_path,
+            swh_revision=swh_revision,
+            start_from_scratch=start_from_scratch,
+            visit_date=visit_date,
+        )
         self.archive_path = archive_path
         self.temp_dir = None
         self.repo_path = None
 
     def prepare(self, *args, **kwargs):
-        self.log.info('Archive to mount and load %s' % self.archive_path)
+        self.log.info("Archive to mount and load %s" % self.archive_path)
         self.temp_dir, self.repo_path = init_svn_repo_from_archive_dump(
             self.archive_path,
             prefix=TEMPORARY_DIR_PREFIX_PATTERN,
-            suffix='-%s' % os.getpid(),
-            root_dir=self.temp_directory)
+            suffix="-%s" % os.getpid(),
+            root_dir=self.temp_directory,
+        )
         super().prepare(*args, **kwargs)
 
     def cleanup(self):
         super().cleanup()
 
         if self.temp_dir and os.path.exists(self.temp_dir):
-            msg = 'Clean up temporary directory dump %s for project %s' % (
-                self.temp_dir, os.path.basename(self.repo_path))
+            msg = "Clean up temporary directory dump %s for project %s" % (
+                self.temp_dir,
+                os.path.basename(self.repo_path),
+            )
             self.log.debug(msg)
             shutil.rmtree(self.temp_dir)
 
@@ -617,13 +648,24 @@ class SvnLoaderFromRemoteDump(SvnLoader):
     Create a subversion repository dump using the svnrdump utility,
     mount it locally and load the repository from it.
     """
-    def __init__(self, url, origin_url=None, destination_path=None,
-                 swh_revision=None, start_from_scratch=False, visit_date=None):
-        super().__init__(url, origin_url=origin_url,
-                         destination_path=destination_path,
-                         swh_revision=swh_revision,
-                         start_from_scratch=start_from_scratch,
-                         visit_date=visit_date)
+
+    def __init__(
+        self,
+        url,
+        origin_url=None,
+        destination_path=None,
+        swh_revision=None,
+        start_from_scratch=False,
+        visit_date=None,
+    ):
+        super().__init__(
+            url,
+            origin_url=origin_url,
+            destination_path=destination_path,
+            swh_revision=swh_revision,
+            start_from_scratch=start_from_scratch,
+            visit_date=visit_date,
+        )
         self.temp_dir = tempfile.mkdtemp(dir=self.temp_directory)
         self.repo_path = None
         self.truncated_dump = False
@@ -636,13 +678,10 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         """
         last_loaded_svn_rev = -1
         try:
-            origin = \
-                self.storage.origin_get({'url': svn_url})
-            last_swh_rev = \
-                self.swh_latest_snapshot_revision(origin['url'])['revision']
-            last_swh_rev_headers = \
-                dict(last_swh_rev['metadata']['extra_headers'])
-            last_loaded_svn_rev = int(last_swh_rev_headers['svn_revision'])
+            origin = self.storage.origin_get({"url": svn_url})
+            last_swh_rev = self.swh_latest_snapshot_revision(origin["url"])["revision"]
+            last_swh_rev_headers = dict(last_swh_rev["metadata"]["extra_headers"])
+            last_loaded_svn_rev = int(last_swh_rev_headers["svn_revision"])
         except Exception:
             pass
         return last_loaded_svn_rev
@@ -655,16 +694,16 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         loading is still feasible.
         """
         # Build the svnrdump command line
-        svnrdump_cmd = ['svnrdump', 'dump', svn_url]
+        svnrdump_cmd = ["svnrdump", "dump", svn_url]
 
         # Launch the svnrdump command while capturing stderr as
         # successfully dumped revision numbers are printed to it
         dump_temp_dir = tempfile.mkdtemp(dir=self.temp_dir)
-        dump_name = ''.join(c for c in svn_url if c.isalnum())
-        dump_path = '%s/%s.svndump' % (dump_temp_dir, dump_name)
+        dump_name = "".join(c for c in svn_url if c.isalnum())
+        dump_path = "%s/%s.svndump" % (dump_temp_dir, dump_name)
         stderr_lines = []
-        self.log.debug('Executing %s' % ' '.join(svnrdump_cmd))
-        with open(dump_path, 'wb') as dump_file:
+        self.log.debug("Executing %s" % " ".join(svnrdump_cmd))
+        with open(dump_path, "wb") as dump_file:
             stderr_r, stderr_w = pty.openpty()
             svnrdump = Popen(svnrdump_cmd, stdout=dump_file, stderr=stderr_w)
             os.close(stderr_w)
@@ -691,39 +730,54 @@ class SvnLoaderFromRemoteDump(SvnLoader):
 
         if last_dumped_rev:
             # Get the latest dumped revision number
-            matched_rev = re.search('.*revision ([0-9]+)', last_dumped_rev)
+            matched_rev = re.search(".*revision ([0-9]+)", last_dumped_rev)
             last_dumped_rev = int(matched_rev.group(1)) if matched_rev else -1
             # Check if revisions inside the dump file can be loaded anyway
             if last_dumped_rev > last_loaded_svn_rev:
-                self.log.debug(('svnrdump did not dump all expected revisions '
-                                'but revisions range %s:%s are available in '
-                                'the generated dump file and will be loaded '
-                                'into the archive.') % (last_loaded_svn_rev+1,
-                                                        last_dumped_rev))
+                self.log.debug(
+                    (
+                        "svnrdump did not dump all expected revisions "
+                        "but revisions range %s:%s are available in "
+                        "the generated dump file and will be loaded "
+                        "into the archive."
+                    )
+                    % (last_loaded_svn_rev + 1, last_dumped_rev)
+                )
                 # Truncate the dump file after the last successfully dumped
                 # revision to avoid the loading of corrupted data
-                self.log.debug(('Truncating dump file after the last '
-                                'successfully dumped revision (%s) to avoid '
-                                'the loading of corrupted data')
-                               % last_dumped_rev)
+                self.log.debug(
+                    (
+                        "Truncating dump file after the last "
+                        "successfully dumped revision (%s) to avoid "
+                        "the loading of corrupted data"
+                    )
+                    % last_dumped_rev
+                )
 
-                with open(dump_path, 'r+b') as f:
+                with open(dump_path, "r+b") as f:
                     with mmap(f.fileno(), 0, access=ACCESS_WRITE) as s:
-                        pattern = ('Revision-number: %s' %
-                                   (last_dumped_rev+1)).encode()
+                        pattern = (
+                            "Revision-number: %s" % (last_dumped_rev + 1)
+                        ).encode()
                         n = s.rfind(pattern)
                         if n != -1:
                             s.resize(n)
                 self.truncated_dump = True
                 return dump_path
             elif last_dumped_rev != -1:
-                raise Exception(('Last dumped subversion revision (%s) is '
-                                 'lesser than the last one loaded into the '
-                                 'archive (%s).') % (last_dumped_rev,
-                                                     last_loaded_svn_rev))
+                raise Exception(
+                    (
+                        "Last dumped subversion revision (%s) is "
+                        "lesser than the last one loaded into the "
+                        "archive (%s)."
+                    )
+                    % (last_dumped_rev, last_loaded_svn_rev)
+                )
 
-        raise Exception('An error occurred when running svnrdump and '
-                        'no exploitable dump file has been generated.')
+        raise Exception(
+            "An error occurred when running svnrdump and "
+            "no exploitable dump file has been generated."
+        )
 
     def prepare(self, *args, **kwargs):
         # First, check if previous revisions have been loaded for the
@@ -736,12 +790,13 @@ class SvnLoaderFromRemoteDump(SvnLoader):
 
         # Finally, mount the dump and load the repository
         self.log.debug('Mounting dump file with "svnadmin load".')
-        _, self.repo_path = \
-            init_svn_repo_from_dump(dump_path,
-                                    prefix=TEMPORARY_DIR_PREFIX_PATTERN,
-                                    suffix='-%s' % os.getpid(),
-                                    root_dir=self.temp_dir)
-        self.svn_url = 'file://%s' % self.repo_path
+        _, self.repo_path = init_svn_repo_from_dump(
+            dump_path,
+            prefix=TEMPORARY_DIR_PREFIX_PATTERN,
+            suffix="-%s" % os.getpid(),
+            root_dir=self.temp_dir,
+        )
+        self.svn_url = "file://%s" % self.repo_path
         super().prepare(*args, **kwargs)
 
     def cleanup(self):
@@ -751,6 +806,6 @@ class SvnLoaderFromRemoteDump(SvnLoader):
 
     def visit_status(self):
         if self.truncated_dump:
-            return 'partial'
+            return "partial"
         else:
             return super().visit_status()

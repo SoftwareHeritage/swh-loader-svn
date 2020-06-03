@@ -9,5 +9,5 @@ export PYBUILD_DISABLE_python3.8=1
 
 override_dh_install:
 	dh_install
-	rm -v $(CURDIR)/debian/python3-*/usr/lib/python*/dist-packages/swh/__init__.py
-	rm -v $(CURDIR)/debian/python3-*/usr/lib/python*/dist-packages/swh/loader/__init__.py
+	rm -fv $(CURDIR)/debian/python3-*/usr/lib/python*/dist-packages/swh/__init__.py
+	rm -fv $(CURDIR)/debian/python3-*/usr/lib/python*/dist-packages/swh/loader/__init__.py

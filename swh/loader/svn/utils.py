@@ -115,7 +115,10 @@ def init_svn_repo_from_dump(
             read_dump_cmd = ["gzip", "-dc", dump_path]
 
         with Popen(read_dump_cmd, stdout=PIPE) as dump:
-            cmd = ["svnadmin", "load", "-q", repo_path]
+            # load dump and bypass properties validation as Unicode decoding errors
+            # are already handled in loader implementation (see _ra_codecs_error_handler
+            # in ra.py)
+            cmd = ["svnadmin", "load", "-q", "--bypass-prop-validation", repo_path]
             r = call(cmd, stdin=dump.stdout)
             if r != 0:
                 raise ValueError(

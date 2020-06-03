@@ -15,7 +15,7 @@ import tempfile
 
 from mmap import mmap, ACCESS_WRITE
 from subprocess import Popen
-from typing import Iterator, List, Tuple
+from typing import Iterator, List, Optional, Tuple
 
 from swh.model import hashutil
 from swh.model.model import (
@@ -556,7 +556,9 @@ Local repository not cleaned up for investigation: %s"""
         # reset internal state for next iteration
         self._revisions = []
 
-    def generate_and_load_snapshot(self, revision=None, snapshot=None):
+    def generate_and_load_snapshot(
+        self, revision: Optional[Revision] = None, snapshot: Optional[Snapshot] = None
+    ) -> Snapshot:
         """Create the snapshot either from existing revision or snapshot.
 
         Revision (supposedly new) has priority over the snapshot
@@ -575,7 +577,9 @@ Local repository not cleaned up for investigation: %s"""
         elif snapshot:  # Fallback to prior snapshot
             snap = snapshot
         else:
-            return None
+            raise ValueError(
+                "generate_and_load_snapshot called with null revision and snapshot!"
+            )
         self.log.debug("snapshot: %s" % snap)
         self.storage.snapshot_add([snap])
         return snap

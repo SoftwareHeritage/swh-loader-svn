@@ -1,3 +1,9 @@
+swh-loader-svn (0.1.1-1~swh2~bpo10+1) buster-swh; urgency=medium
+
+  * Rebuild for buster-swh
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Wed, 03 Jun 2020 14:17:30 +0000
+
 swh-loader-svn (0.1.1-1~swh2) unstable-swh; urgency=medium
 
   * Force removing __init__.py files.

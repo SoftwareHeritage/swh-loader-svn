@@ -3,7 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional, Sequence
 
 from swh.model.model import Person, Revision, RevisionType, TimestampWithTimezone
 
@@ -41,7 +41,7 @@ def svn_author_to_swh_person(author: Optional[bytes]) -> Person:
 
 
 def build_swh_revision(
-    rev: int, commit: Dict, repo_uuid: str, dir_id: bytes, parents: List[bytes]
+    rev: int, commit: Dict, repo_uuid: str, dir_id: bytes, parents: Sequence[bytes]
 ) -> Revision:
     """Given a svn revision, build a swh revision.
 
@@ -80,5 +80,5 @@ def build_swh_revision(
         committer=author,
         synthetic=True,
         metadata=metadata,
-        parents=parents,
+        parents=tuple(parents),
     )

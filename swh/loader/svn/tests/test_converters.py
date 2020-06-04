@@ -62,7 +62,7 @@ def test_build_swh_revision_default():
             "author_date": date,
         },
         rev=10,
-        parents=[],
+        parents=(),
     )
 
     expected_rev = Revision.from_dict(
@@ -86,7 +86,7 @@ def test_build_swh_revision_default():
             "metadata": {
                 "extra_headers": [["svn_repo_uuid", b"uuid"], ["svn_revision", b"10"],]
             },
-            "parents": [],
+            "parents": (),
         }
     )
 

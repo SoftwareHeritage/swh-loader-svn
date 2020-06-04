@@ -216,7 +216,9 @@ _LAST_SNP_REV = {
     "snapshot": Snapshot.from_dict({"id": GOURMET_FLAG_SNAPSHOT, "branches": {}}),
     "revision": {
         "id": hashutil.hash_to_bytes("4876cb10aec6f708f7466dddf547567b65f6c39c"),
-        "parents": [hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41")],
+        "parents": (
+            hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41"),
+        ),
         "directory": hashutil.hash_to_bytes("0deab3023ac59398ae467fc4bff5583008af1ee2"),
         "target_type": "revision",
         "metadata": {
@@ -422,9 +424,9 @@ class SvnLoaderTest6(BaseSvnLoaderTest):
                 "id": hashutil.hash_to_bytes(
                     "4876cb10aec6f708f7466dddf547567b65f6c39c"
                 ),
-                "parents": [
-                    hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41")
-                ],
+                "parents": (
+                    hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41"),
+                ),
                 "directory": hashutil.hash_to_bytes(
                     "0deab3023ac59398ae467fc4bff5583008af1ee2"
                 ),
@@ -490,9 +492,9 @@ class SvnLoaderTest7(BaseSvnLoaderTest):
     def setUp(self):
         previous_unfinished_revision = {
             "id": hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41"),
-            "parents": [
-                hashutil.hash_to_bytes("3f51abf3b3d466571be0855dfa67e094f9ceff1b")
-            ],
+            "parents": (
+                hashutil.hash_to_bytes("3f51abf3b3d466571be0855dfa67e094f9ceff1b"),
+            ),
             "directory": hashutil.hash_to_bytes(
                 "7dc52cc04c3b8bd7c085900d60c159f7b846f866"
             ),
@@ -562,9 +564,9 @@ class SvnLoaderTest8(BaseSvnLoaderTest):
                 "id": hashutil.hash_to_bytes(
                     "a3a577948fdbda9d1061913b77a1588695eadb41"
                 ),
-                "parents": [
-                    hashutil.hash_to_bytes("3f51abf3b3d466571be0855dfa67e094f9ceff1b")
-                ],
+                "parents": (
+                    hashutil.hash_to_bytes("3f51abf3b3d466571be0855dfa67e094f9ceff1b"),
+                ),
                 "directory": hashutil.hash_to_bytes(
                     "7dc52cc04c3b8bd7c085900d60c159f7b846f866"
                 ),
@@ -579,9 +581,9 @@ class SvnLoaderTest8(BaseSvnLoaderTest):
         }
         previous_unfinished_revision = {
             "id": hashutil.hash_to_bytes("4876cb10aec6f708f7466dddf547567b65f6c39c"),
-            "parents": [
-                hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41")
-            ],
+            "parents": (
+                hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41"),
+            ),
             "directory": hashutil.hash_to_bytes(
                 "0deab3023ac59398ae467fc4bff5583008af1ee2"
             ),

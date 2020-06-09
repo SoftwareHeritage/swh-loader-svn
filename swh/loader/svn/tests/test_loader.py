@@ -183,8 +183,7 @@ class SvnLoaderTest1(BaseSvnLoaderTest):
 
         """
         # when
-        self.loader.load()
-
+        assert self.loader.load() == {"status": "eventful"}
         # then
         self.assertCountRevisions(6)
         self.assertCountReleases(0)
@@ -204,7 +203,6 @@ class SvnLoaderTest1(BaseSvnLoaderTest):
 
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.load_status(), {"status": "eventful"})
         self.assertEqual(self.loader.visit_status(), "full")
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
@@ -216,7 +214,9 @@ _LAST_SNP_REV = {
     "snapshot": Snapshot.from_dict({"id": GOURMET_FLAG_SNAPSHOT, "branches": {}}),
     "revision": {
         "id": hashutil.hash_to_bytes("4876cb10aec6f708f7466dddf547567b65f6c39c"),
-        "parents": [hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41")],
+        "parents": (
+            hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41"),
+        ),
         "directory": hashutil.hash_to_bytes("0deab3023ac59398ae467fc4bff5583008af1ee2"),
         "target_type": "revision",
         "metadata": {
@@ -243,7 +243,7 @@ class SvnLoaderTest2(BaseSvnLoaderTest):
 
         """
         # when
-        self.loader.load()
+        assert self.loader.load() == {"status": "uneventful"}
 
         # then
 
@@ -252,7 +252,6 @@ class SvnLoaderTest2(BaseSvnLoaderTest):
         self.assertCountRevisions(0)
         self.assertCountReleases(0)
         self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.load_status(), {"status": "uneventful"})
         self.assertEqual(self.loader.visit_status(), "full")
         visit = self.storage.origin_visit_get_latest(self.repo_url)
         self.assertEqual(visit["snapshot"], GOURMET_FLAG_SNAPSHOT)
@@ -285,7 +284,7 @@ class SvnLoaderTest3(BaseSvnLoaderTest):
 
         """
         # when
-        self.loader.load()
+        assert self.loader.load() == {"status": "failed"}
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -295,7 +294,6 @@ class SvnLoaderTest3(BaseSvnLoaderTest):
         self.assertCountRevisions(0)
         self.assertCountReleases(0)
         self.assertCountSnapshots(0)
-        self.assertEqual(self.loader.load_status(), {"status": "uneventful"})
         self.assertEqual(self.loader.visit_status(), "partial")
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
@@ -321,7 +319,7 @@ class SvnLoaderTest4(BaseSvnLoaderTest):
 
         """
         # when
-        self.loader.load()
+        assert self.loader.load() == {"status": "eventful"}
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -344,7 +342,6 @@ class SvnLoaderTest4(BaseSvnLoaderTest):
         self.assertRevisionsContain(expected_revisions)
 
         self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.load_status(), {"status": "eventful"})
         self.assertEqual(self.loader.visit_status(), "full")
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
@@ -373,7 +370,7 @@ class SvnLoaderTest5(BaseSvnLoaderTest):
 
         """
         # when
-        self.loader.load()
+        assert self.loader.load() == {"status": "eventful"}
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -399,7 +396,6 @@ class SvnLoaderTest5(BaseSvnLoaderTest):
         self.assertRevisionsContain(expected_revisions)
 
         self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.load_status(), {"status": "eventful"})
         self.assertEqual(self.loader.visit_status(), "full")
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
@@ -422,9 +418,9 @@ class SvnLoaderTest6(BaseSvnLoaderTest):
                 "id": hashutil.hash_to_bytes(
                     "4876cb10aec6f708f7466dddf547567b65f6c39c"
                 ),
-                "parents": [
-                    hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41")
-                ],
+                "parents": (
+                    hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41"),
+                ),
                 "directory": hashutil.hash_to_bytes(
                     "0deab3023ac59398ae467fc4bff5583008af1ee2"
                 ),
@@ -449,7 +445,7 @@ class SvnLoaderTest6(BaseSvnLoaderTest):
 
         """
         # when
-        self.loader.load()
+        assert self.loader.load() == {"status": "eventful"}
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -471,7 +467,6 @@ class SvnLoaderTest6(BaseSvnLoaderTest):
 
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.load_status(), {"status": "eventful"})
         self.assertEqual(self.loader.visit_status(), "full")
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
@@ -490,9 +485,9 @@ class SvnLoaderTest7(BaseSvnLoaderTest):
     def setUp(self):
         previous_unfinished_revision = {
             "id": hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41"),
-            "parents": [
-                hashutil.hash_to_bytes("3f51abf3b3d466571be0855dfa67e094f9ceff1b")
-            ],
+            "parents": (
+                hashutil.hash_to_bytes("3f51abf3b3d466571be0855dfa67e094f9ceff1b"),
+            ),
             "directory": hashutil.hash_to_bytes(
                 "7dc52cc04c3b8bd7c085900d60c159f7b846f866"
             ),
@@ -516,7 +511,7 @@ class SvnLoaderTest7(BaseSvnLoaderTest):
         """
 
         # when
-        self.loader.load()
+        assert self.loader.load() == {"status": "eventful"}
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -538,7 +533,6 @@ class SvnLoaderTest7(BaseSvnLoaderTest):
 
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.load_status(), {"status": "eventful"})
         self.assertEqual(self.loader.visit_status(), "full")
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
@@ -562,9 +556,9 @@ class SvnLoaderTest8(BaseSvnLoaderTest):
                 "id": hashutil.hash_to_bytes(
                     "a3a577948fdbda9d1061913b77a1588695eadb41"
                 ),
-                "parents": [
-                    hashutil.hash_to_bytes("3f51abf3b3d466571be0855dfa67e094f9ceff1b")
-                ],
+                "parents": (
+                    hashutil.hash_to_bytes("3f51abf3b3d466571be0855dfa67e094f9ceff1b"),
+                ),
                 "directory": hashutil.hash_to_bytes(
                     "7dc52cc04c3b8bd7c085900d60c159f7b846f866"
                 ),
@@ -579,9 +573,9 @@ class SvnLoaderTest8(BaseSvnLoaderTest):
         }
         previous_unfinished_revision = {
             "id": hashutil.hash_to_bytes("4876cb10aec6f708f7466dddf547567b65f6c39c"),
-            "parents": [
-                hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41")
-            ],
+            "parents": (
+                hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41"),
+            ),
             "directory": hashutil.hash_to_bytes(
                 "0deab3023ac59398ae467fc4bff5583008af1ee2"
             ),
@@ -604,7 +598,7 @@ class SvnLoaderTest8(BaseSvnLoaderTest):
 
         """
         # when
-        self.loader.load()
+        assert self.loader.load() == {"status": "eventful"}
 
         # then
         # we got the previous run's last revision (rev 6)
@@ -626,7 +620,6 @@ class SvnLoaderTest8(BaseSvnLoaderTest):
 
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.load_status(), {"status": "eventful"})
         self.assertEqual(self.loader.visit_status(), "full")
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
@@ -653,14 +646,13 @@ class SvnLoaderTest9(BaseSvnLoaderTest):
 
         """
         # when
-        self.loader.load()
+        assert self.loader.load() == {"status": "eventful"}
 
         expected_revisions = {
             "7da4975c363101b819756d33459f30a866d01b1b": "f63637223ee0f7d4951ffd2d4d9547a4882c5d8b"  # noqa
         }
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.load_status(), {"status": "eventful"})
         self.assertEqual(self.loader.visit_status(), "full")
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
@@ -687,7 +679,7 @@ class SvnLoaderTest10(BaseSvnLoaderTest):  # noqa
         """Load repo with mixed CRLF/LF endings (svn:eol-style:native) is ok
 
         """
-        self.loader.load()
+        assert self.loader.load() == {"status": "eventful"}
 
         expected_revisions = {
             "9c6962eeb9164a636c374be700672355e34a98a7": "16aa6b6271f3456d4643999d234cf39fe3d0cc5a"  # noqa
@@ -695,7 +687,6 @@ class SvnLoaderTest10(BaseSvnLoaderTest):  # noqa
 
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.load_status(), {"status": "eventful"})
         self.assertEqual(self.loader.visit_status(), "full")
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
@@ -724,7 +715,7 @@ class SvnLoaderTest11(BaseSvnLoaderTest):
         """
 
         # when
-        self.loader.load()
+        assert self.loader.load() == {"status": "eventful"}
 
         # then repositories holds 21 revisions, but the last commit
         # one holds an 'svn:externals' property which will make the
@@ -760,7 +751,6 @@ class SvnLoaderTest11(BaseSvnLoaderTest):
         # The last revision being the one used later to start back from
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.load_status(), {"status": "eventful"})
         self.assertEqual(self.loader.visit_status(), "partial")
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
@@ -789,7 +779,7 @@ class SvnLoaderTest12(BaseSvnLoaderTest):
         """
 
         # when
-        self.loader.load()
+        assert self.loader.load() == {"status": "eventful"}
 
         # then repositories holds 14 revisions, but the last commit
         self.assertCountRevisions(19)
@@ -821,7 +811,6 @@ class SvnLoaderTest12(BaseSvnLoaderTest):
 
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.load_status(), {"status": "eventful"})
         self.assertEqual(self.loader.visit_status(), "full")
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
@@ -844,7 +833,7 @@ class SvnLoaderTest13(BaseSvnLoaderTest):
 
         """
         # when
-        self.loader.load()
+        assert self.loader.load() == {"status": "eventful"}
 
         # then repositories holds 14 revisions, but the last commit
         self.assertCountRevisions(21)
@@ -879,7 +868,6 @@ class SvnLoaderTest13(BaseSvnLoaderTest):
 
         self.assertRevisionsContain(expected_revisions)
         self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.load_status(), {"status": "eventful"})
         self.assertEqual(self.loader.visit_status(), "full")
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)
@@ -942,7 +930,7 @@ class SvnLoaderTest14(BaseSvnLoaderTest):
 
         """
         # when
-        self.loader.load()
+        assert self.loader.load() == {"status": "eventful"}
 
         self.assertCountRevisions(7, "7 svn commits")
         self.assertCountReleases(0)
@@ -968,7 +956,6 @@ class SvnLoaderTest14(BaseSvnLoaderTest):
 
         self.assertSnapshotEqual(expected_snapshot_id, expected_branches)
 
-        self.assertEqual(self.loader.load_status(), {"status": "eventful"})
         self.assertEqual(self.loader.visit_status(), "full")
 
         visit = self.storage.origin_visit_get_latest(self.repo_url)

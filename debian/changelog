@@ -1,3 +1,13 @@
+swh-loader-svn (0.1.2-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.1.2     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2020-06-09 11:03:56
+    +0200)
+  * Upstream changes:     - v0.1.2     - test_loader: assert returned
+    loader status is what we expect     - Adapt to swh.model 0.3
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Tue, 09 Jun 2020 09:06:01 +0000
+
 swh-loader-svn (0.1.1-1~swh3) unstable-swh; urgency=medium
 
   * Enable build for python3.8 (Debian ships a patched subvertpy.)

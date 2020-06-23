@@ -3,10 +3,10 @@ click
 retrying
 python-dateutil
 subvertpy>=0.9.4
-swh.storage>=0.1
+swh.storage>=0.7.0
 swh.model>=0.3
 swh.scheduler>=0.0.39
-swh.loader.core>=0.2
+swh.loader.core>=0.3.2
 
 [testing]
 pytest

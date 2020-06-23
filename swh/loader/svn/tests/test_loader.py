@@ -7,6 +7,8 @@ import copy
 import os
 
 from swh.loader.core.tests import BaseLoaderTest
+from swh.loader.tests.common import assert_last_visit_matches
+
 from swh.loader.svn.loader import (
     DEFAULT_BRANCH,
     SvnLoader,
@@ -205,9 +207,13 @@ class SvnLoaderTest1(BaseSvnLoaderTest):
         self.assertCountSnapshots(1)
         self.assertEqual(self.loader.visit_status(), "full")
 
-        visit = self.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], GOURMET_SNAPSHOT)
-        self.assertEqual(visit["status"], "full")
+        assert_last_visit_matches(
+            self.storage,
+            self.repo_url,
+            status="full",
+            type="svn",
+            snapshot=GOURMET_SNAPSHOT,
+        )
 
 
 _LAST_SNP_REV = {
@@ -253,9 +259,14 @@ class SvnLoaderTest2(BaseSvnLoaderTest):
         self.assertCountReleases(0)
         self.assertCountSnapshots(1)
         self.assertEqual(self.loader.visit_status(), "full")
-        visit = self.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], GOURMET_FLAG_SNAPSHOT)
-        self.assertEqual(visit["status"], "full")
+
+        assert_last_visit_matches(
+            self.storage,
+            self.repo_url,
+            status="full",
+            type="svn",
+            snapshot=GOURMET_FLAG_SNAPSHOT,
+        )
 
 
 class SvnLoaderTest3(BaseSvnLoaderTest):
@@ -296,9 +307,10 @@ class SvnLoaderTest3(BaseSvnLoaderTest):
         self.assertCountSnapshots(0)
         self.assertEqual(self.loader.visit_status(), "partial")
 
-        visit = self.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], None)
-        self.assertEqual(visit["status"], "partial")
+        visit_status = assert_last_visit_matches(
+            self.storage, self.repo_url, status="partial", type="svn"
+        )
+        assert visit_status.snapshot is None
 
 
 class SvnLoaderTest4(BaseSvnLoaderTest):
@@ -344,9 +356,13 @@ class SvnLoaderTest4(BaseSvnLoaderTest):
         self.assertCountSnapshots(1)
         self.assertEqual(self.loader.visit_status(), "full")
 
-        visit = self.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], GOURMET_UPDATES_SNAPSHOT)
-        self.assertEqual(visit["status"], "full")
+        assert_last_visit_matches(
+            self.storage,
+            self.repo_url,
+            status="full",
+            type="svn",
+            snapshot=GOURMET_UPDATES_SNAPSHOT,
+        )
 
 
 class SvnLoaderTest5(BaseSvnLoaderTest):
@@ -398,9 +414,13 @@ class SvnLoaderTest5(BaseSvnLoaderTest):
         self.assertCountSnapshots(1)
         self.assertEqual(self.loader.visit_status(), "full")
 
-        visit = self.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], GOURMET_UPDATES_SNAPSHOT)
-        self.assertEqual(visit["status"], "full")
+        assert_last_visit_matches(
+            self.storage,
+            self.repo_url,
+            status="full",
+            type="svn",
+            snapshot=GOURMET_UPDATES_SNAPSHOT,
+        )
 
 
 class SvnLoaderTest6(BaseSvnLoaderTest):
@@ -469,9 +489,13 @@ class SvnLoaderTest6(BaseSvnLoaderTest):
         self.assertCountSnapshots(1)
         self.assertEqual(self.loader.visit_status(), "full")
 
-        visit = self.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], GOURMET_UPDATES_SNAPSHOT)
-        self.assertEqual(visit["status"], "full")
+        assert_last_visit_matches(
+            self.storage,
+            self.repo_url,
+            status="full",
+            type="svn",
+            snapshot=GOURMET_UPDATES_SNAPSHOT,
+        )
 
 
 class SvnLoaderTest7(BaseSvnLoaderTest):
@@ -535,9 +559,13 @@ class SvnLoaderTest7(BaseSvnLoaderTest):
         self.assertCountSnapshots(1)
         self.assertEqual(self.loader.visit_status(), "full")
 
-        visit = self.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], GOURMET_UPDATES_SNAPSHOT)
-        self.assertEqual(visit["status"], "full")
+        assert_last_visit_matches(
+            self.storage,
+            self.repo_url,
+            status="full",
+            type="svn",
+            snapshot=GOURMET_UPDATES_SNAPSHOT,
+        )
 
 
 class SvnLoaderTest8(BaseSvnLoaderTest):
@@ -622,9 +650,13 @@ class SvnLoaderTest8(BaseSvnLoaderTest):
         self.assertCountSnapshots(1)
         self.assertEqual(self.loader.visit_status(), "full")
 
-        visit = self.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], GOURMET_UPDATES_SNAPSHOT)
-        self.assertEqual(visit["status"], "full")
+        assert_last_visit_matches(
+            self.storage,
+            self.repo_url,
+            status="full",
+            type="svn",
+            snapshot=GOURMET_UPDATES_SNAPSHOT,
+        )
 
 
 class SvnLoaderTest9(BaseSvnLoaderTest):
@@ -655,9 +687,13 @@ class SvnLoaderTest9(BaseSvnLoaderTest):
         self.assertCountSnapshots(1)
         self.assertEqual(self.loader.visit_status(), "full")
 
-        visit = self.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], MEDIAWIKI_SNAPSHOT)
-        self.assertEqual(visit["status"], "full")
+        assert_last_visit_matches(
+            self.storage,
+            self.repo_url,
+            status="full",
+            type="svn",
+            snapshot=MEDIAWIKI_SNAPSHOT,
+        )
 
 
 class SvnLoaderTest10(BaseSvnLoaderTest):  # noqa
@@ -689,9 +725,13 @@ class SvnLoaderTest10(BaseSvnLoaderTest):  # noqa
         self.assertCountSnapshots(1)
         self.assertEqual(self.loader.visit_status(), "full")
 
-        visit = self.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], PYANG_SNAPSHOT)
-        self.assertEqual(visit["status"], "full")
+        assert_last_visit_matches(
+            self.storage,
+            self.repo_url,
+            status="full",
+            type="svn",
+            snapshot=PYANG_SNAPSHOT,
+        )
 
 
 class SvnLoaderTest11(BaseSvnLoaderTest):
@@ -753,9 +793,13 @@ class SvnLoaderTest11(BaseSvnLoaderTest):
         self.assertCountSnapshots(1)
         self.assertEqual(self.loader.visit_status(), "partial")
 
-        visit = self.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], GOURMET_EXTERNALS_SNAPSHOT)
-        self.assertEqual(visit["status"], "partial")
+        assert_last_visit_matches(
+            self.storage,
+            self.repo_url,
+            status="partial",
+            type="svn",
+            snapshot=GOURMET_EXTERNALS_SNAPSHOT,
+        )
 
 
 class SvnLoaderTest12(BaseSvnLoaderTest):
@@ -813,9 +857,13 @@ class SvnLoaderTest12(BaseSvnLoaderTest):
         self.assertCountSnapshots(1)
         self.assertEqual(self.loader.visit_status(), "full")
 
-        visit = self.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], GOURMET_EDGE_CASES_SNAPSHOT)
-        self.assertEqual(visit["status"], "full")
+        assert_last_visit_matches(
+            self.storage,
+            self.repo_url,
+            status="full",
+            type="svn",
+            snapshot=GOURMET_EDGE_CASES_SNAPSHOT,
+        )
 
 
 class SvnLoaderTest13(BaseSvnLoaderTest):
@@ -870,9 +918,13 @@ class SvnLoaderTest13(BaseSvnLoaderTest):
         self.assertCountSnapshots(1)
         self.assertEqual(self.loader.visit_status(), "full")
 
-        visit = self.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], GOURMET_WRONG_LINKS_SNAPSHOT)
-        self.assertEqual(visit["status"], "full")
+        assert_last_visit_matches(
+            self.storage,
+            self.repo_url,
+            status="full",
+            type="svn",
+            snapshot=GOURMET_WRONG_LINKS_SNAPSHOT,
+        )
 
 
 class SvnLoaderTestFromRemoteDump(SvnLoaderTest, SvnLoaderFromRemoteDump):
@@ -908,11 +960,21 @@ class SvnLoaderFromRemoteDumpTest(BaseSvnLoaderTest):
         base_storage_stat = base_loader.storage.stat_counters()
         self.assertEqual(dump_storage_stat, base_storage_stat)
 
-        visit = dump_loader.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], GOURMET_SNAPSHOT)
+        assert_last_visit_matches(
+            self.storage,
+            self.repo_url,
+            status="full",
+            type="svn",
+            snapshot=GOURMET_SNAPSHOT,
+        )
 
-        visit = base_loader.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(visit["snapshot"], GOURMET_SNAPSHOT)
+        assert_last_visit_matches(
+            base_loader.storage,
+            self.repo_url,
+            status="full",
+            type="svn",
+            snapshot=GOURMET_SNAPSHOT,
+        )
 
 
 class SvnLoaderTest14(BaseSvnLoaderTest):
@@ -958,8 +1020,10 @@ class SvnLoaderTest14(BaseSvnLoaderTest):
 
         self.assertEqual(self.loader.visit_status(), "full")
 
-        visit = self.storage.origin_visit_get_latest(self.repo_url)
-        self.assertEqual(
-            visit["snapshot"], hashutil.hash_to_bytes(expected_snapshot_id)
+        assert_last_visit_matches(
+            self.storage,
+            self.repo_url,
+            status="full",
+            type="svn",
+            snapshot=hashutil.hash_to_bytes(expected_snapshot_id),
         )
-        self.assertEqual(visit["status"], "full")

@@ -15,7 +15,7 @@ import tempfile
 
 from mmap import mmap, ACCESS_WRITE
 from subprocess import Popen
-from typing import Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 from swh.model import hashutil
 from swh.model.model import (
@@ -31,7 +31,7 @@ from swh.model.model import (
 from swh.model import from_disk
 from swh.loader.core.loader import BaseLoader
 from swh.loader.core.utils import clean_dangling_folders
-from swh.storage.algos.snapshot import snapshot_get_all_branches
+from swh.storage.algos.snapshot import snapshot_get_latest
 
 from . import svn, converters
 from .utils import (
@@ -166,43 +166,45 @@ Local repository not cleaned up for investigation: %s"""
         self.svnrepo.clean_fs(local_dirname)
         return h
 
-    def swh_latest_snapshot_revision(self, origin_url, previous_swh_revision=None):
+    def swh_latest_snapshot_revision(
+        self,
+        origin_url: str,
+        previous_swh_revision: Optional[Union[bytes, dict]] = None,
+    ) -> Dict[str, Any]:
         """Look for latest snapshot revision and returns it if any.
 
         Args:
-            origin_url (str): Origin identifier
-            previous_swh_revision: (optional) id of a possible
-                                   previous swh revision
+            origin_url: Origin identifier
+            previous_swh_revision: possible previous swh revision (either a dict or
+                revision identifier)
 
         Returns:
-            dict: The latest known point in time. Dict with keys:
+            dict: The latest known point in time as dict with keys (if any):
 
                 'revision': latest visited revision
                 'snapshot': latest snapshot
 
-            If None is found, return an empty dict.
+            If no snapshot matching criteria is found, returns an empty dict.
 
         """
         storage = self.storage
-        if not previous_swh_revision:  # check latest snapshot's revision
-            visit = storage.origin_visit_get_latest(origin_url, require_snapshot=True)
-            if visit:
-                latest_snap = snapshot_get_all_branches(storage, visit["snapshot"])
-                if latest_snap:
-                    branches = latest_snap.get("branches")
-                    if not branches:
-                        return {}
-                    branch = branches.get(DEFAULT_BRANCH)
-                    if not branch:
-                        return {}
-                    target_type = branch["target_type"]
-                    if target_type != "revision":
-                        return {}
-                    previous_swh_revision = branch["target"]
-                else:
-                    return {}
-            else:
+
+        latest_snapshot_d = {}
+        if not previous_swh_revision:
+            latest_snapshot = snapshot_get_latest(storage, origin_url)
+            if not latest_snapshot:
                 return {}
+            latest_snapshot_d = latest_snapshot.to_dict()
+            branches = latest_snapshot.branches
+            if not branches:
+                return {}
+            branch = branches.get(DEFAULT_BRANCH)
+            if not branch:
+                return {}
+            target_type = branch.target_type.value
+            if target_type != "revision":
+                return {}
+            previous_swh_revision = branch.target
 
         if isinstance(previous_swh_revision, dict):
             swh_id = previous_swh_revision["id"]
@@ -211,7 +213,7 @@ Local repository not cleaned up for investigation: %s"""
 
         revs = list(storage.revision_get([swh_id]))
         if revs:
-            return {"snapshot": latest_snap, "revision": revs[0]}
+            return {"snapshot": latest_snapshot_d, "revision": revs[0]}
         return {}
 
     def build_swh_revision(self, rev, commit, dir_id, parents):

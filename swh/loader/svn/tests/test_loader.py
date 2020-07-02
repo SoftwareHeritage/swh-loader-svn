@@ -5,9 +5,13 @@
 
 import copy
 import os
+import subprocess
+
+from typing import Optional
 
 from swh.loader.core.tests import BaseLoaderTest
 from swh.loader.tests.common import assert_last_visit_matches
+from swh.loader.package.tests.common import check_snapshot, get_stats
 
 from swh.loader.svn.loader import (
     DEFAULT_BRANCH,
@@ -175,45 +179,54 @@ class BaseSvnLoaderTest(BaseLoaderTest):
         self.storage = self.loader.storage
 
 
-class SvnLoaderTest1(BaseSvnLoaderTest):
-    """Load an unknown svn repository results in new data.
+def prepare_repository_from_archive(
+    archive_path: str, filename: Optional[str] = None, tmp_path: str = "/tmp"
+) -> str:
+    # uncompress folder/repositories/dump for the loader to ingest
+    subprocess.check_output(["tar", "xf", archive_path, "-C", tmp_path])
+    # build the origin url (or some derivative form)
+    _fname = filename if filename else os.path.basename(archive_path)
+    repo_url = f"file://{tmp_path}/{_fname}"
+    return repo_url
 
-    """
 
-    def test_load(self):
-        """Load a new repository results in new swh object and snapshot
+def test_loader_svn_new_visit(swh_config, datadir, tmp_path):
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-        """
-        # when
-        assert self.loader.load() == {"status": "eventful"}
-        # then
-        self.assertCountRevisions(6)
-        self.assertCountReleases(0)
+    loader = SvnLoader(repo_url, destination_path=tmp_path)
 
-        last_revision = "4876cb10aec6f708f7466dddf547567b65f6c39c"
-        # cf. test_loader.org for explaining from where those hashes
-        # come from
-        expected_revisions = {
-            # revision hash | directory hash
-            "0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71": "669a71cce6c424a81ba42b7dc5d560d32252f0ca",  # noqa
-            "95edacc8848369d6fb1608e887d6d2474fd5224f": "008ac97a1118560797c50e3392fa1443acdaa349",  # noqa
-            "fef26ea45a520071711ba2b9d16a2985ee837021": "3780effbe846a26751a95a8c95c511fb72be15b4",  # noqa
-            "3f51abf3b3d466571be0855dfa67e094f9ceff1b": "ffcca9b09c5827a6b8137322d4339c8055c3ee1e",  # noqa
-            "a3a577948fdbda9d1061913b77a1588695eadb41": "7dc52cc04c3b8bd7c085900d60c159f7b846f866",  # noqa
-            last_revision: "0deab3023ac59398ae467fc4bff5583008af1ee2",  # noqa
-        }
+    assert loader.load() == {"status": "eventful"}
 
-        self.assertRevisionsContain(expected_revisions)
-        self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.visit_status(), "full")
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT,
+    )
 
-        assert_last_visit_matches(
-            self.storage,
-            self.repo_url,
-            status="full",
-            type="svn",
-            snapshot=GOURMET_SNAPSHOT,
-        )
+    stats = get_stats(loader.storage)
+    assert stats == {
+        "content": 19,
+        "directory": 17,
+        "origin": 1,
+        "origin_visit": 1,
+        "person": 1,
+        "release": 0,
+        "revision": 6,
+        "skipped_content": 0,
+        "snapshot": 1,
+    }
+
+    expected_snapshot = {
+        "id": GOURMET_SNAPSHOT,
+        "branches": {
+            "HEAD": {
+                "target": "4876cb10aec6f708f7466dddf547567b65f6c39c",
+                "target_type": "revision",
+            }
+        },
+    }
+
+    check_snapshot(expected_snapshot, loader.storage)
 
 
 _LAST_SNP_REV = {

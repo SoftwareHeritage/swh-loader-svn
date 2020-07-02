@@ -1,4 +1,4 @@
-# Copyright (C) 2019  The Software Heritage developers
+# Copyright (C) 2019-2020  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -18,7 +18,6 @@ def swh_loader_config() -> Dict[str, Any]:
         "storage": {
             "cls": "pipeline",
             "steps": [
-                {"cls": "validate"},
                 {"cls": "filter"},
                 {
                     "cls": "buffer",
@@ -56,3 +55,12 @@ def celery_includes():
     return [
         "swh.loader.svn.tasks",
     ]
+
+
+@pytest.fixture
+def datadir(request):
+    """Override default datadir because it's named `resources` in this repository and not
+    `data` as expected by the default fixture.
+
+    """
+    return os.path.join(os.path.dirname(str(request.fspath)), "resources")

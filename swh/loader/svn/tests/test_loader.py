@@ -122,8 +122,7 @@ def test_loader_svn_2_visits_no_change(swh_config, datadir, tmp_path):
         loader.storage, repo_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT,
     )
 
-    # FIXME: This should be uneventful here as there is no change in between visits...
-    assert loader.load() == {"status": "eventful"}
+    assert loader.load() == {"status": "uneventful"}
     visit_status2 = assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT,
     )

@@ -489,6 +489,7 @@ Local repository not cleaned up for investigation: %s"""
             if self.latest_snapshot and "snapshot" in self.latest_snapshot:
                 self._snapshot = self.latest_snapshot["snapshot"]
             self.done = True
+            self._load_status = "uneventful"
         except SvnLoaderHistoryAltered as e:
             self.log.error(e)
             self.done = True

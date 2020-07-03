@@ -630,68 +630,48 @@ def test_loader_svn_with_external_properties(swh_config, datadir, tmp_path):
     assert stats["revision"] == 21 - 1  # commit with the svn:external property
 
 
-class SvnLoaderTest12(BaseSvnLoaderTest):
-    """Edge cases:
+def test_loader_svn_with_symlink(swh_config, datadir, tmp_path):
+    """Repository with symlinks should be ingested ok
+
+    Edge case:
        - first create a file and commit it.
          Remove it, then add folder holding the same name, commit.
        - do the same scenario with symbolic link (instead of file)
 
     """
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(
+        datadir, "pkg-gourmet-with-edge-case-links-and-files.tgz"
+    )
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    def setUp(self):
-        previous_unfinished_revision = None
-        super().setUp(
-            archive_name="pkg-gourmet-with-edge-case-links-and-files.tgz",
-            swh_revision=previous_unfinished_revision,
-        )
+    loader = SvnLoader(repo_url)
 
-    def test_load(self):
-        """File/Link removed prior to folder with same name creation is ok
+    assert loader.load() == {"status": "eventful"}
+    expected_snapshot = {
+        "id": GOURMET_EDGE_CASES_SNAPSHOT,
+        "branches": {
+            "HEAD": {
+                "target": "3f43af2578fccf18b0d4198e48563da7929dc608",
+                "target_type": "revision",
+            }
+        },
+    }
+    check_snapshot(expected_snapshot, loader.storage)
 
-        """
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_EDGE_CASES_SNAPSHOT,
+    )
 
-        # when
-        assert self.loader.load() == {"status": "eventful"}
-
-        # then repositories holds 14 revisions, but the last commit
-        self.assertCountRevisions(19)
-        self.assertCountReleases(0)
-
-        last_revision = "3f43af2578fccf18b0d4198e48563da7929dc608"
-        expected_revisions = {
-            # revision hash | directory hash
-            "0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71": "669a71cce6c424a81ba42b7dc5d560d32252f0ca",  # noqa
-            "95edacc8848369d6fb1608e887d6d2474fd5224f": "008ac97a1118560797c50e3392fa1443acdaa349",  # noqa
-            "fef26ea45a520071711ba2b9d16a2985ee837021": "3780effbe846a26751a95a8c95c511fb72be15b4",  # noqa
-            "3f51abf3b3d466571be0855dfa67e094f9ceff1b": "ffcca9b09c5827a6b8137322d4339c8055c3ee1e",  # noqa
-            "a3a577948fdbda9d1061913b77a1588695eadb41": "7dc52cc04c3b8bd7c085900d60c159f7b846f866",  # noqa
-            "4876cb10aec6f708f7466dddf547567b65f6c39c": "0deab3023ac59398ae467fc4bff5583008af1ee2",  # noqa
-            "7f5bc909c29d4e93d8ccfdda516e51ed44930ee1": "752c52134dcbf2fff13c7be1ce4e9e5dbf428a59",  # noqa
-            "38d81702cb28db4f1a6821e64321e5825d1f7fd6": "39c813fb4717a4864bacefbd90b51a3241ae4140",  # noqa
-            "99c27ebbd43feca179ac0e895af131d8314cafe1": "3397ca7f709639cbd36b18a0d1b70bce80018c45",  # noqa
-            "902f29b4323a9b9de3af6d28e72dd581e76d9397": "c4e12483f0a13e6851459295a4ae735eb4e4b5c4",  # noqa
-            "171dc35522bfd17dda4e90a542a0377fb2fc707a": "fd24a76c87a3207428e06612b49860fc78e9f6dc",  # noqa
-            "9231f9a98a9051a0cd34231cddd4e11773f8348e": "6c07f4f4ac780eaf99a247fbfd0897533598dd36",  # noqa
-            "c309bd3b57796696d6655ab3ab0b438fdd2d8201": "fd24a76c87a3207428e06612b49860fc78e9f6dc",  # noqa
-            "bb78300cc1ac9119eb6fffa9e9fa04a7f9340b11": "ee995a0d85f6917c75bcee3aa448bea7726b265d",  # noqa
-            "f2e01111329f84580dc3febb1fd45515692c5886": "e2baec7b6a5543758e9c73695bc847db0a4f7941",  # noqa
-            "1a0f70c34e211f073e1be3435ecf6f0dd7700267": "e7536e721fa806c19971b749c091c144b2f2b88e",  # noqa
-            "0c612a23d293cc3100496a54ae4ad13d750efe4c": "2123d12749294bbfb54e73f9d73fac658aabb266",  # noqa
-            "69a53d972e2f863acbbbda546d9da96287af6a88": "13896cb96ec004140ce5be8852fee8c29830d9c7",  # noqa
-            last_revision: "6b1e0243768ff9ac060064b2eeade77e764ffc82",  # noqa
-        }
-
-        self.assertRevisionsContain(expected_revisions)
-        self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.visit_status(), "full")
-
-        assert_last_visit_matches(
-            self.storage,
-            self.repo_url,
-            status="full",
-            type="svn",
-            snapshot=GOURMET_EDGE_CASES_SNAPSHOT,
-        )
+    stats = get_stats(loader.storage)
+    assert stats["origin"] == 1
+    assert stats["origin_visit"] == 1
+    assert stats["snapshot"] == 1
+    assert stats["revision"] == 19
 
 
 class SvnLoaderTest13(BaseSvnLoaderTest):

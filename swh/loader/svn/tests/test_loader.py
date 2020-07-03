@@ -8,7 +8,6 @@ import subprocess
 
 from typing import Optional
 
-from swh.loader.core.tests import BaseLoaderTest
 from swh.loader.tests.common import assert_last_visit_matches
 from swh.loader.package.tests.common import check_snapshot, get_stats
 
@@ -19,7 +18,7 @@ from swh.loader.svn.loader import (
     build_swh_snapshot,
 )
 from swh.model import hashutil
-from swh.model.model import Origin, Snapshot
+from swh.model.model import Snapshot
 
 
 def test_build_swh_snapshot():
@@ -34,39 +33,7 @@ def test_build_swh_snapshot():
     assert snap == expected_snapshot
 
 
-_LOADER_TEST_CONFIG = {
-    "check_revision": {"limit": 100, "status": False},
-    "debug": False,
-    "log_db": "dbname=softwareheritage-log",
-    "save_data": False,
-    "save_data_path": "",
-    "temp_directory": "/tmp",
-    "max_content_size": 100 * 1024 * 1024,
-    "storage": {
-        "cls": "pipeline",
-        "steps": [
-            {"cls": "retry",},
-            {"cls": "filter",},
-            {
-                "cls": "buffer",
-                "min_batch_size": {
-                    "content": 10000,
-                    "content_bytes": 1073741824,
-                    "directory": 2500,
-                    "revision": 10,
-                    "release": 100,
-                },
-            },
-            {"cls": "memory"},
-        ],
-    },
-}
-
 GOURMET_SNAPSHOT = hashutil.hash_to_bytes("889cacc2731e3312abfb2b1a0c18ade82a949e07")
-
-GOURMET_FLAG_SNAPSHOT = hashutil.hash_to_bytes(
-    "0011223344556677889900112233445566778899"
-)
 
 GOURMET_UPDATES_SNAPSHOT = hashutil.hash_to_bytes(
     "11086d15317014e43d2438b7ffc712c44f1b8afe"
@@ -87,95 +54,6 @@ GOURMET_WRONG_LINKS_SNAPSHOT = hashutil.hash_to_bytes(
 MEDIAWIKI_SNAPSHOT = hashutil.hash_to_bytes("d6d6e9703f157c5702d9a4a5dec878926ed4ab76")
 
 PYANG_SNAPSHOT = hashutil.hash_to_bytes("6d9590de11b00a5801de0ff3297c5b44bbbf7d24")
-
-
-class SvnLoaderTest(SvnLoader):
-    """An SVNLoader with no persistence.
-
-    Context:
-        Load a new svn repository using the swh policy (so no update).
-
-    """
-
-    def __init__(
-        self,
-        url,
-        last_snp_rev={},
-        destination_path=None,
-        start_from_scratch=False,
-        swh_revision=None,
-    ):
-        super().__init__(
-            url,
-            destination_path=destination_path,
-            start_from_scratch=start_from_scratch,
-            swh_revision=swh_revision,
-        )
-        self.origin = Origin(url=url)
-        self.last_snp_rev = last_snp_rev
-
-    def parse_config_file(self, *args, **kwargs):
-        return _LOADER_TEST_CONFIG
-
-    def swh_latest_snapshot_revision(self, origin_url, prev_swh_revision=None):
-        """Avoid the storage persistence call and return the expected previous
-        revision for that repository.
-
-        Check the following for explanation about the hashes:
-        - test_loader.org for (swh policy).
-        - cf. SvnLoaderTest
-
-        """
-        return self.last_snp_rev
-
-
-class BaseSvnLoaderTest(BaseLoaderTest):
-    """Base test loader class.
-
-    In its setup, it's uncompressing a local svn mirror to /tmp.
-
-    """
-
-    def setUp(
-        self,
-        archive_name="pkg-gourmet.tgz",
-        filename="pkg-gourmet",
-        loader=None,
-        snapshot=None,
-        type="default",
-        start_from_scratch=False,
-        swh_revision=None,
-    ):
-        super().setUp(
-            archive_name=archive_name,
-            filename=filename,
-            prefix_tmp_folder_name="swh.loader.svn.",
-            start_path=os.path.dirname(__file__),
-        )
-        self.svn_mirror_url = self.repo_url
-        if type == "default":
-            loader_test_class = SvnLoaderTest
-        else:
-            loader_test_class = SvnLoaderTestFromRemoteDump
-
-        if loader:
-            self.loader = loader
-        elif snapshot:
-            self.loader = loader_test_class(
-                self.svn_mirror_url,
-                destination_path=self.destination_path,
-                start_from_scratch=start_from_scratch,
-                swh_revision=swh_revision,
-                last_snp_rev=snapshot,
-            )
-        else:
-            self.loader = loader_test_class(
-                self.svn_mirror_url,
-                destination_path=self.destination_path,
-                start_from_scratch=start_from_scratch,
-                swh_revision=swh_revision,
-            )
-        self.storage = self.loader.storage
 
 
 def prepare_repository_from_archive(
@@ -277,25 +155,6 @@ def test_loader_svn_2_visits_no_change(swh_config, datadir, tmp_path):
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT,
     )
-
-
-_LAST_SNP_REV = {
-    "snapshot": Snapshot.from_dict({"id": GOURMET_FLAG_SNAPSHOT, "branches": {}}),
-    "revision": {
-        "id": hashutil.hash_to_bytes("4876cb10aec6f708f7466dddf547567b65f6c39c"),
-        "parents": (
-            hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41"),
-        ),
-        "directory": hashutil.hash_to_bytes("0deab3023ac59398ae467fc4bff5583008af1ee2"),
-        "target_type": "revision",
-        "metadata": {
-            "extra_headers": [
-                ["svn_repo_uuid", "3187e211-bb14-4c82-9596-0b59d67cd7f4"],
-                ["svn_revision", "6"],
-            ]
-        },
-    },
-}
 
 
 def test_loader_tampered_repository(swh_config, datadir, tmp_path):
@@ -777,10 +636,6 @@ def test_loader_svn_loader_from_dump_archive(swh_config, datadir, tmp_path):
     assert stats["origin"] == 2
     assert stats["origin_visit"] == 3
     assert stats["snapshot"] == 1
-
-
-class SvnLoaderTestFromRemoteDump(SvnLoaderTest, SvnLoaderFromRemoteDump):
-    pass
 
 
 def test_loader_user_defined_svn_properties(swh_config, datadir, tmp_path):

@@ -776,53 +776,43 @@ class SvnLoaderTestFromRemoteDump(SvnLoaderTest, SvnLoaderFromRemoteDump):
     pass
 
 
-class SvnLoaderTest14(BaseSvnLoaderTest):
-    """Edge cases: The repository held some user defined svn-properties
-       with special encodings, this prevented the repository from
-       being loaded even though we do not ingest those information.
+def test_loader_user_defined_svn_properties(swh_config, datadir, tmp_path):
+    """Edge cases: The repository held some user defined svn-properties with special
+       encodings, this prevented the repository from being loaded even though we do not
+       ingest those information.
 
     """
+    archive_name = "httthttt"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    def setUp(self):
-        super().setUp(archive_name="httthttt.tgz", filename="httthttt")
+    loader = SvnLoader(repo_url)
 
-    def test_load(self):
-        """Decoding user defined svn properties error should not fail loading
+    assert loader.load() == {"status": "eventful"}
+    expected_snapshot_id = hashutil.hash_to_bytes(
+        "70487267f682c07e52a2371061369b6cf5bffa47"
+    )
+    expected_snapshot = {
+        "id": expected_snapshot_id,
+        "branches": {
+            "HEAD": {
+                "target": "604a17dbb15e8d7ecb3e9f3768d09bf493667a93",
+                "target_type": "revision",
+            }
+        },
+    }
+    check_snapshot(expected_snapshot, loader.storage)
 
-        """
-        # when
-        assert self.loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=expected_snapshot_id,
+    )
 
-        self.assertCountRevisions(7, "7 svn commits")
-        self.assertCountReleases(0)
-
-        last_revision = "604a17dbb15e8d7ecb3e9f3768d09bf493667a93"
-
-        expected_revisions = {
-            "e6ae8487c6d14df9e6cb7196c6aac045798fd5be": "75ed58f260bfa4102d0e09657803511f5f0ab372",  # noqa
-            "e1e3314e0e9c9d17e6a3f60d6662f48f0e3c2fa3": "7bfb95cef68c1affe8d7f786353213d92abbb2b7",  # noqa
-            "1632fd38a8653e9b607c00feb93a41faddfb544c": "cd6de65c84d9405e7ca45fead02aa10162e30727",  # noqa
-            "0ad1ebbb92d00721644b0a46d6322d18dbcba848": "cd6de65c84d9405e7ca45fead02aa10162e30727",  # noqa
-            "94b87c97697d178a9311b018daa5179f7d4ba31e": "c2128108adecb59a0144339c2e701cd8118cff5a",  # noqa
-            "bd741cf22f0642d88cd0d8b545e8896b898c692d": "c2128108adecb59a0144339c2e701cd8118cff5a",  # noqa
-            last_revision: "f051d60256b2d89a0ca2704d6f91ad1b0ab44e02",
-        }
-
-        self.assertRevisionsContain(expected_revisions)
-
-        expected_snapshot_id = "70487267f682c07e52a2371061369b6cf5bffa47"
-        expected_branches = {
-            "HEAD": {"target": last_revision, "target_type": "revision"}
-        }
-
-        self.assertSnapshotEqual(expected_snapshot_id, expected_branches)
-
-        self.assertEqual(self.loader.visit_status(), "full")
-
-        assert_last_visit_matches(
-            self.storage,
-            self.repo_url,
-            status="full",
-            type="svn",
-            snapshot=hashutil.hash_to_bytes(expected_snapshot_id),
-        )
+    stats = get_stats(loader.storage)
+    assert stats["origin"] == 1
+    assert stats["origin_visit"] == 1
+    assert stats["snapshot"] == 1
+    assert stats["revision"] == 7

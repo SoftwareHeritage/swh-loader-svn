@@ -715,54 +715,65 @@ def test_loader_svn_with_wrong_symlinks(swh_config, datadir, tmp_path):
     assert stats["revision"] == 21
 
 
+def test_loader_svn_loader_from_dump_archive(swh_config, datadir, tmp_path):
+    """Repository with wrong symlinks should be ingested ok nonetheless
+
+    Edge case:
+       - wrong symbolic link
+       - wrong symbolic link with empty space names
+
+    """
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    loaderFromDump = SvnLoaderFromRemoteDump(repo_url)
+    assert loaderFromDump.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loaderFromDump.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT,
+    )
+
+    origin_url = repo_url + "2"  # rename to another origin
+    loader = SvnLoader(repo_url, origin_url=origin_url)
+    assert loader.load() == {"status": "eventful"}  # because are working on new origin
+    assert_last_visit_matches(
+        loader.storage, origin_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT
+    )
+
+    expected_snapshot = {
+        "id": GOURMET_SNAPSHOT,
+        "branches": {
+            "HEAD": {
+                "target": "4876cb10aec6f708f7466dddf547567b65f6c39c",
+                "target_type": "revision",
+            }
+        },
+    }
+    check_snapshot(expected_snapshot, loader.storage)
+
+    stats = get_stats(loader.storage)
+    assert stats["origin"] == 2  # created one more origin
+    assert stats["origin_visit"] == 2
+    assert stats["snapshot"] == 1
+
+    loader = SvnLoader(repo_url)  # no change on the origin-url
+    assert loader.load() == {"status": "uneventful"}
+    assert_last_visit_matches(
+        loader.storage, origin_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT
+    )
+
+    stats = get_stats(loader.storage)
+    assert stats["origin"] == 2
+    assert stats["origin_visit"] == 3
+    assert stats["snapshot"] == 1
+
+
 class SvnLoaderTestFromRemoteDump(SvnLoaderTest, SvnLoaderFromRemoteDump):
     pass
-
-
-class SvnLoaderFromRemoteDumpTest(BaseSvnLoaderTest):
-    """
-    Check that the results obtained with the remote svn dump loader
-    and the base svn loader are the same.
-    """
-
-    def setUp(self):
-        _LOADER_TEST_CONFIG["debug"] = True  # to avoid cleanup in between load
-        super().setUp(archive_name="pkg-gourmet.tgz", type="remote")
-
-    def test_load(self):
-        """
-        Compare results of remote dump loader and base loader
-        """
-        dump_loader = self.loader
-        dump_loader.load()
-
-        self.assertCountContents(19)
-        self.assertCountDirectories(17)
-        self.assertCountRevisions(6)
-        self.assertCountSnapshots(1)
-
-        base_loader = SvnLoaderTest(self.svn_mirror_url)
-        base_loader.load()
-
-        dump_storage_stat = dump_loader.storage.stat_counters()
-        base_storage_stat = base_loader.storage.stat_counters()
-        self.assertEqual(dump_storage_stat, base_storage_stat)
-
-        assert_last_visit_matches(
-            self.storage,
-            self.repo_url,
-            status="full",
-            type="svn",
-            snapshot=GOURMET_SNAPSHOT,
-        )
-
-        assert_last_visit_matches(
-            base_loader.storage,
-            self.repo_url,
-            status="full",
-            type="svn",
-            snapshot=GOURMET_SNAPSHOT,
-        )
 
 
 class SvnLoaderTest14(BaseSvnLoaderTest):

@@ -10,10 +10,12 @@ import yaml
 from typing import Any, Dict
 
 from swh.scheduler.tests.conftest import swh_app  # noqa
+from swh.storage.tests.conftest import *  # noqa
 
 
 @pytest.fixture
-def swh_loader_config() -> Dict[str, Any]:
+def swh_loader_config(swh_storage_backend_config) -> Dict[str, Any]:
+    swh_storage_backend_config["journal_writer"] = {}
     return {
         "storage": {
             "cls": "pipeline",
@@ -29,7 +31,7 @@ def swh_loader_config() -> Dict[str, Any]:
                         "release": 100,
                     },
                 },
-                {"cls": "memory"},
+                swh_storage_backend_config,
             ],
         },
         "check_revision": {"limit": 100, "status": False},

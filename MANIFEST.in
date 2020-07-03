@@ -1,5 +1,5 @@
 include Makefile
 include requirements*.txt
 include version.txt
-recursive-include swh/loader/svn/tests/resources *
+recursive-include swh/loader/svn/tests/data *
 recursive-include swh py.typed

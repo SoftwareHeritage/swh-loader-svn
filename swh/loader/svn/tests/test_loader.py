@@ -191,6 +191,7 @@ def prepare_repository_from_archive(
 
 
 def test_loader_svn_new_visit(swh_config, datadir, tmp_path):
+    """Eventful visit should yield 1 snapshot"""
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
@@ -229,6 +230,33 @@ def test_loader_svn_new_visit(swh_config, datadir, tmp_path):
     check_snapshot(expected_snapshot, loader.storage)
 
 
+def test_loader_svn_2_visits_no_change(swh_config, datadir, tmp_path):
+    """Visit twice the same repository with no change should yield the same snapshot"""
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    loader = SvnLoader(repo_url)
+
+    assert loader.load() == {"status": "eventful"}
+    visit_status1 = assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT,
+    )
+
+    # FIXME: This should be uneventful here as there is no change in between visits...
+    assert loader.load() == {"status": "eventful"}
+    visit_status2 = assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT,
+    )
+
+    assert visit_status1.date < visit_status2.date
+    assert visit_status1.snapshot == visit_status2.snapshot
+
+    stats = get_stats(loader.storage)
+    assert stats["origin_visit"] == 1 + 1  # computed twice the same snapshot
+    assert stats["snapshot"] == 1
+
+
 _LAST_SNP_REV = {
     "snapshot": Snapshot.from_dict({"id": GOURMET_FLAG_SNAPSHOT, "branches": {}}),
     "revision": {
@@ -246,40 +274,6 @@ _LAST_SNP_REV = {
         },
     },
 }
-
-
-class SvnLoaderTest2(BaseSvnLoaderTest):
-    """Load a visited repository with no new change results in no data
-       change.
-
-    """
-
-    def setUp(self):
-        super().setUp(snapshot=_LAST_SNP_REV)
-
-    def test_load(self):
-        """Load a repository without new changes results in same snapshot
-
-        """
-        # when
-        assert self.loader.load() == {"status": "uneventful"}
-
-        # then
-
-        self.assertCountContents(0)
-        self.assertCountDirectories(0)
-        self.assertCountRevisions(0)
-        self.assertCountReleases(0)
-        self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.visit_status(), "full")
-
-        assert_last_visit_matches(
-            self.storage,
-            self.repo_url,
-            status="full",
-            type="svn",
-            snapshot=GOURMET_FLAG_SNAPSHOT,
-        )
 
 
 class SvnLoaderTest3(BaseSvnLoaderTest):

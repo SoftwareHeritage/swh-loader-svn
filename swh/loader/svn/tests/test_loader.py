@@ -231,7 +231,9 @@ def test_loader_svn_new_visit(swh_config, datadir, tmp_path):
 
 
 def test_loader_svn_2_visits_no_change(swh_config, datadir, tmp_path):
-    """Visit twice the same repository with no change should yield the same snapshot"""
+    """Visit multiple times a repository with no change should yield the same snapshot
+
+    """
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
@@ -255,6 +257,27 @@ def test_loader_svn_2_visits_no_change(swh_config, datadir, tmp_path):
     stats = get_stats(loader.storage)
     assert stats["origin_visit"] == 1 + 1  # computed twice the same snapshot
     assert stats["snapshot"] == 1
+
+    # even starting from previous revision...
+    revs = list(
+        loader.storage.revision_get(
+            [hashutil.hash_to_bytes("95edacc8848369d6fb1608e887d6d2474fd5224f")]
+        )
+    )
+    start_revision = revs[0]
+    assert start_revision is not None
+
+    loader = SvnLoader(repo_url, swh_revision=start_revision)
+    assert loader.load() == {"status": "eventful"}
+
+    stats = get_stats(loader.storage)
+    assert stats["origin_visit"] == 2 + 1
+    # ... with no change in repository, this yields the same snapshot
+    assert stats["snapshot"] == 1
+
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT,
+    )
 
 
 _LAST_SNP_REV = {
@@ -411,165 +434,85 @@ def test_loader_svn_visit_with_changes(swh_config, datadir, tmp_path):
     assert stats["snapshot"] == 2  # no new snapshot
 
 
-class SvnLoaderTest7(BaseSvnLoaderTest):
-    """Context:
-       - repository already visited with load successful
-       - Changes on existing repository
-       - New Visit done with successful new data
+def test_loader_svn_visit_start_from_revision(swh_config, datadir, tmp_path):
+    """Starting from existing revision, next visit on changed repo should yield 1 new
+       snapshot.
 
     """
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_initial_url = prepare_repository_from_archive(
+        archive_path, archive_name, tmp_path
+    )
 
-    def setUp(self):
-        previous_unfinished_revision = {
-            "id": hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41"),
-            "parents": (
-                hashutil.hash_to_bytes("3f51abf3b3d466571be0855dfa67e094f9ceff1b"),
-            ),
-            "directory": hashutil.hash_to_bytes(
-                "7dc52cc04c3b8bd7c085900d60c159f7b846f866"
-            ),
-            "target_type": "revision",
-            "metadata": {
-                "extra_headers": [
-                    ["svn_repo_uuid", "3187e211-bb14-4c82-9596-0b59d67cd7f4"],
-                    ["svn_revision", "5"],
-                ]
-            },
-        }
-        super().setUp(
-            archive_name="pkg-gourmet-with-updates.tgz",
-            snapshot=_LAST_SNP_REV,
-            swh_revision=previous_unfinished_revision,
+    # repo_initial_url becomes the origin_url we want to visit some more below
+    loader = SvnLoader(repo_initial_url)
+
+    assert loader.load() == {"status": "eventful"}
+    visit_status1 = assert_last_visit_matches(
+        loader.storage,
+        repo_initial_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT,
+    )
+
+    revs = list(
+        loader.storage.revision_get(
+            [hashutil.hash_to_bytes("95edacc8848369d6fb1608e887d6d2474fd5224f")]
         )
+    )
+    start_revision = revs[0]
+    assert start_revision is not None
 
-    def test_load(self):
-        """Load known and partial repository should start from last visit
+    archive_path = os.path.join(datadir, "pkg-gourmet-with-updates.tgz")
+    repo_updated_url = prepare_repository_from_archive(
+        archive_path, "pkg-gourmet", tmp_path
+    )
 
-        """
+    # we'll start from start_revision
+    loader = SvnLoader(
+        repo_updated_url, origin_url=repo_initial_url, swh_revision=start_revision
+    )
 
-        # when
-        assert self.loader.load() == {"status": "eventful"}
+    assert loader.load() == {"status": "eventful"}
 
-        # then
-        # we got the previous run's last revision (rev 6)
-        # so 2 new
-        self.assertCountRevisions(5)
-        self.assertCountReleases(0)
+    # nonetheless, we obtain the same snapshot (as previous tests on that repository)
+    visit_status2 = assert_last_visit_matches(
+        loader.storage,
+        repo_updated_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_UPDATES_SNAPSHOT,
+    )
 
-        last_revision = "171dc35522bfd17dda4e90a542a0377fb2fc707a"
-        # cf. test_loader.org for explaining from where those hashes
-        # come from
-        expected_revisions = {
-            # revision hash | directory hash
-            "7f5bc909c29d4e93d8ccfdda516e51ed44930ee1": "752c52134dcbf2fff13c7be1ce4e9e5dbf428a59",  # noqa
-            "38d81702cb28db4f1a6821e64321e5825d1f7fd6": "39c813fb4717a4864bacefbd90b51a3241ae4140",  # noqa
-            "99c27ebbd43feca179ac0e895af131d8314cafe1": "3397ca7f709639cbd36b18a0d1b70bce80018c45",  # noqa
-            "902f29b4323a9b9de3af6d28e72dd581e76d9397": "c4e12483f0a13e6851459295a4ae735eb4e4b5c4",  # noqa
-            last_revision: "fd24a76c87a3207428e06612b49860fc78e9f6dc",  # noqa
-        }
+    assert visit_status1.date < visit_status2.date
+    assert visit_status1.snapshot != visit_status2.snapshot
 
-        self.assertRevisionsContain(expected_revisions)
-        self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.visit_status(), "full")
+    stats = get_stats(loader.storage)
+    assert stats == {
+        "content": 22,
+        "directory": 28,
+        "origin": 1,
+        "origin_visit": 2,
+        "person": 2,
+        "release": 0,
+        "revision": 11,
+        "skipped_content": 0,
+        "snapshot": 2,
+    }
 
-        assert_last_visit_matches(
-            self.storage,
-            self.repo_url,
-            status="full",
-            type="svn",
-            snapshot=GOURMET_UPDATES_SNAPSHOT,
-        )
-
-
-class SvnLoaderTest8(BaseSvnLoaderTest):
-    """Context:
-
-       - Previous visit on existing repository done
-       - Starting the loading from the last unfinished visit
-       - New objects are created (1 new snapshot)
-
-    """
-
-    def setUp(self):
-        last_snp_rev = {
-            "snapshot": None,
-            "revision": {
-                "id": hashutil.hash_to_bytes(
-                    "a3a577948fdbda9d1061913b77a1588695eadb41"
-                ),
-                "parents": (
-                    hashutil.hash_to_bytes("3f51abf3b3d466571be0855dfa67e094f9ceff1b"),
-                ),
-                "directory": hashutil.hash_to_bytes(
-                    "7dc52cc04c3b8bd7c085900d60c159f7b846f866"
-                ),
+    expected_snapshot = {
+        "id": GOURMET_UPDATES_SNAPSHOT,
+        "branches": {
+            "HEAD": {
+                "target": "171dc35522bfd17dda4e90a542a0377fb2fc707a",
                 "target_type": "revision",
-                "metadata": {
-                    "extra_headers": [
-                        ["svn_repo_uuid", "3187e211-bb14-4c82-9596-0b59d67cd7f4"],
-                        ["svn_revision", "5"],
-                    ]
-                },
-            },
-        }
-        previous_unfinished_revision = {
-            "id": hashutil.hash_to_bytes("4876cb10aec6f708f7466dddf547567b65f6c39c"),
-            "parents": (
-                hashutil.hash_to_bytes("a3a577948fdbda9d1061913b77a1588695eadb41"),
-            ),
-            "directory": hashutil.hash_to_bytes(
-                "0deab3023ac59398ae467fc4bff5583008af1ee2"
-            ),
-            "target_type": "revision",
-            "metadata": {
-                "extra_headers": [
-                    ["svn_repo_uuid", "3187e211-bb14-4c82-9596-0b59d67cd7f4"],
-                    ["svn_revision", "6"],
-                ]
-            },
-        }
-        super().setUp(
-            archive_name="pkg-gourmet-with-updates.tgz",
-            snapshot=last_snp_rev,
-            swh_revision=previous_unfinished_revision,
-        )
+            }
+        },
+    }
 
-    def test_load(self):
-        """Load repository should yield revisions starting from last visit
-
-        """
-        # when
-        assert self.loader.load() == {"status": "eventful"}
-
-        # then
-        # we got the previous run's last revision (rev 6)
-        # so 2 new
-        self.assertCountRevisions(5)
-        self.assertCountReleases(0)
-
-        last_revision = "171dc35522bfd17dda4e90a542a0377fb2fc707a"
-        # cf. test_loader.org for explaining from where those hashes
-        # come from
-        expected_revisions = {
-            # revision hash | directory hash
-            "7f5bc909c29d4e93d8ccfdda516e51ed44930ee1": "752c52134dcbf2fff13c7be1ce4e9e5dbf428a59",  # noqa
-            "38d81702cb28db4f1a6821e64321e5825d1f7fd6": "39c813fb4717a4864bacefbd90b51a3241ae4140",  # noqa
-            "99c27ebbd43feca179ac0e895af131d8314cafe1": "3397ca7f709639cbd36b18a0d1b70bce80018c45",  # noqa
-            "902f29b4323a9b9de3af6d28e72dd581e76d9397": "c4e12483f0a13e6851459295a4ae735eb4e4b5c4",  # noqa
-            last_revision: "fd24a76c87a3207428e06612b49860fc78e9f6dc",  # noqa
-        }
-
-        self.assertRevisionsContain(expected_revisions)
-        self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.visit_status(), "full")
-
-        assert_last_visit_matches(
-            self.storage,
-            self.repo_url,
-            status="full",
-            type="svn",
-            snapshot=GOURMET_UPDATES_SNAPSHOT,
-        )
+    check_snapshot(expected_snapshot, loader.storage)
 
 
 class SvnLoaderTest9(BaseSvnLoaderTest):

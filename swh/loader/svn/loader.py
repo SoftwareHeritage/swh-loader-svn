@@ -114,7 +114,7 @@ class SvnLoader(BaseLoader):
         self._skipped_contents = []
         self._directories = []
         self._revisions = []
-        self._snapshot = None
+        self._snapshot: Optional[Snapshot] = None
         self._last_revision = None
         self._visit_status = "full"
         self._load_status = "uneventful"
@@ -188,13 +188,12 @@ Local repository not cleaned up for investigation: %s"""
 
         """
         storage = self.storage
+        latest_snapshot: Optional[Snapshot] = None
 
-        latest_snapshot_d = {}
         if not previous_swh_revision:
             latest_snapshot = snapshot_get_latest(storage, origin_url)
             if not latest_snapshot:
                 return {}
-            latest_snapshot_d = latest_snapshot.to_dict()
             branches = latest_snapshot.branches
             if not branches:
                 return {}
@@ -213,7 +212,7 @@ Local repository not cleaned up for investigation: %s"""
 
         revs = list(storage.revision_get([swh_id]))
         if revs:
-            return {"snapshot": latest_snapshot_d, "revision": revs[0]}
+            return {"snapshot": latest_snapshot, "revision": revs[0]}
         return {}
 
     def build_swh_revision(self, rev, commit, dir_id, parents):
@@ -490,6 +489,7 @@ Local repository not cleaned up for investigation: %s"""
             if self.latest_snapshot and "snapshot" in self.latest_snapshot:
                 self._snapshot = self.latest_snapshot["snapshot"]
             self.done = True
+            self._load_status = "uneventful"
         except SvnLoaderHistoryAltered as e:
             self.log.error(e)
             self.done = True

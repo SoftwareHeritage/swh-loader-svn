@@ -1,8 +1,15 @@
-swh-loader-svn (0.2.0-1~swh1~bpo10+1) buster-swh; urgency=medium
+swh-loader-svn (0.2.1-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 0.2.1     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2020-07-03 15:17:44
+    +0200)
+  * Upstream changes:     - v0.2.1     - svn.loader: Fix uneventful
+    visit case     - svn.loader: Fix edge case on mistyped snapshot     -
+    tests: Refactor to use pytest     - Reuse
+    swh.model.from_disk.iter_directory function     - Migrate to Use the
+    object's object_type field when computing objects
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Tue, 23 Jun 2020 13:28:19 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 03 Jul 2020 13:20:20 +0000
 
 swh-loader-svn (0.2.0-1~swh1) unstable-swh; urgency=medium
 

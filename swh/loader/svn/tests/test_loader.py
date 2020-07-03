@@ -590,72 +590,44 @@ def test_loader_svn_visit_with_mixed_crlf_lf(swh_config, datadir, tmp_path):
     assert stats["snapshot"] == 1
 
 
-class SvnLoaderTest11(BaseSvnLoaderTest):
-    """Context:
-
-       - Repository with svn:external (which is not deal with for now)
-       - Visit is partial with as much data loaded as possible
+def test_loader_svn_with_external_properties(swh_config, datadir, tmp_path):
+    """Repository with svn:external properties cannot be fully ingested yet
 
     """
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, "pkg-gourmet-with-external-id.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    def setUp(self):
-        previous_unfinished_revision = None
-        super().setUp(
-            archive_name="pkg-gourmet-with-external-id.tgz",
-            swh_revision=previous_unfinished_revision,
-        )
+    loader = SvnLoader(repo_url)
 
-    def test_load(self):
-        """Repository with svn:externals property, will stop raising an error
+    assert loader.load() == {"status": "eventful"}
+    # repositoy holds 21 revisions, but the last commit holds an 'svn:externals'
+    # property which will make the loader-svn stops at the last revision prior to the
+    # bad one
+    expected_snapshot = {
+        "id": GOURMET_EXTERNALS_SNAPSHOT,
+        "branches": {
+            "HEAD": {
+                "target": "82a7a4a09f9549223429143ba36ad77375e33c5c",
+                "target_type": "revision",
+            }
+        },
+    }
+    check_snapshot(expected_snapshot, loader.storage)
 
-        """
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="partial",
+        type="svn",
+        snapshot=GOURMET_EXTERNALS_SNAPSHOT,
+    )
 
-        # when
-        assert self.loader.load() == {"status": "eventful"}
-
-        # then repositories holds 21 revisions, but the last commit
-        # one holds an 'svn:externals' property which will make the
-        # loader-svn stops at the last revision prior to the bad one
-        self.assertCountRevisions(20)
-        self.assertCountReleases(0)
-
-        last_revision = "82a7a4a09f9549223429143ba36ad77375e33c5c"
-        expected_revisions = {
-            # revision hash | directory hash
-            "0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71": "669a71cce6c424a81ba42b7dc5d560d32252f0ca",  # noqa
-            "95edacc8848369d6fb1608e887d6d2474fd5224f": "008ac97a1118560797c50e3392fa1443acdaa349",  # noqa
-            "fef26ea45a520071711ba2b9d16a2985ee837021": "3780effbe846a26751a95a8c95c511fb72be15b4",  # noqa
-            "3f51abf3b3d466571be0855dfa67e094f9ceff1b": "ffcca9b09c5827a6b8137322d4339c8055c3ee1e",  # noqa
-            "a3a577948fdbda9d1061913b77a1588695eadb41": "7dc52cc04c3b8bd7c085900d60c159f7b846f866",  # noqa
-            "4876cb10aec6f708f7466dddf547567b65f6c39c": "0deab3023ac59398ae467fc4bff5583008af1ee2",  # noqa
-            "7f5bc909c29d4e93d8ccfdda516e51ed44930ee1": "752c52134dcbf2fff13c7be1ce4e9e5dbf428a59",  # noqa
-            "38d81702cb28db4f1a6821e64321e5825d1f7fd6": "39c813fb4717a4864bacefbd90b51a3241ae4140",  # noqa
-            "99c27ebbd43feca179ac0e895af131d8314cafe1": "3397ca7f709639cbd36b18a0d1b70bce80018c45",  # noqa
-            "902f29b4323a9b9de3af6d28e72dd581e76d9397": "c4e12483f0a13e6851459295a4ae735eb4e4b5c4",  # noqa
-            "171dc35522bfd17dda4e90a542a0377fb2fc707a": "fd24a76c87a3207428e06612b49860fc78e9f6dc",  # noqa
-            "027e8769f4786597436ab94a91f85527d04a6cbb": "2d9ca72c6afec6284fb01e459588cbb007017c8c",  # noqa
-            "4474d96018877742d9697d5c76666c9693353bfc": "ab111577e0ab39e4a157c476072af48f2641d93f",  # noqa
-            "97ad21eab92961e2a22ca0285f09c6d1e9a7ffbc": "ab111577e0ab39e4a157c476072af48f2641d93f",  # noqa
-            "d04ea8afcee6205cc8384c091bfc578931c169fd": "b0a648b02e55a4dce356ac35187a058f89694ec7",  # noqa
-            "ded78810401fd354ffe894aa4a1e5c7d30a645d1": "b0a648b02e55a4dce356ac35187a058f89694ec7",  # noqa
-            "4ee95e39358712f53c4fc720da3fafee9249ed19": "c3c98df624733fef4e592bef983f93e2ed02b179",  # noqa
-            "ffa901b69ca0f46a2261f42948838d19709cb9f8": "c3c98df624733fef4e592bef983f93e2ed02b179",  # noqa
-            "0148ae3eaa520b73a50802c59f3f416b7a36cf8c": "844d4646d6c2b4f3a3b2b22ab0ee38c7df07bab2",  # noqa
-            last_revision: "0de6e75d2b79ec90d00a3a7611aa3861b2e4aa5e",  # noqa
-        }
-
-        # The last revision being the one used later to start back from
-        self.assertRevisionsContain(expected_revisions)
-        self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.visit_status(), "partial")
-
-        assert_last_visit_matches(
-            self.storage,
-            self.repo_url,
-            status="partial",
-            type="svn",
-            snapshot=GOURMET_EXTERNALS_SNAPSHOT,
-        )
+    stats = get_stats(loader.storage)
+    assert stats["origin"] == 1
+    assert stats["origin_visit"] == 1
+    assert stats["snapshot"] == 1
+    assert stats["revision"] == 21 - 1  # commit with the svn:external property
 
 
 class SvnLoaderTest12(BaseSvnLoaderTest):

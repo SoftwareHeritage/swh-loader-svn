@@ -388,63 +388,27 @@ def test_loader_svn_visit_with_changes(swh_config, datadir, tmp_path):
 
     check_snapshot(expected_snapshot, loader.storage)
 
+    # Start from scratch loading yields the same result
 
-class SvnLoaderTest5(BaseSvnLoaderTest):
-    """Context:
+    loader = SvnLoader(
+        repo_updated_url, origin_url=repo_initial_url, start_from_scratch=True
+    )
+    assert loader.load() == {"status": "eventful"}
+    visit_status3 = assert_last_visit_matches(
+        loader.storage,
+        repo_updated_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_UPDATES_SNAPSHOT,
+    )
+    assert visit_status2.date < visit_status3.date
+    assert visit_status3.snapshot == visit_status2.snapshot
+    check_snapshot(expected_snapshot, loader.storage)
 
-       - Repository already injected with successful data
-       - New visit from scratch done with successful load
-
-    """
-
-    def setUp(self):
-        # the svn repository pkg-gourmet has been updated with changes
-        super().setUp(
-            archive_name="pkg-gourmet-with-updates.tgz",
-            snapshot=_LAST_SNP_REV,
-            start_from_scratch=True,
-        )
-
-    def test_load(self):
-        """Load an existing repository from scratch yields same swh objects
-
-        """
-        # when
-        assert self.loader.load() == {"status": "eventful"}
-
-        # then
-        # we got the previous run's last revision (rev 6)
-        # but we do not inspect that as we start from from scratch so
-        # we should have all revisions so 11
-        self.assertCountRevisions(11)
-        self.assertCountReleases(0)
-
-        expected_revisions = {
-            "0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71": "669a71cce6c424a81ba42b7dc5d560d32252f0ca",  # noqa
-            "95edacc8848369d6fb1608e887d6d2474fd5224f": "008ac97a1118560797c50e3392fa1443acdaa349",  # noqa
-            "fef26ea45a520071711ba2b9d16a2985ee837021": "3780effbe846a26751a95a8c95c511fb72be15b4",  # noqa
-            "3f51abf3b3d466571be0855dfa67e094f9ceff1b": "ffcca9b09c5827a6b8137322d4339c8055c3ee1e",  # noqa
-            "a3a577948fdbda9d1061913b77a1588695eadb41": "7dc52cc04c3b8bd7c085900d60c159f7b846f866",  # noqa
-            "4876cb10aec6f708f7466dddf547567b65f6c39c": "0deab3023ac59398ae467fc4bff5583008af1ee2",  # noqa
-            "7f5bc909c29d4e93d8ccfdda516e51ed44930ee1": "752c52134dcbf2fff13c7be1ce4e9e5dbf428a59",  # noqa
-            "38d81702cb28db4f1a6821e64321e5825d1f7fd6": "39c813fb4717a4864bacefbd90b51a3241ae4140",  # noqa
-            "99c27ebbd43feca179ac0e895af131d8314cafe1": "3397ca7f709639cbd36b18a0d1b70bce80018c45",  # noqa
-            "902f29b4323a9b9de3af6d28e72dd581e76d9397": "c4e12483f0a13e6851459295a4ae735eb4e4b5c4",  # noqa
-            "171dc35522bfd17dda4e90a542a0377fb2fc707a": "fd24a76c87a3207428e06612b49860fc78e9f6dc",  # noqa
-        }
-
-        self.assertRevisionsContain(expected_revisions)
-
-        self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.visit_status(), "full")
-
-        assert_last_visit_matches(
-            self.storage,
-            self.repo_url,
-            status="full",
-            type="svn",
-            snapshot=GOURMET_UPDATES_SNAPSHOT,
-        )
+    stats = get_stats(loader.storage)
+    assert stats["origin"] == 1  # always the same visit
+    assert stats["origin_visit"] == 2 + 1  # 1 more visit
+    assert stats["snapshot"] == 2  # no new snapshot
 
 
 class SvnLoaderTest7(BaseSvnLoaderTest):

@@ -3,7 +3,6 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-import copy
 import os
 import subprocess
 
@@ -299,48 +298,56 @@ _LAST_SNP_REV = {
 }
 
 
-class SvnLoaderTest3(BaseSvnLoaderTest):
+def test_loader_tampered_repository(swh_config, datadir, tmp_path):
     """In this scenario, the dump has been tampered with to modify the
-       commit log.  This results in a hash divergence which is
-       detected at startup.
+       commit log [1].  This results in a hash divergence which is
+       detected at startup after a new run for the same origin.
 
        In effect, that stops the loading and do nothing.
 
+    [1] Tampering with revision 6 log message following:
+
+    ```
+        tar xvf pkg-gourmet.tgz  # initial repository ingested
+        cd pkg-gourmet/
+        echo "Tampering with commit log message for fun and profit" > log.txt
+        svnadmin setlog . -r 6 log.txt --bypass-hooks
+        tar cvf pkg-gourmet-tampered-rev6-log.tgz pkg-gourmet/
+    ```
     """
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    def setUp(self):
-        last_snp_rev = copy.deepcopy(_LAST_SNP_REV)
-        last_snp_rev["snapshot"] = None
-        # Changed the revision id's hash to simulate history altered
-        last_snp_rev["revision"]["id"] = hashutil.hash_to_bytes(
-            "badbadbadbadf708f7466dddf547567b65f6c39d"
-        )
-        # the svn repository pkg-gourmet has been updated with changes
-        super().setUp(
-            archive_name="pkg-gourmet-with-updates.tgz", snapshot=last_snp_rev
-        )
+    loader = SvnLoader(repo_url)
+    assert loader.load() == {"status": "eventful"}
+    expected_snapshot = {
+        "id": GOURMET_SNAPSHOT,
+        "branches": {
+            "HEAD": {
+                "target": "4876cb10aec6f708f7466dddf547567b65f6c39c",
+                "target_type": "revision",
+            }
+        },
+    }
+    check_snapshot(expected_snapshot, loader.storage)
 
-    def test_load(self):
-        """Load known repository with history altered should do nothing
+    archive_path2 = os.path.join(datadir, "pkg-gourmet-tampered-rev6-log.tgz")
+    repo_tampered_url = prepare_repository_from_archive(
+        archive_path2, archive_name, tmp_path
+    )
 
-        """
-        # when
-        assert self.loader.load() == {"status": "failed"}
+    loader2 = SvnLoader(repo_tampered_url, origin_url=repo_url)
+    assert loader2.load() == {"status": "failed"}
 
-        # then
-        # we got the previous run's last revision (rev 6)
-        # so 2 news + 1 old
-        self.assertCountContents(0)
-        self.assertCountDirectories(0)
-        self.assertCountRevisions(0)
-        self.assertCountReleases(0)
-        self.assertCountSnapshots(0)
-        self.assertEqual(self.loader.visit_status(), "partial")
+    assert_last_visit_matches(
+        loader2.storage, repo_url, status="partial", type="svn", snapshot=None,
+    )
 
-        visit_status = assert_last_visit_matches(
-            self.storage, self.repo_url, status="partial", type="svn"
-        )
-        assert visit_status.snapshot is None
+    stats = get_stats(loader.storage)
+    assert stats["origin"] == 1
+    assert stats["origin_visit"] == 2
+    assert stats["snapshot"] == 1
 
 
 def test_loader_svn_visit_with_changes(swh_config, datadir, tmp_path):

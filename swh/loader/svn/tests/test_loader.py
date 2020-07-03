@@ -554,7 +554,7 @@ def test_loader_svn_visit_with_eol_style(swh_config, datadir, tmp_path):
     assert stats["snapshot"] == 1
 
 
-class SvnLoaderTest10(BaseSvnLoaderTest):  # noqa
+def test_loader_svn_visit_with_mixed_crlf_lf(swh_config, datadir, tmp_path):
     """Check that a svn repo containing a versioned file with mixed
     CRLF/LF line endings with svn:eol-style property set to 'native'
     (this is a violation of svn specification as mixed line endings
@@ -562,34 +562,32 @@ class SvnLoaderTest10(BaseSvnLoaderTest):  # noqa
     property is set) can be loaded anyway.
 
     """
+    archive_name = "pyang-repo-r343-eol-native-mixed-lf-crlf"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    def setUp(self):
-        super().setUp(
-            archive_name="pyang-repo-r343-eol-native-mixed-lf-crlf.tgz",
-            filename="pyang-repo-r343-eol-native-mixed-lf-crlf",
-        )
+    loader = SvnLoader(repo_url)
 
-    def test_load(self):
-        """Load repo with mixed CRLF/LF endings (svn:eol-style:native) is ok
+    assert loader.load() == {"status": "eventful"}
+    expected_snapshot = {
+        "id": PYANG_SNAPSHOT,
+        "branches": {
+            "HEAD": {
+                "target": "9c6962eeb9164a636c374be700672355e34a98a7",
+                "target_type": "revision",
+            }
+        },
+    }
+    check_snapshot(expected_snapshot, loader.storage)
 
-        """
-        assert self.loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn", snapshot=PYANG_SNAPSHOT,
+    )
 
-        expected_revisions = {
-            "9c6962eeb9164a636c374be700672355e34a98a7": "16aa6b6271f3456d4643999d234cf39fe3d0cc5a"  # noqa
-        }
-
-        self.assertRevisionsContain(expected_revisions)
-        self.assertCountSnapshots(1)
-        self.assertEqual(self.loader.visit_status(), "full")
-
-        assert_last_visit_matches(
-            self.storage,
-            self.repo_url,
-            status="full",
-            type="svn",
-            snapshot=PYANG_SNAPSHOT,
-        )
+    stats = get_stats(loader.storage)
+    assert stats["origin"] == 1
+    assert stats["origin_visit"] == 1
+    assert stats["snapshot"] == 1
 
 
 class SvnLoaderTest11(BaseSvnLoaderTest):

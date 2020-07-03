@@ -454,23 +454,7 @@ class Replay:
 
         """
         self.replay(rev)
-        # TODO: Move this listing up in swh.model
-        contents: List[Content] = []
-        skipped_contents: List[SkippedContent] = []
-        directories: List[Directory] = []
-        for obj in self.directory.iter_tree():
-            obj = obj.to_model()
-            if isinstance(obj, Content):
-                obj = obj.with_data()
-                contents.append(obj)
-            elif isinstance(obj, SkippedContent):
-                skipped_contents.append(obj)
-            elif isinstance(obj, Directory):
-                directories.append(obj)
-            else:
-                raise TypeError(f"Unexpected content type from disk: {obj}")
-
-        return contents, skipped_contents, directories
+        return from_disk.iter_directory(self.directory)
 
 
 @click.command()

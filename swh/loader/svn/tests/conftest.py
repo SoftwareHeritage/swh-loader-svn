@@ -57,12 +57,3 @@ def celery_includes():
     return [
         "swh.loader.svn.tasks",
     ]
-
-
-@pytest.fixture
-def datadir(request):
-    """Override default datadir because it's named `resources` in this repository and not
-    `data` as expected by the default fixture.
-
-    """
-    return os.path.join(os.path.dirname(str(request.fspath)), "resources")

@@ -83,9 +83,7 @@ def test_build_swh_revision_default():
                 "fullname": b"theo <theo@uuid>",
             },
             "synthetic": True,
-            "metadata": {
-                "extra_headers": [["svn_repo_uuid", b"uuid"], ["svn_revision", b"10"],]
-            },
+            "extra_headers": ((b"svn_repo_uuid", b"uuid"), (b"svn_revision", b"10"),),
             "parents": (),
         }
     )

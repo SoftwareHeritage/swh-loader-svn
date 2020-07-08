@@ -4,12 +4,14 @@
 # See top-level LICENSE file for more information
 
 import os
-import subprocess
 
-from typing import Optional
 
-from swh.loader.tests.common import assert_last_visit_matches
-from swh.loader.package.tests.common import check_snapshot, get_stats
+from swh.loader.tests import (
+    assert_last_visit_matches,
+    check_snapshot,
+    prepare_repository_from_archive,
+    get_stats,
+)
 
 from swh.loader.svn.loader import (
     DEFAULT_BRANCH,
@@ -54,17 +56,6 @@ GOURMET_WRONG_LINKS_SNAPSHOT = hashutil.hash_to_bytes(
 MEDIAWIKI_SNAPSHOT = hashutil.hash_to_bytes("d6d6e9703f157c5702d9a4a5dec878926ed4ab76")
 
 PYANG_SNAPSHOT = hashutil.hash_to_bytes("6d9590de11b00a5801de0ff3297c5b44bbbf7d24")
-
-
-def prepare_repository_from_archive(
-    archive_path: str, filename: Optional[str] = None, tmp_path: str = "/tmp"
-) -> str:
-    # uncompress folder/repositories/dump for the loader to ingest
-    subprocess.check_output(["tar", "xf", archive_path, "-C", tmp_path])
-    # build the origin url (or some derivative form)
-    _fname = filename if filename else os.path.basename(archive_path)
-    repo_url = f"file://{tmp_path}/{_fname}"
-    return repo_url
 
 
 def test_loader_svn_new_visit(swh_config, datadir, tmp_path):

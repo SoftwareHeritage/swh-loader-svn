@@ -276,10 +276,10 @@ Local repository not cleaned up for investigation: %s"""
             return previous_swh_revision
         if partial_swh_revision and previous_swh_revision:
             # will determine from which to start from
-            extra_headers1 = dict(partial_swh_revision["metadata"]["extra_headers"])
-            extra_headers2 = dict(previous_swh_revision["metadata"]["extra_headers"])
-            rev_start1 = int(extra_headers1["svn_revision"])
-            rev_start2 = int(extra_headers2["svn_revision"])
+            extra_headers1 = dict(partial_swh_revision["extra_headers"])
+            extra_headers2 = dict(previous_swh_revision["extra_headers"])
+            rev_start1 = int(extra_headers1[b"svn_revision"])
+            rev_start2 = int(extra_headers2[b"svn_revision"])
             if rev_start1 <= rev_start2:
                 return previous_swh_revision
             return partial_swh_revision
@@ -326,8 +326,8 @@ Local repository not cleaned up for investigation: %s"""
             )
 
             if swh_rev:  # Yes, we know a previous revision. Try and update it.
-                extra_headers = dict(swh_rev["metadata"]["extra_headers"])
-                revision_start = int(extra_headers["svn_revision"])
+                extra_headers = dict(swh_rev["extra_headers"])
+                revision_start = int(extra_headers[b"svn_revision"])
                 revision_parents = {
                     revision_start: swh_rev["parents"],
                 }
@@ -682,8 +682,8 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         try:
             origin = self.storage.origin_get({"url": svn_url})
             last_swh_rev = self.swh_latest_snapshot_revision(origin["url"])["revision"]
-            last_swh_rev_headers = dict(last_swh_rev["metadata"]["extra_headers"])
-            last_loaded_svn_rev = int(last_swh_rev_headers["svn_revision"])
+            last_swh_rev_headers = dict(last_swh_rev["extra_headers"])
+            last_loaded_svn_rev = int(last_swh_rev_headers[b"svn_revision"])
         except Exception:
             pass
         return last_loaded_svn_rev

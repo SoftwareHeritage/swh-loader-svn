@@ -19,12 +19,12 @@ from swh.loader.svn.loader import (
     SvnLoaderFromRemoteDump,
     build_swh_snapshot,
 )
-from swh.model import hashutil
+from swh.model.hashutil import hash_to_bytes
 from swh.model.model import Snapshot
 
 
 def test_build_swh_snapshot():
-    rev_id = hashutil.hash_to_bytes("3f51abf3b3d466571be0855dfa67e094f9ceff1b")
+    rev_id = hash_to_bytes("3f51abf3b3d466571be0855dfa67e094f9ceff1b")
     snap = build_swh_snapshot(rev_id)
 
     assert isinstance(snap, Snapshot)
@@ -35,27 +35,19 @@ def test_build_swh_snapshot():
     assert snap == expected_snapshot
 
 
-GOURMET_SNAPSHOT = hashutil.hash_to_bytes("889cacc2731e3312abfb2b1a0c18ade82a949e07")
+GOURMET_SNAPSHOT = hash_to_bytes("889cacc2731e3312abfb2b1a0c18ade82a949e07")
 
-GOURMET_UPDATES_SNAPSHOT = hashutil.hash_to_bytes(
-    "11086d15317014e43d2438b7ffc712c44f1b8afe"
-)
+GOURMET_UPDATES_SNAPSHOT = hash_to_bytes("11086d15317014e43d2438b7ffc712c44f1b8afe")
 
-GOURMET_EXTERNALS_SNAPSHOT = hashutil.hash_to_bytes(
-    "19cb68d0a3f22372e2b7017ea5e2a2ea5ae3e09a"
-)
+GOURMET_EXTERNALS_SNAPSHOT = hash_to_bytes("19cb68d0a3f22372e2b7017ea5e2a2ea5ae3e09a")
 
-GOURMET_EDGE_CASES_SNAPSHOT = hashutil.hash_to_bytes(
-    "18e60982fe521a2546ab8c3c73a535d80462d9d0"
-)
+GOURMET_EDGE_CASES_SNAPSHOT = hash_to_bytes("18e60982fe521a2546ab8c3c73a535d80462d9d0")
 
-GOURMET_WRONG_LINKS_SNAPSHOT = hashutil.hash_to_bytes(
-    "b17f38acabb90f066dedd30c29f01a02af88a5c4"
-)
+GOURMET_WRONG_LINKS_SNAPSHOT = hash_to_bytes("b17f38acabb90f066dedd30c29f01a02af88a5c4")
 
-MEDIAWIKI_SNAPSHOT = hashutil.hash_to_bytes("d6d6e9703f157c5702d9a4a5dec878926ed4ab76")
+MEDIAWIKI_SNAPSHOT = hash_to_bytes("d6d6e9703f157c5702d9a4a5dec878926ed4ab76")
 
-PYANG_SNAPSHOT = hashutil.hash_to_bytes("6d9590de11b00a5801de0ff3297c5b44bbbf7d24")
+PYANG_SNAPSHOT = hash_to_bytes("6d9590de11b00a5801de0ff3297c5b44bbbf7d24")
 
 
 def test_loader_svn_new_visit(swh_config, datadir, tmp_path):
@@ -88,8 +80,8 @@ def test_loader_svn_new_visit(swh_config, datadir, tmp_path):
     expected_snapshot = {
         "id": GOURMET_SNAPSHOT,
         "branches": {
-            "HEAD": {
-                "target": "4876cb10aec6f708f7466dddf547567b65f6c39c",
+            b"HEAD": {
+                "target": hash_to_bytes("4876cb10aec6f708f7466dddf547567b65f6c39c"),
                 "target_type": "revision",
             }
         },
@@ -128,7 +120,7 @@ def test_loader_svn_2_visits_no_change(swh_config, datadir, tmp_path):
     # even starting from previous revision...
     revs = list(
         loader.storage.revision_get(
-            [hashutil.hash_to_bytes("95edacc8848369d6fb1608e887d6d2474fd5224f")]
+            [hash_to_bytes("95edacc8848369d6fb1608e887d6d2474fd5224f")]
         )
     )
     start_revision = revs[0]
@@ -173,8 +165,8 @@ def test_loader_tampered_repository(swh_config, datadir, tmp_path):
     expected_snapshot = {
         "id": GOURMET_SNAPSHOT,
         "branches": {
-            "HEAD": {
-                "target": "4876cb10aec6f708f7466dddf547567b65f6c39c",
+            b"HEAD": {
+                "target": hash_to_bytes("4876cb10aec6f708f7466dddf547567b65f6c39c"),
                 "target_type": "revision",
             }
         },
@@ -258,8 +250,8 @@ def test_loader_svn_visit_with_changes(swh_config, datadir, tmp_path):
     expected_snapshot = {
         "id": GOURMET_UPDATES_SNAPSHOT,
         "branches": {
-            "HEAD": {
-                "target": "171dc35522bfd17dda4e90a542a0377fb2fc707a",
+            b"HEAD": {
+                "target": hash_to_bytes("171dc35522bfd17dda4e90a542a0377fb2fc707a"),
                 "target_type": "revision",
             }
         },
@@ -315,7 +307,7 @@ def test_loader_svn_visit_start_from_revision(swh_config, datadir, tmp_path):
 
     revs = list(
         loader.storage.revision_get(
-            [hashutil.hash_to_bytes("95edacc8848369d6fb1608e887d6d2474fd5224f")]
+            [hash_to_bytes("95edacc8848369d6fb1608e887d6d2474fd5224f")]
         )
     )
     start_revision = revs[0]
@@ -361,8 +353,8 @@ def test_loader_svn_visit_start_from_revision(swh_config, datadir, tmp_path):
     expected_snapshot = {
         "id": GOURMET_UPDATES_SNAPSHOT,
         "branches": {
-            "HEAD": {
-                "target": "171dc35522bfd17dda4e90a542a0377fb2fc707a",
+            b"HEAD": {
+                "target": hash_to_bytes("171dc35522bfd17dda4e90a542a0377fb2fc707a"),
                 "target_type": "revision",
             }
         },
@@ -388,8 +380,8 @@ def test_loader_svn_visit_with_eol_style(swh_config, datadir, tmp_path):
     expected_snapshot = {
         "id": MEDIAWIKI_SNAPSHOT,
         "branches": {
-            "HEAD": {
-                "target": "7da4975c363101b819756d33459f30a866d01b1b",
+            b"HEAD": {
+                "target": hash_to_bytes("7da4975c363101b819756d33459f30a866d01b1b"),
                 "target_type": "revision",
             }
         },
@@ -428,8 +420,8 @@ def test_loader_svn_visit_with_mixed_crlf_lf(swh_config, datadir, tmp_path):
     expected_snapshot = {
         "id": PYANG_SNAPSHOT,
         "branches": {
-            "HEAD": {
-                "target": "9c6962eeb9164a636c374be700672355e34a98a7",
+            b"HEAD": {
+                "target": hash_to_bytes("9c6962eeb9164a636c374be700672355e34a98a7"),
                 "target_type": "revision",
             }
         },
@@ -463,8 +455,8 @@ def test_loader_svn_with_external_properties(swh_config, datadir, tmp_path):
     expected_snapshot = {
         "id": GOURMET_EXTERNALS_SNAPSHOT,
         "branches": {
-            "HEAD": {
-                "target": "82a7a4a09f9549223429143ba36ad77375e33c5c",
+            b"HEAD": {
+                "target": hash_to_bytes("82a7a4a09f9549223429143ba36ad77375e33c5c"),
                 "target_type": "revision",
             }
         },
@@ -507,8 +499,8 @@ def test_loader_svn_with_symlink(swh_config, datadir, tmp_path):
     expected_snapshot = {
         "id": GOURMET_EDGE_CASES_SNAPSHOT,
         "branches": {
-            "HEAD": {
-                "target": "3f43af2578fccf18b0d4198e48563da7929dc608",
+            b"HEAD": {
+                "target": hash_to_bytes("3f43af2578fccf18b0d4198e48563da7929dc608"),
                 "target_type": "revision",
             }
         },
@@ -548,8 +540,8 @@ def test_loader_svn_with_wrong_symlinks(swh_config, datadir, tmp_path):
     expected_snapshot = {
         "id": GOURMET_WRONG_LINKS_SNAPSHOT,
         "branches": {
-            "HEAD": {
-                "target": "cf30d3bb9d5967d0a2bbeacc405f10a5dd9b138a",
+            b"HEAD": {
+                "target": hash_to_bytes("cf30d3bb9d5967d0a2bbeacc405f10a5dd9b138a"),
                 "target_type": "revision",
             }
         },
@@ -603,8 +595,8 @@ def test_loader_svn_loader_from_dump_archive(swh_config, datadir, tmp_path):
     expected_snapshot = {
         "id": GOURMET_SNAPSHOT,
         "branches": {
-            "HEAD": {
-                "target": "4876cb10aec6f708f7466dddf547567b65f6c39c",
+            b"HEAD": {
+                "target": hash_to_bytes("4876cb10aec6f708f7466dddf547567b65f6c39c"),
                 "target_type": "revision",
             }
         },
@@ -641,14 +633,12 @@ def test_loader_user_defined_svn_properties(swh_config, datadir, tmp_path):
     loader = SvnLoader(repo_url)
 
     assert loader.load() == {"status": "eventful"}
-    expected_snapshot_id = hashutil.hash_to_bytes(
-        "70487267f682c07e52a2371061369b6cf5bffa47"
-    )
+    expected_snapshot_id = hash_to_bytes("70487267f682c07e52a2371061369b6cf5bffa47")
     expected_snapshot = {
         "id": expected_snapshot_id,
         "branches": {
-            "HEAD": {
-                "target": "604a17dbb15e8d7ecb3e9f3768d09bf493667a93",
+            b"HEAD": {
+                "target": hash_to_bytes("604a17dbb15e8d7ecb3e9f3768d09bf493667a93"),
                 "target_type": "revision",
             }
         },

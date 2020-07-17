@@ -46,17 +46,6 @@ from .exception import SvnLoaderHistoryAltered
 DEFAULT_BRANCH = b"HEAD"
 
 
-def build_swh_snapshot(revision_id, branch=DEFAULT_BRANCH):
-    """Build a swh snapshot from the revision id, origin url, and visit.
-
-    """
-    return Snapshot(
-        branches={
-            branch: SnapshotBranch(target=revision_id, target_type=TargetType.REVISION)
-        }
-    )
-
-
 TEMPORARY_DIR_PREFIX_PATTERN = "swh.loader.svn."
 
 
@@ -575,7 +564,13 @@ Local repository not cleaned up for investigation: %s"""
 
         """
         if revision:  # Priority to the revision
-            snap = build_swh_snapshot(revision.id)
+            snap = Snapshot(
+                branches={
+                    DEFAULT_BRANCH: SnapshotBranch(
+                        target=revision.id, target_type=TargetType.REVISION
+                    )
+                }
+            )
         elif snapshot:  # Fallback to prior snapshot
             snap = snapshot
         else:

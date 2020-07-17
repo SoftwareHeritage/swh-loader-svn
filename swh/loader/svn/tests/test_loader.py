@@ -14,25 +14,10 @@ from swh.loader.tests import (
 )
 
 from swh.loader.svn.loader import (
-    DEFAULT_BRANCH,
     SvnLoader,
     SvnLoaderFromRemoteDump,
-    build_swh_snapshot,
 )
 from swh.model.hashutil import hash_to_bytes
-from swh.model.model import Snapshot
-
-
-def test_build_swh_snapshot():
-    rev_id = hash_to_bytes("3f51abf3b3d466571be0855dfa67e094f9ceff1b")
-    snap = build_swh_snapshot(rev_id)
-
-    assert isinstance(snap, Snapshot)
-
-    expected_snapshot = Snapshot.from_dict(
-        {"branches": {DEFAULT_BRANCH: {"target": rev_id, "target_type": "revision",}}}
-    )
-    assert snap == expected_snapshot
 
 
 GOURMET_SNAPSHOT = hash_to_bytes("889cacc2731e3312abfb2b1a0c18ade82a949e07")

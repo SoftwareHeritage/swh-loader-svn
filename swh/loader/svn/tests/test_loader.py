@@ -18,21 +18,28 @@ from swh.loader.svn.loader import (
     SvnLoaderFromRemoteDump,
 )
 from swh.model.hashutil import hash_to_bytes
+from swh.model.model import Snapshot, SnapshotBranch, TargetType
 
 
-GOURMET_SNAPSHOT = hash_to_bytes("889cacc2731e3312abfb2b1a0c18ade82a949e07")
+GOURMET_SNAPSHOT = Snapshot(
+    id=hash_to_bytes("889cacc2731e3312abfb2b1a0c18ade82a949e07"),
+    branches={
+        b"HEAD": SnapshotBranch(
+            target=hash_to_bytes("4876cb10aec6f708f7466dddf547567b65f6c39c"),
+            target_type=TargetType.REVISION,
+        )
+    },
+)
 
-GOURMET_UPDATES_SNAPSHOT = hash_to_bytes("11086d15317014e43d2438b7ffc712c44f1b8afe")
-
-GOURMET_EXTERNALS_SNAPSHOT = hash_to_bytes("19cb68d0a3f22372e2b7017ea5e2a2ea5ae3e09a")
-
-GOURMET_EDGE_CASES_SNAPSHOT = hash_to_bytes("18e60982fe521a2546ab8c3c73a535d80462d9d0")
-
-GOURMET_WRONG_LINKS_SNAPSHOT = hash_to_bytes("b17f38acabb90f066dedd30c29f01a02af88a5c4")
-
-MEDIAWIKI_SNAPSHOT = hash_to_bytes("d6d6e9703f157c5702d9a4a5dec878926ed4ab76")
-
-PYANG_SNAPSHOT = hash_to_bytes("6d9590de11b00a5801de0ff3297c5b44bbbf7d24")
+GOURMET_UPDATES_SNAPSHOT = Snapshot(
+    id=hash_to_bytes("11086d15317014e43d2438b7ffc712c44f1b8afe"),
+    branches={
+        b"HEAD": SnapshotBranch(
+            target=hash_to_bytes("171dc35522bfd17dda4e90a542a0377fb2fc707a"),
+            target_type=TargetType.REVISION,
+        )
+    },
+)
 
 
 def test_loader_svn_new_visit(swh_config, datadir, tmp_path):
@@ -46,7 +53,11 @@ def test_loader_svn_new_visit(swh_config, datadir, tmp_path):
     assert loader.load() == {"status": "eventful"}
 
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT,
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
     )
 
     stats = get_stats(loader.storage)
@@ -62,17 +73,7 @@ def test_loader_svn_new_visit(swh_config, datadir, tmp_path):
         "snapshot": 1,
     }
 
-    expected_snapshot = {
-        "id": GOURMET_SNAPSHOT,
-        "branches": {
-            b"HEAD": {
-                "target": hash_to_bytes("4876cb10aec6f708f7466dddf547567b65f6c39c"),
-                "target_type": "revision",
-            }
-        },
-    }
-
-    check_snapshot(expected_snapshot, loader.storage)
+    check_snapshot(GOURMET_SNAPSHOT, loader.storage)
 
 
 def test_loader_svn_2_visits_no_change(swh_config, datadir, tmp_path):
@@ -87,12 +88,20 @@ def test_loader_svn_2_visits_no_change(swh_config, datadir, tmp_path):
 
     assert loader.load() == {"status": "eventful"}
     visit_status1 = assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT,
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
     )
 
     assert loader.load() == {"status": "uneventful"}
     visit_status2 = assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT,
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
     )
 
     assert visit_status1.date < visit_status2.date
@@ -120,7 +129,11 @@ def test_loader_svn_2_visits_no_change(swh_config, datadir, tmp_path):
     assert stats["snapshot"] == 1
 
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT,
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
     )
 
 
@@ -147,16 +160,7 @@ def test_loader_tampered_repository(swh_config, datadir, tmp_path):
 
     loader = SvnLoader(repo_url)
     assert loader.load() == {"status": "eventful"}
-    expected_snapshot = {
-        "id": GOURMET_SNAPSHOT,
-        "branches": {
-            b"HEAD": {
-                "target": hash_to_bytes("4876cb10aec6f708f7466dddf547567b65f6c39c"),
-                "target_type": "revision",
-            }
-        },
-    }
-    check_snapshot(expected_snapshot, loader.storage)
+    check_snapshot(GOURMET_SNAPSHOT, loader.storage)
 
     archive_path2 = os.path.join(datadir, "pkg-gourmet-tampered-rev6-log.tgz")
     repo_tampered_url = prepare_repository_from_archive(
@@ -197,7 +201,7 @@ def test_loader_svn_visit_with_changes(swh_config, datadir, tmp_path):
         repo_initial_url,
         status="full",
         type="svn",
-        snapshot=GOURMET_SNAPSHOT,
+        snapshot=GOURMET_SNAPSHOT.id,
     )
 
     archive_path = os.path.join(datadir, "pkg-gourmet-with-updates.tgz")
@@ -213,7 +217,7 @@ def test_loader_svn_visit_with_changes(swh_config, datadir, tmp_path):
         repo_updated_url,
         status="full",
         type="svn",
-        snapshot=GOURMET_UPDATES_SNAPSHOT,
+        snapshot=GOURMET_UPDATES_SNAPSHOT.id,
     )
 
     assert visit_status1.date < visit_status2.date
@@ -232,17 +236,7 @@ def test_loader_svn_visit_with_changes(swh_config, datadir, tmp_path):
         "snapshot": 2,
     }
 
-    expected_snapshot = {
-        "id": GOURMET_UPDATES_SNAPSHOT,
-        "branches": {
-            b"HEAD": {
-                "target": hash_to_bytes("171dc35522bfd17dda4e90a542a0377fb2fc707a"),
-                "target_type": "revision",
-            }
-        },
-    }
-
-    check_snapshot(expected_snapshot, loader.storage)
+    check_snapshot(GOURMET_UPDATES_SNAPSHOT, loader.storage)
 
     # Start from scratch loading yields the same result
 
@@ -255,11 +249,11 @@ def test_loader_svn_visit_with_changes(swh_config, datadir, tmp_path):
         repo_updated_url,
         status="full",
         type="svn",
-        snapshot=GOURMET_UPDATES_SNAPSHOT,
+        snapshot=GOURMET_UPDATES_SNAPSHOT.id,
     )
     assert visit_status2.date < visit_status3.date
     assert visit_status3.snapshot == visit_status2.snapshot
-    check_snapshot(expected_snapshot, loader.storage)
+    check_snapshot(GOURMET_UPDATES_SNAPSHOT, loader.storage)
 
     stats = get_stats(loader.storage)
     assert stats["origin"] == 1  # always the same visit
@@ -287,7 +281,7 @@ def test_loader_svn_visit_start_from_revision(swh_config, datadir, tmp_path):
         repo_initial_url,
         status="full",
         type="svn",
-        snapshot=GOURMET_SNAPSHOT,
+        snapshot=GOURMET_SNAPSHOT.id,
     )
 
     revs = list(
@@ -316,7 +310,7 @@ def test_loader_svn_visit_start_from_revision(swh_config, datadir, tmp_path):
         repo_updated_url,
         status="full",
         type="svn",
-        snapshot=GOURMET_UPDATES_SNAPSHOT,
+        snapshot=GOURMET_UPDATES_SNAPSHOT.id,
     )
 
     assert visit_status1.date < visit_status2.date
@@ -335,17 +329,7 @@ def test_loader_svn_visit_start_from_revision(swh_config, datadir, tmp_path):
         "snapshot": 2,
     }
 
-    expected_snapshot = {
-        "id": GOURMET_UPDATES_SNAPSHOT,
-        "branches": {
-            b"HEAD": {
-                "target": hash_to_bytes("171dc35522bfd17dda4e90a542a0377fb2fc707a"),
-                "target_type": "revision",
-            }
-        },
-    }
-
-    check_snapshot(expected_snapshot, loader.storage)
+    check_snapshot(GOURMET_UPDATES_SNAPSHOT, loader.storage)
 
 
 def test_loader_svn_visit_with_eol_style(swh_config, datadir, tmp_path):
@@ -362,23 +346,23 @@ def test_loader_svn_visit_with_eol_style(swh_config, datadir, tmp_path):
     loader = SvnLoader(repo_url)
 
     assert loader.load() == {"status": "eventful"}
-    expected_snapshot = {
-        "id": MEDIAWIKI_SNAPSHOT,
-        "branches": {
-            b"HEAD": {
-                "target": hash_to_bytes("7da4975c363101b819756d33459f30a866d01b1b"),
-                "target_type": "revision",
-            }
+    mediawiki_snapshot = Snapshot(
+        id=hash_to_bytes("d6d6e9703f157c5702d9a4a5dec878926ed4ab76"),
+        branches={
+            b"HEAD": SnapshotBranch(
+                target=hash_to_bytes("7da4975c363101b819756d33459f30a866d01b1b"),
+                target_type=TargetType.REVISION,
+            )
         },
-    }
-    check_snapshot(expected_snapshot, loader.storage)
+    )
+    check_snapshot(mediawiki_snapshot, loader.storage)
 
     assert_last_visit_matches(
         loader.storage,
         repo_url,
         status="full",
         type="svn",
-        snapshot=MEDIAWIKI_SNAPSHOT,
+        snapshot=mediawiki_snapshot.id,
     )
 
     stats = get_stats(loader.storage)
@@ -402,19 +386,19 @@ def test_loader_svn_visit_with_mixed_crlf_lf(swh_config, datadir, tmp_path):
     loader = SvnLoader(repo_url)
 
     assert loader.load() == {"status": "eventful"}
-    expected_snapshot = {
-        "id": PYANG_SNAPSHOT,
-        "branches": {
-            b"HEAD": {
-                "target": hash_to_bytes("9c6962eeb9164a636c374be700672355e34a98a7"),
-                "target_type": "revision",
-            }
+    pyang_snapshot = Snapshot(
+        id=hash_to_bytes("6d9590de11b00a5801de0ff3297c5b44bbbf7d24"),
+        branches={
+            b"HEAD": SnapshotBranch(
+                target=hash_to_bytes("9c6962eeb9164a636c374be700672355e34a98a7"),
+                target_type=TargetType.REVISION,
+            )
         },
-    }
-    check_snapshot(expected_snapshot, loader.storage)
+    )
+    check_snapshot(pyang_snapshot, loader.storage)
 
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn", snapshot=PYANG_SNAPSHOT,
+        loader.storage, repo_url, status="full", type="svn", snapshot=pyang_snapshot.id,
     )
 
     stats = get_stats(loader.storage)
@@ -434,32 +418,31 @@ def test_loader_svn_with_external_properties(swh_config, datadir, tmp_path):
     loader = SvnLoader(repo_url)
 
     assert loader.load() == {"status": "eventful"}
-    # repositoy holds 21 revisions, but the last commit holds an 'svn:externals'
-    # property which will make the loader-svn stops at the last revision prior to the
-    # bad one
-    expected_snapshot = {
-        "id": GOURMET_EXTERNALS_SNAPSHOT,
-        "branches": {
-            b"HEAD": {
-                "target": hash_to_bytes("82a7a4a09f9549223429143ba36ad77375e33c5c"),
-                "target_type": "revision",
-            }
+    gourmet_externals_snapshot = Snapshot(
+        id=hash_to_bytes("19cb68d0a3f22372e2b7017ea5e2a2ea5ae3e09a"),
+        branches={
+            b"HEAD": SnapshotBranch(
+                target=hash_to_bytes("82a7a4a09f9549223429143ba36ad77375e33c5c"),
+                target_type=TargetType.REVISION,
+            )
         },
-    }
-    check_snapshot(expected_snapshot, loader.storage)
-
+    )
+    check_snapshot(gourmet_externals_snapshot, loader.storage)
     assert_last_visit_matches(
         loader.storage,
         repo_url,
         status="partial",
         type="svn",
-        snapshot=GOURMET_EXTERNALS_SNAPSHOT,
+        snapshot=gourmet_externals_snapshot.id,
     )
 
     stats = get_stats(loader.storage)
     assert stats["origin"] == 1
     assert stats["origin_visit"] == 1
     assert stats["snapshot"] == 1
+    # repository holds 21 revisions, but the last commit holds an 'svn:externals'
+    # property which will make the loader-svn stops at the last revision prior to the
+    # bad one
     assert stats["revision"] == 21 - 1  # commit with the svn:external property
 
 
@@ -481,23 +464,23 @@ def test_loader_svn_with_symlink(swh_config, datadir, tmp_path):
     loader = SvnLoader(repo_url)
 
     assert loader.load() == {"status": "eventful"}
-    expected_snapshot = {
-        "id": GOURMET_EDGE_CASES_SNAPSHOT,
-        "branches": {
-            b"HEAD": {
-                "target": hash_to_bytes("3f43af2578fccf18b0d4198e48563da7929dc608"),
-                "target_type": "revision",
-            }
+    gourmet_edge_cases_snapshot = Snapshot(
+        id=hash_to_bytes("18e60982fe521a2546ab8c3c73a535d80462d9d0"),
+        branches={
+            b"HEAD": SnapshotBranch(
+                target=hash_to_bytes("3f43af2578fccf18b0d4198e48563da7929dc608"),
+                target_type=TargetType.REVISION,
+            )
         },
-    }
-    check_snapshot(expected_snapshot, loader.storage)
+    )
+    check_snapshot(gourmet_edge_cases_snapshot, loader.storage)
 
     assert_last_visit_matches(
         loader.storage,
         repo_url,
         status="full",
         type="svn",
-        snapshot=GOURMET_EDGE_CASES_SNAPSHOT,
+        snapshot=gourmet_edge_cases_snapshot.id,
     )
 
     stats = get_stats(loader.storage)
@@ -522,23 +505,23 @@ def test_loader_svn_with_wrong_symlinks(swh_config, datadir, tmp_path):
     loader = SvnLoader(repo_url)
 
     assert loader.load() == {"status": "eventful"}
-    expected_snapshot = {
-        "id": GOURMET_WRONG_LINKS_SNAPSHOT,
-        "branches": {
-            b"HEAD": {
-                "target": hash_to_bytes("cf30d3bb9d5967d0a2bbeacc405f10a5dd9b138a"),
-                "target_type": "revision",
-            }
+    gourmet_wrong_links_snapshot = Snapshot(
+        id=hash_to_bytes("b17f38acabb90f066dedd30c29f01a02af88a5c4"),
+        branches={
+            b"HEAD": SnapshotBranch(
+                target=hash_to_bytes("cf30d3bb9d5967d0a2bbeacc405f10a5dd9b138a"),
+                target_type=TargetType.REVISION,
+            )
         },
-    }
-    check_snapshot(expected_snapshot, loader.storage)
+    )
+    check_snapshot(gourmet_wrong_links_snapshot, loader.storage)
 
     assert_last_visit_matches(
         loader.storage,
         repo_url,
         status="full",
         type="svn",
-        snapshot=GOURMET_WRONG_LINKS_SNAPSHOT,
+        snapshot=gourmet_wrong_links_snapshot.id,
     )
 
     stats = get_stats(loader.storage)
@@ -567,26 +550,21 @@ def test_loader_svn_loader_from_dump_archive(swh_config, datadir, tmp_path):
         repo_url,
         status="full",
         type="svn",
-        snapshot=GOURMET_SNAPSHOT,
+        snapshot=GOURMET_SNAPSHOT.id,
     )
 
     origin_url = repo_url + "2"  # rename to another origin
     loader = SvnLoader(repo_url, origin_url=origin_url)
     assert loader.load() == {"status": "eventful"}  # because are working on new origin
     assert_last_visit_matches(
-        loader.storage, origin_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT
+        loader.storage,
+        origin_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
     )
 
-    expected_snapshot = {
-        "id": GOURMET_SNAPSHOT,
-        "branches": {
-            b"HEAD": {
-                "target": hash_to_bytes("4876cb10aec6f708f7466dddf547567b65f6c39c"),
-                "target_type": "revision",
-            }
-        },
-    }
-    check_snapshot(expected_snapshot, loader.storage)
+    check_snapshot(GOURMET_SNAPSHOT, loader.storage)
 
     stats = get_stats(loader.storage)
     assert stats["origin"] == 2  # created one more origin
@@ -596,7 +574,11 @@ def test_loader_svn_loader_from_dump_archive(swh_config, datadir, tmp_path):
     loader = SvnLoader(repo_url)  # no change on the origin-url
     assert loader.load() == {"status": "uneventful"}
     assert_last_visit_matches(
-        loader.storage, origin_url, status="full", type="svn", snapshot=GOURMET_SNAPSHOT
+        loader.storage,
+        origin_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
     )
 
     stats = get_stats(loader.storage)
@@ -618,16 +600,15 @@ def test_loader_user_defined_svn_properties(swh_config, datadir, tmp_path):
     loader = SvnLoader(repo_url)
 
     assert loader.load() == {"status": "eventful"}
-    expected_snapshot_id = hash_to_bytes("70487267f682c07e52a2371061369b6cf5bffa47")
-    expected_snapshot = {
-        "id": expected_snapshot_id,
-        "branches": {
-            b"HEAD": {
-                "target": hash_to_bytes("604a17dbb15e8d7ecb3e9f3768d09bf493667a93"),
-                "target_type": "revision",
-            }
+    expected_snapshot = Snapshot(
+        id=hash_to_bytes("70487267f682c07e52a2371061369b6cf5bffa47"),
+        branches={
+            b"HEAD": SnapshotBranch(
+                target=hash_to_bytes("604a17dbb15e8d7ecb3e9f3768d09bf493667a93"),
+                target_type=TargetType.REVISION,
+            )
         },
-    }
+    )
     check_snapshot(expected_snapshot, loader.storage)
 
     assert_last_visit_matches(
@@ -635,7 +616,7 @@ def test_loader_user_defined_svn_properties(swh_config, datadir, tmp_path):
         repo_url,
         status="full",
         type="svn",
-        snapshot=expected_snapshot_id,
+        snapshot=expected_snapshot.id,
     )
 
     stats = get_stats(loader.storage)

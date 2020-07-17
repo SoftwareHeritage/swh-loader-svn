@@ -5,7 +5,11 @@
 
 import pytest
 
-pytest_plugins = ["swh.scheduler.pytest_plugin", "swh.storage.pytest_plugin"]
+pytest_plugins = [
+    "swh.scheduler.pytest_plugin",
+    "swh.storage.pytest_plugin",
+    "swh.loader.pytest_plugin",
+]
 
 
 @pytest.fixture(scope="session")

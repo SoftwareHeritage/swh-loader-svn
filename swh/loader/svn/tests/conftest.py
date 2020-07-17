@@ -3,9 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-import os
 import pytest
-import yaml
 
 from typing import Any, Dict
 
@@ -38,12 +36,3 @@ def swh_loader_config(swh_storage_backend_config) -> Dict[str, Any]:
         "save_data_path": "",
         "temp_directory": "/tmp",
     }
-
-
-@pytest.fixture
-def swh_config(swh_loader_config, monkeypatch, tmp_path):
-    conffile = os.path.join(str(tmp_path), "loader.yml")
-    with open(conffile, "w") as f:
-        f.write(yaml.dump(swh_loader_config))
-    monkeypatch.setenv("SWH_CONFIG_FILENAME", conffile)
-    return conffile

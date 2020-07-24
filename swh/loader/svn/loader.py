@@ -673,10 +673,12 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         and return the last loaded svn revision number or -1
         otherwise.
         """
+        origin = self.storage.origin_get([svn_url])[0]
+        if not origin:
+            return -1
         last_loaded_svn_rev = -1
         try:
-            origin = self.storage.origin_get({"url": svn_url})
-            last_swh_rev = self.swh_latest_snapshot_revision(origin["url"])["revision"]
+            last_swh_rev = self.swh_latest_snapshot_revision(origin.url)["revision"]
             last_swh_rev_headers = dict(last_swh_rev["extra_headers"])
             last_loaded_svn_rev = int(last_swh_rev_headers[b"svn_revision"])
         except Exception:

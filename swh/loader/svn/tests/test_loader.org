@@ -1,0 +1,317 @@
+#+title: Prepare test_converters.py it tests
+#+author: ardumont
+
+* Requisite:
+
+#+BEGIN_SRC sh
+sudo apt install subversion git-svn
+#+END_SRC
+
+* Create mirror repository
+
+Then:
+#+BEGIN_SRC sh
+./init-svn-repository.sh /home/storage/svn/repos/pkg-gourmet svn://svn.debian.org/svn/pkg-gourmet/
+#+END_SRC
+Note:
+Saved as ../../../../bin/init-svn-repository.sh
+
+And now we have a mirror svn repository at file:///home/storage/svn/repos/pkg-gourmet
+
+* git-svn policy
+
+`git svn clone` the repository and parse the git log entries for the needed data.
+
+#+BEGIN_SRC sh
+git svn clone file:///home/storage/svn/repos/pkg-gourmet -q --no-metadata
+cd pkg-gourmet
+# commit
+git log --format=raw --reverse | grep '^commit ' | awk '{print $2}'
+# tree
+git log --format=raw --reverse | grep '^tree ' | awk '{print $2}'
+#+END_SRC
+
+Those are the data to check when done parsing the repository:
+
+|------------------------------------------+------------------------------------------|
+| revision                                 | tree                                     |
+|------------------------------------------+------------------------------------------|
+| 22c0fa5195a53f2e733ec75a9b6e9d1624a8b771 | 4b825dc642cb6eb9a060e54bf8d69288fbee4904 |
+| 17a631d474f49bbebfdf3d885dcde470d7faafd7 | 4b825dc642cb6eb9a060e54bf8d69288fbee4904 |
+| c8a9172b2a615d461154f61158180de53edc6070 | 4b825dc642cb6eb9a060e54bf8d69288fbee4904 |
+| 7c8f83394b6e8966eb46f0d3416c717612198a4b | 4b825dc642cb6eb9a060e54bf8d69288fbee4904 |
+| 852547b3b2bb76c8582cee963e8aa180d552a15c | ab047e38d1532f61ff5c3621202afc3e763e9945 |
+| bad4a83737f337d47e0ba681478214b07a707218 | 9bcfc25001b71c333b4b5a89224217de81c56e2e |
+|------------------------------------------+------------------------------------------|
+
+* swh policy
+
+** New repository
+
+For this one this was more tedious.
+#+BEGIN_SRC sh
+$ svn export --ignore-keywords file:///home/storage/svn/repos/pkg-gourmet@1
+#+END_SRC
+The export does not expand the keywords and does not include the .svn folder.
+
+Then:
+#+BEGIN_SRC sh
+$ cd pkg-gourmet
+$ swh-hashtree --path .
+669a71cce6c424a81ba42b7dc5d560d32252f0ca
+#+END_SRC
+
+Note: ../../../../bin/hashtree
+
+Then for the next revision:
+#+BEGIN_SRC sh
+cd .. ; rm -rf pkg-gourmet; svn export --ignore-keywords file:///home/storage/svn/repos/pkg-gourmet@2
+A    pkg-gourmet
+A    pkg-gourmet/gourmet
+A    pkg-gourmet/gourmet/trunk
+Exported revision 2.
+$ cd pkg-gourmet && swh-hashtree --path .
+008ac97a1118560797c50e3392fa1443acdaa349
+#+END_SRC
+etc...
+
+|--------------+------------------------------------------+------------------------------------------|
+| svn revision | swh revision                             | tree                                     |
+|--------------+------------------------------------------+------------------------------------------|
+|            1 | 0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71 | 669a71cce6c424a81ba42b7dc5d560d32252f0ca |
+|            2 | 95edacc8848369d6fb1608e887d6d2474fd5224f | 008ac97a1118560797c50e3392fa1443acdaa349 |
+|            3 | fef26ea45a520071711ba2b9d16a2985ee837021 | 3780effbe846a26751a95a8c95c511fb72be15b4 |
+|            4 | 3f51abf3b3d466571be0855dfa67e094f9ceff1b | ffcca9b09c5827a6b8137322d4339c8055c3ee1e |
+|            5 | a3a577948fdbda9d1061913b77a1588695eadb41 | 7dc52cc04c3b8bd7c085900d60c159f7b846f866 |
+|            6 | 4876cb10aec6f708f7466dddf547567b65f6c39c | 0deab3023ac59398ae467fc4bff5583008af1ee2 |
+|--------------+------------------------------------------+------------------------------------------|
+
+For the revision, cheating a little.
+That is adapting swh.model.identifiers.revision_identifiers to print the commit's manifest:
+
+#+BEGIN_SRC sh
+b'tree 669a71cce6c424a81ba42b7dc5d560d32252f0ca\nauthor seanius 1138341038.645397 +0000\ncommitter seanius 1138341038.645397 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 1\n\nmaking dir structure...'
+[2016-06-23 12:35:39,291: DEBUG/Worker-1] rev: 1, swhrev: 0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71, dir: 669a71cce6c424a81ba42b7dc5d560d32252f0ca
+b'tree 008ac97a1118560797c50e3392fa1443acdaa349\nparent 0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71\nauthor seanius 1138341044.821526 +0000\ncommitter seanius 1138341044.821526 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 2\n\nmaking dir structure...'
+[2016-06-23 12:35:39,302: DEBUG/Worker-1] rev: 2, swhrev: 95edacc8848369d6fb1608e887d6d2474fd5224f, dir: 008ac97a1118560797c50e3392fa1443acdaa349
+b'tree 3780effbe846a26751a95a8c95c511fb72be15b4\nparent 95edacc8848369d6fb1608e887d6d2474fd5224f\nauthor seanius 1138341057.282488 +0000\ncommitter seanius 1138341057.282488 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 3\n\nmaking dir structure...'
+[2016-06-23 12:35:39,313: DEBUG/Worker-1] rev: 3, swhrev: fef26ea45a520071711ba2b9d16a2985ee837021, dir: 3780effbe846a26751a95a8c95c511fb72be15b4
+b'tree ffcca9b09c5827a6b8137322d4339c8055c3ee1e\nparent fef26ea45a520071711ba2b9d16a2985ee837021\nauthor seanius 1138341064.191867 +0000\ncommitter seanius 1138341064.191867 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 4\n\nmaking dir structure...'
+[2016-06-23 12:35:39,322: DEBUG/Worker-1] rev: 4, swhrev: 3f51abf3b3d466571be0855dfa67e094f9ceff1b, dir: ffcca9b09c5827a6b8137322d4339c8055c3ee1e
+b'tree 7dc52cc04c3b8bd7c085900d60c159f7b846f866\nparent 3f51abf3b3d466571be0855dfa67e094f9ceff1b\nauthor seanius 1138342632.066765 +0000\ncommitter seanius 1138342632.066765 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 5\n\ninitial import'
+[2016-06-23 12:35:39,339: DEBUG/Worker-1] rev: 5, swhrev: a3a577948fdbda9d1061913b77a1588695eadb41, dir: 7dc52cc04c3b8bd7c085900d60c159f7b846f866
+b'tree 0deab3023ac59398ae467fc4bff5583008af1ee2\nparent a3a577948fdbda9d1061913b77a1588695eadb41\nauthor seanius 1138343905.448277 +0000\ncommitter seanius 1138343905.448277 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 6\n\nfix breakage in rules'
+[2016-06-23 12:35:39,348: DEBUG/Worker-1] rev: 6, swhrev: 4876cb10aec6f708f7466dddf547567b65f6c39c, dir: 0deab3023ac59398ae467fc4bff5583008af1ee2
+[2016-06-23 12:35:39,355: INFO/Worker-1] Processed 6 revisions: [0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71, ...]
+#+END_SRC
+
+Then checking the manifest's hash is ok:
+#+BEGIN_SRC sh
+$ echo -en 'tree 669a71cce6c424a81ba42b7dc5d560d32252f0ca\nauthor seanius 1138341038.645397 +0000\ncommitter seanius 1138341038.645397 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 1\n\nmaking dir structure...' | git hash-object -t commit --stdin
+0d7dd5f751cef8fe17e8024f7d6b0e3aac2cfd71
+#+END_SRC
+
+And all is ok.
+
+** Update existing repository
+
+Checkout on disk the repository and do some modifications on it:
+#+BEGIN_SRC sh
+$ svn co file:///home/storage/svn/repos/pkg-gourmet/
+A    pkg-gourmet/gourmet
+A    pkg-gourmet/gourmet/branches
+A    pkg-gourmet/gourmet/tags
+A    pkg-gourmet/gourmet/trunk
+A    pkg-gourmet/gourmet/trunk/debian
+A    pkg-gourmet/gourmet/trunk/debian/patches
+A    pkg-gourmet/gourmet/trunk/debian/patches/00list
+A    pkg-gourmet/gourmet/trunk/debian/patches/01_printer_warning.dpatch
+A    pkg-gourmet/gourmet/trunk/debian/README.Maintainer
+A    pkg-gourmet/gourmet/trunk/debian/TODO
+A    pkg-gourmet/gourmet/trunk/debian/changelog
+A    pkg-gourmet/gourmet/trunk/debian/compat
+A    pkg-gourmet/gourmet/trunk/debian/control
+A    pkg-gourmet/gourmet/trunk/debian/copyright
+A    pkg-gourmet/gourmet/trunk/debian/dirs
+A    pkg-gourmet/gourmet/trunk/debian/docs
+A    pkg-gourmet/gourmet/trunk/debian/gourmet.1
+A    pkg-gourmet/gourmet/trunk/debian/menu
+A    pkg-gourmet/gourmet/trunk/debian/postinst
+A    pkg-gourmet/gourmet/trunk/debian/postrm
+A    pkg-gourmet/gourmet/trunk/debian/prerm
+A    pkg-gourmet/gourmet/trunk/debian/recbox.xpm
+A    pkg-gourmet/gourmet/trunk/debian/rules
+A    pkg-gourmet/gourmet/trunk/debian/source.lintian-overrides
+Checked out revision 6.
+$ cd pkg-gourmet
+$ mkdir foo/bar/ -p
+$ em foo/bar/new-file
+% svn add foo
+A         foo
+A         foo/bar
+A         foo/bar/README
+$ svn commit -m 'Add a new README'
+Adding         foo
+Adding         foo/bar
+Adding         foo/bar/README
+Transmitting file data .done
+Committing transaction...
+Committed revision 7.
+$ ln -s foo/bar/README README
+$ svn add README
+A         README
+$ svn commit -m 'Add link to README'
+Adding         README
+Transmitting file data .done
+Committing transaction...
+Committed revision 8.
+$ svn update
+Updating '.':
+At revision 8.
+#+END_SRC
+
+Checking the log, we see those new svn commits:
+#+BEGIN_SRC sh
+$ svn log
+------------------------------------------------------------------------
+r11 | tony | 2016-07-11 10:38:43 +0200 (Mon, 11 Jul 2016) | 1 line
+
+Delete broken link
+------------------------------------------------------------------------
+r10 | tony | 2016-07-11 10:09:13 +0200 (Mon, 11 Jul 2016) | 1 line
+
+Add bin/hello executable
+------------------------------------------------------------------------
+r9 | tony | 2016-07-07 11:13:52 +0200 (Thu, 07 Jul 2016) | 1 line
+
+------------------------------------------------------------------------
+r8 | tony | 2016-06-24 11:08:42 +0200 (Fri, 24 Jun 2016) | 1 line
+
+Add link to README
+------------------------------------------------------------------------
+r7 | tony | 2016-06-24 11:07:04 +0200 (Fri, 24 Jun 2016) | 1 line
+
+Add a new README
+------------------------------------------------------------------------
+r6 | seanius | 2006-01-27 07:38:25 +0100 (Fri, 27 Jan 2006) | 1 line
+
+fix breakage in rules
+#+END_SRC
+
+Loading the svn repository, we see 2 new swh revisions:
+#+BEGIN_SRC sh
+b'tree 752c52134dcbf2fff13c7be1ce4e9e5dbf428a59\nparent 4876cb10aec6f708f7466dddf547567b65f6c39c\nauthor tony 1466759224.2817 +0000\ncommitter tony 1466759224.2817 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 7\n\nAdd a new README'
+[2016-06-24 11:18:21,055: DEBUG/Worker-1] rev: 7, swhrev: 7f5bc909c29d4e93d8ccfdda516e51ed44930ee1, dir: 752c52134dcbf2fff13c7be1ce4e9e5dbf428a59
+b'tree 39c813fb4717a4864bacefbd90b51a3241ae4140\nparent 7f5bc909c29d4e93d8ccfdda516e51ed44930ee1\nauthor tony 1466759322.099151 +0000\ncommitter tony 1466759322.099151 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 8\n\nAdd link to README'
+[2016-06-24 11:18:21,066: DEBUG/Worker-1] rev: 8, swhrev: 38d81702cb28db4f1a6821e64321e5825d1f7fd6, dir: 39c813fb4717a4864bacefbd90b51a3241ae4140
+[2016-07-11 10:47:18,609: DEBUG/Worker-1] rev: 9, swhrev: 99c27ebbd43feca179ac0e895af131d8314cafe1, dir: 3397ca7f709639cbd36b18a0d1b70bce80018c45
+[2016-07-11 10:47:18,644: DEBUG/Worker-1] rev: 10, swhrev: 902f29b4323a9b9de3af6d28e72dd581e76d9397, dir: c4e12483f0a13e6851459295a4ae735eb4e4b5c4
+[2016-07-11 10:47:18,831: DEBUG/Worker-1] rev: 11, swhrev: 171dc35522bfd17dda4e90a542a0377fb2fc707a, dir: fd24a76c87a3207428e06612b49860fc78e9f6dc
+#+END_SRC
+
+|--------------+------------------------------------------+------------------------------------------|
+| svn revision | swh revision                             | tree                                     |
+|--------------+------------------------------------------+------------------------------------------|
+|            7 | 7f5bc909c29d4e93d8ccfdda516e51ed44930ee1 | 752c52134dcbf2fff13c7be1ce4e9e5dbf428a59 |
+|            8 | 38d81702cb28db4f1a6821e64321e5825d1f7fd6 | 39c813fb4717a4864bacefbd90b51a3241ae4140 |
+|            9 | 99c27ebbd43feca179ac0e895af131d8314cafe1 | 3397ca7f709639cbd36b18a0d1b70bce80018c45 |
+|           10 | 902f29b4323a9b9de3af6d28e72dd581e76d9397 | c4e12483f0a13e6851459295a4ae735eb4e4b5c4 |
+|           11 | 171dc35522bfd17dda4e90a542a0377fb2fc707a | fd24a76c87a3207428e06612b49860fc78e9f6dc |
+|--------------+------------------------------------------+------------------------------------------|
+*** Checks
+**** Trees
+
+#+BEGIN_SRC sh
+$ pwd
+/home/storage/svn/working-copies/pkg-gourmet
+$ cd ..; rm -rf pkg-gourmet; svn export --ignore-keywords file:///home/storage/svn/repos/pkg-gourmet@7; cd pkg-gourmet; swh-hashtree --path .
+A    pkg-gourmet
+A    pkg-gourmet/foo
+A    pkg-gourmet/foo/bar
+A    pkg-gourmet/foo/bar/README
+A    pkg-gourmet/gourmet
+A    pkg-gourmet/gourmet/branches
+A    pkg-gourmet/gourmet/tags
+A    pkg-gourmet/gourmet/trunk
+A    pkg-gourmet/gourmet/trunk/debian
+A    pkg-gourmet/gourmet/trunk/debian/patches
+A    pkg-gourmet/gourmet/trunk/debian/patches/00list
+A    pkg-gourmet/gourmet/trunk/debian/patches/01_printer_warning.dpatch
+A    pkg-gourmet/gourmet/trunk/debian/README.Maintainer
+A    pkg-gourmet/gourmet/trunk/debian/TODO
+A    pkg-gourmet/gourmet/trunk/debian/changelog
+A    pkg-gourmet/gourmet/trunk/debian/compat
+A    pkg-gourmet/gourmet/trunk/debian/control
+A    pkg-gourmet/gourmet/trunk/debian/copyright
+A    pkg-gourmet/gourmet/trunk/debian/dirs
+A    pkg-gourmet/gourmet/trunk/debian/docs
+A    pkg-gourmet/gourmet/trunk/debian/gourmet.1
+A    pkg-gourmet/gourmet/trunk/debian/menu
+A    pkg-gourmet/gourmet/trunk/debian/postinst
+A    pkg-gourmet/gourmet/trunk/debian/postrm
+A    pkg-gourmet/gourmet/trunk/debian/prerm
+A    pkg-gourmet/gourmet/trunk/debian/recbox.xpm
+A    pkg-gourmet/gourmet/trunk/debian/rules
+A    pkg-gourmet/gourmet/trunk/debian/source.lintian-overrides
+Exported revision 7.
+752c52134dcbf2fff13c7be1ce4e9e5dbf428a59
+$ cd ..; rm -rf pkg-gourmet; svn export --ignore-keywords file:///home/storage/svn/repos/pkg-gourmet@8; cd pkg-gourmet; swh-hashtree --path .
+A    pkg-gourmet
+A    pkg-gourmet/foo
+A    pkg-gourmet/foo/bar
+A    pkg-gourmet/foo/bar/README
+A    pkg-gourmet/gourmet
+A    pkg-gourmet/gourmet/branches
+A    pkg-gourmet/gourmet/tags
+A    pkg-gourmet/gourmet/trunk
+A    pkg-gourmet/gourmet/trunk/debian
+A    pkg-gourmet/gourmet/trunk/debian/patches
+A    pkg-gourmet/gourmet/trunk/debian/patches/00list
+A    pkg-gourmet/gourmet/trunk/debian/patches/01_printer_warning.dpatch
+A    pkg-gourmet/gourmet/trunk/debian/README.Maintainer
+A    pkg-gourmet/gourmet/trunk/debian/TODO
+A    pkg-gourmet/gourmet/trunk/debian/changelog
+A    pkg-gourmet/gourmet/trunk/debian/compat
+A    pkg-gourmet/gourmet/trunk/debian/control
+A    pkg-gourmet/gourmet/trunk/debian/copyright
+A    pkg-gourmet/gourmet/trunk/debian/dirs
+A    pkg-gourmet/gourmet/trunk/debian/docs
+A    pkg-gourmet/gourmet/trunk/debian/gourmet.1
+A    pkg-gourmet/gourmet/trunk/debian/menu
+A    pkg-gourmet/gourmet/trunk/debian/postinst
+A    pkg-gourmet/gourmet/trunk/debian/postrm
+A    pkg-gourmet/gourmet/trunk/debian/prerm
+A    pkg-gourmet/gourmet/trunk/debian/recbox.xpm
+A    pkg-gourmet/gourmet/trunk/debian/rules
+A    pkg-gourmet/gourmet/trunk/debian/source.lintian-overrides
+A    pkg-gourmet/README
+Exported revision 8.
+39c813fb4717a4864bacefbd90b51a3241ae4140
+#+END_SRC
+
+Trees ok!
+
+**** Revisions
+
+#+BEGIN_SRC sh
+$ git-revhash 'tree 752c52134dcbf2fff13c7be1ce4e9e5dbf428a59\nparent 4876cb10aec6f708f7466dddf547567b65f6c39c\nauthor tony 1466759224.2817 +0000\ncommitter tony 1466759224.2817 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 7\n\nAdd a new README'
+7f5bc909c29d4e93d8ccfdda516e51ed44930ee1
+$ git-revhash 'tree 39c813fb4717a4864bacefbd90b51a3241ae4140\nparent 7f5bc909c29d4e93d8ccfdda516e51ed44930ee1\nauthor tony 1466759322.099151 +0000\ncommitter tony 1466759322.099151 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 8\n\nAdd link to README
+38d81702cb28db4f1a6821e64321e5825d1f7fd6
+#+END_SRC
+** Adding new corner cases
+
+About [[http://svnbook.red-bean.com/en/1.8/svn.advanced.props.file-portability.html#svn.advanced.props.special.eol-style][eol property on files]].
+
+|--------------+------------------------------------------+------------------------------------------+-------------------------------------------------+-----------------------------------------|
+| svn revision | swh revision                             | tree                                     | File                                            | Expects                                 |
+|--------------+------------------------------------------+------------------------------------------+-------------------------------------------------+-----------------------------------------|
+|           12 | 027e8769f4786597436ab94a91f85527d04a6cbb | 2d9ca72c6afec6284fb01e459588cbb007017c8c | Added and committed a file with standard lf eol | Nothing to do                           |
+|           13 | 4474d96018877742d9697d5c76666c9693353bfc | ab111577e0ab39e4a157c476072af48f2641d93f | Added and committed a file with crlf eol        | Nothing done (file contains CRLF)       |
+|           14 | 97ad21eab92961e2a22ca0285f09c6d1e9a7ffbc | ab111577e0ab39e4a157c476072af48f2641d93f | Update that file with svn:style 'CRLF'          | Nothing to do (already in CRLF)         |
+|           15 | d04ea8afcee6205cc8384c091bfc578931c169fd | b0a648b02e55a4dce356ac35187a058f89694ec7 | Update that file with svn:style 'native'        | Conversion to LF (during commit)        |
+|           16 | ded78810401fd354ffe894aa4a1e5c7d30a645d1 | b0a648b02e55a4dce356ac35187a058f89694ec7 | Update that file with svn:style 'LF             | Nothing to do (already converted in LF) |
+|           17 | 4ee95e39358712f53c4fc720da3fafee9249ed19 | c3c98df624733fef4e592bef983f93e2ed02b179 | Added and committed a file with cr eol          | Nothing to do (file contains CR)        |
+|           18 | ffa901b69ca0f46a2261f42948838d19709cb9f8 | c3c98df624733fef4e592bef983f93e2ed02b179 | Update that file with svn:style 'CR'            | Nothing to do (already in CR)           |
+|           19 | 0148ae3eaa520b73a50802c59f3f416b7a36cf8c | 844d4646d6c2b4f3a3b2b22ab0ee38c7df07bab2 | Update that file with svn:style 'native'        | Conversion (during commit)              |
+|--------------+------------------------------------------+------------------------------------------+-------------------------------------------------+-----------------------------------------|

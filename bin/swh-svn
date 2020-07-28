@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+
+# Use sample:
+# swh-svn --remote-url file:///home/storage/svn/repos/asf \
+#    --revision 30000 --path swh-asf-30000
+
+import click
+
+from subvertpy.ra import Auth, get_username_provider
+from subvertpy import client
+
+
+@click.command()
+@click.option("--remote-url", help="Remote url to export.")
+@click.option("--path", default=".", help="path to checkout locally.")
+@click.option("--revision", type=click.INT, help="")
+def main(remote_url, path, revision):
+    _auth = Auth([get_username_provider()])
+    _client = client.Client(auth=_auth)
+
+    print("svn export --ignore-keywords %s@%s %s" % (remote_url, revision, path))
+    _client.export(remote_url, to=path, rev=revision, ignore_keywords=True)
+
+
+if __name__ == "__main__":
+    main()

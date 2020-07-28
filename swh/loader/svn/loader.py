@@ -46,17 +46,6 @@ from .exception import SvnLoaderHistoryAltered
 DEFAULT_BRANCH = b"HEAD"
 
 
-def build_swh_snapshot(revision_id, branch=DEFAULT_BRANCH):
-    """Build a swh snapshot from the revision id, origin url, and visit.
-
-    """
-    return Snapshot(
-        branches={
-            branch: SnapshotBranch(target=revision_id, target_type=TargetType.REVISION)
-        }
-    )
-
-
 TEMPORARY_DIR_PREFIX_PATTERN = "swh.loader.svn."
 
 
@@ -575,7 +564,13 @@ Local repository not cleaned up for investigation: %s"""
 
         """
         if revision:  # Priority to the revision
-            snap = build_swh_snapshot(revision.id)
+            snap = Snapshot(
+                branches={
+                    DEFAULT_BRANCH: SnapshotBranch(
+                        target=revision.id, target_type=TargetType.REVISION
+                    )
+                }
+            )
         elif snapshot:  # Fallback to prior snapshot
             snap = snapshot
         else:
@@ -678,10 +673,12 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         and return the last loaded svn revision number or -1
         otherwise.
         """
+        origin = self.storage.origin_get([svn_url])[0]
+        if not origin:
+            return -1
         last_loaded_svn_rev = -1
         try:
-            origin = self.storage.origin_get({"url": svn_url})
-            last_swh_rev = self.swh_latest_snapshot_revision(origin["url"])["revision"]
+            last_swh_rev = self.swh_latest_snapshot_revision(origin.url)["revision"]
             last_swh_rev_headers = dict(last_swh_rev["extra_headers"])
             last_loaded_svn_rev = int(last_swh_rev_headers[b"svn_revision"])
         except Exception:

@@ -1,3 +1,17 @@
+swh-loader-svn (0.3.1-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.3.1     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2020-07-28 07:50:03
+    +0200)
+  * Upstream changes:     - v0.3.1     - loader: Update
+    swh.storage.origin_get call to latest api change     - tests: Reuse
+    pytest fixtures from swh.loader.core     - tests: Check against
+    snapshot model object     - svn.loader: Drop `build_swh_snapshot`
+    function, oneliner used once     - Fix branches types in tests     -
+    Clean up the swh.scheduler / swh.storage pytest plugin imports
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Tue, 28 Jul 2020 05:52:35 +0000
+
 swh-loader-svn (0.3.0-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.3.0     - (tagged by David Douard

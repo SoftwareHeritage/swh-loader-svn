@@ -121,7 +121,7 @@ def test_loader_svn_2_visits_no_change(swh_config, datadir, tmp_path):
     assert start_revision is not None
 
     loader = SvnLoader(repo_url, swh_revision=start_revision)
-    assert loader.load() == {"status": "eventful"}
+    assert loader.load() == {"status": "uneventful"}
 
     stats = get_stats(loader.storage)
     assert stats["origin_visit"] == 2 + 1
@@ -585,6 +585,10 @@ def test_loader_svn_loader_from_dump_archive(swh_config, datadir, tmp_path):
     assert stats["origin"] == 2
     assert stats["origin_visit"] == 3
     assert stats["snapshot"] == 1
+
+    # second visit from the dump should be uneventful
+    loaderFromDump = SvnLoaderFromRemoteDump(repo_url)
+    assert loaderFromDump.load() == {"status": "uneventful"}
 
 
 def test_loader_user_defined_svn_properties(swh_config, datadir, tmp_path):

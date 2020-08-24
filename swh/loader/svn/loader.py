@@ -15,7 +15,7 @@ import tempfile
 
 from mmap import mmap, ACCESS_WRITE
 from subprocess import Popen
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Dict, Iterator, List, Optional, Tuple
 
 from swh.model import hashutil
 from swh.model.model import (
@@ -88,7 +88,6 @@ class SvnLoader(BaseLoader):
         # origin url as unique identifier for origin in swh archive
         self.origin_url = origin_url if origin_url else self.svn_url
         self.debug = self.config["debug"]
-        self.last_seen_revision = None
         self.temp_directory = self.config["temp_directory"]
         self.done = False
         self.svnrepo = None
@@ -104,15 +103,18 @@ class SvnLoader(BaseLoader):
         self._directories = []
         self._revisions = []
         self._snapshot: Optional[Snapshot] = None
+        # internal state, current visit
         self._last_revision = None
         self._visit_status = "full"
         self._load_status = "uneventful"
         self.visit_date = visit_date
         self.destination_path = destination_path
         self.start_from_scratch = start_from_scratch
-        self.swh_revision = swh_revision
         self.max_content_length = self.config["max_content_size"]
         self.snapshot = None
+        # state from previous visit
+        self.latest_snapshot = None
+        self.latest_revision = None
 
     def pre_cleanup(self):
         """Cleanup potential dangling files from prior runs (e.g. OOM killed
@@ -155,11 +157,9 @@ Local repository not cleaned up for investigation: %s"""
         self.svnrepo.clean_fs(local_dirname)
         return h
 
-    def swh_latest_snapshot_revision(
-        self,
-        origin_url: str,
-        previous_swh_revision: Optional[Union[bytes, dict]] = None,
-    ) -> Dict[str, Any]:
+    def _latest_snapshot_revision(
+        self, origin_url: str,
+    ) -> Optional[Tuple[Snapshot, Revision]]:
         """Look for latest snapshot revision and returns it if any.
 
         Args:
@@ -168,41 +168,28 @@ Local repository not cleaned up for investigation: %s"""
                 revision identifier)
 
         Returns:
-            dict: The latest known point in time as dict with keys (if any):
-
-                'revision': latest visited revision
-                'snapshot': latest snapshot
-
-            If no snapshot matching criteria is found, returns an empty dict.
+            Tuple of the latest Snapshot from the previous visit and its targeted
+            revision if any or None otherwise.
 
         """
         storage = self.storage
-        latest_snapshot: Optional[Snapshot] = None
-
-        if not previous_swh_revision:
-            latest_snapshot = snapshot_get_latest(storage, origin_url)
-            if not latest_snapshot:
-                return {}
-            branches = latest_snapshot.branches
-            if not branches:
-                return {}
-            branch = branches.get(DEFAULT_BRANCH)
-            if not branch:
-                return {}
-            target_type = branch.target_type.value
-            if target_type != "revision":
-                return {}
-            previous_swh_revision = branch.target
-
-        if isinstance(previous_swh_revision, dict):
-            swh_id = previous_swh_revision["id"]
-        else:
-            swh_id = previous_swh_revision
+        latest_snapshot = snapshot_get_latest(storage, origin_url)
+        if not latest_snapshot:
+            return None
+        branches = latest_snapshot.branches
+        if not branches:
+            return None
+        branch = branches.get(DEFAULT_BRANCH)
+        if not branch:
+            return None
+        if branch.target_type != TargetType.REVISION:
+            return None
+        swh_id = branch.target
 
         revs = list(storage.revision_get([swh_id]))
-        if revs:
-            return {"snapshot": latest_snapshot, "revision": revs[0]}
-        return {}
+        if not revs or revs[0] is None:
+            return None
+        return latest_snapshot, Revision.from_dict(revs[0])
 
     def build_swh_revision(self, rev, commit, dir_id, parents):
         """Build the swh revision dictionary.
@@ -227,12 +214,14 @@ Local repository not cleaned up for investigation: %s"""
             rev, commit, self.svnrepo.uuid, dir_id, parents
         )
 
-    def check_history_not_altered(self, svnrepo, revision_start, swh_rev):
-        """Given a svn repository, check if the history was not tampered with.
+    def check_history_not_altered(
+        self, svnrepo, revision_start: int, swh_rev: Revision
+    ) -> bool:
+        """Given a svn repository, check if the history was modified in between visits.
 
         """
-        revision_id = swh_rev["id"]
-        parents = swh_rev["parents"]
+        revision_id = swh_rev.id
+        parents = swh_rev.parents
         hash_data_per_revs = svnrepo.swh_hash_data_at_revision(revision_start)
 
         rev = revision_start
@@ -243,44 +232,13 @@ Local repository not cleaned up for investigation: %s"""
         swh_revision_id = swh_revision.id
         return swh_revision_id == revision_id
 
-    def _init_from(self, partial_swh_revision, previous_swh_revision):
-        """Function to determine from where to start from.
-
-        Args:
-            partial_swh_revision (dict): A known revision from which
-                                         the previous loading did not
-                                         finish.
-            known_previous_revision (dict): A known revision from
-                                            which the previous loading
-                                            did finish.
-
-        Returns:
-            The revision from which to start or None if nothing (fresh
-            start).
-
-        """
-        if partial_swh_revision and not previous_swh_revision:
-            return partial_swh_revision
-        if not partial_swh_revision and previous_swh_revision:
-            return previous_swh_revision
-        if partial_swh_revision and previous_swh_revision:
-            # will determine from which to start from
-            extra_headers1 = dict(partial_swh_revision["extra_headers"])
-            extra_headers2 = dict(previous_swh_revision["extra_headers"])
-            rev_start1 = int(extra_headers1[b"svn_revision"])
-            rev_start2 = int(extra_headers2[b"svn_revision"])
-            if rev_start1 <= rev_start2:
-                return previous_swh_revision
-            return partial_swh_revision
-
-        return None
-
-    def start_from(self, last_known_swh_revision=None, start_from_scratch=False):
+    def start_from(
+        self, start_from_scratch: bool = False
+    ) -> Tuple[int, int, Dict[int, Tuple[bytes, ...]]]:
         """Determine from where to start the loading.
 
         Args:
-            last_known_swh_revision (dict): Last know swh revision or None
-            start_from_scratch (bool): To start loading from scratch or not
+            start_from_scratch: As opposed to start from the last snapshot
 
         Returns:
             tuple (revision_start, revision_end, revision_parents)
@@ -300,46 +258,35 @@ Local repository not cleaned up for investigation: %s"""
             revision_start = self.svnrepo.initial_revision()
             revision_end = revision_head
 
-        revision_parents = {revision_start: []}
+        revision_parents: Dict[int, Tuple[bytes, ...]] = {revision_start: ()}
 
-        if not start_from_scratch:
-            # Check if we already know a previous revision for that origin
-            if self.latest_snapshot:
-                swh_rev = self.latest_snapshot["revision"]
-            else:
-                swh_rev = None
+        # start from a previous revision if any
+        if not start_from_scratch and self.latest_revision is not None:
+            extra_headers = dict(self.latest_revision.extra_headers)
+            revision_start = int(extra_headers[b"svn_revision"])
+            revision_parents = {
+                revision_start: self.latest_revision.parents,
+            }
 
-            # Determine from which known revision to start
-            swh_rev = self._init_from(
-                last_known_swh_revision, previous_swh_revision=swh_rev
+            self.log.debug(
+                "svn export --ignore-keywords %s@%s"
+                % (self.svnrepo.remote_url, revision_start)
             )
 
-            if swh_rev:  # Yes, we know a previous revision. Try and update it.
-                extra_headers = dict(swh_rev["extra_headers"])
-                revision_start = int(extra_headers[b"svn_revision"])
-                revision_parents = {
-                    revision_start: swh_rev["parents"],
-                }
-
-                self.log.debug(
-                    "svn export --ignore-keywords %s@%s"
-                    % (self.svnrepo.remote_url, revision_start)
+            if not self.check_history_not_altered(
+                self.svnrepo, revision_start, self.latest_revision
+            ):
+                msg = "History of svn %s@%s altered. Skipping..." % (
+                    self.svnrepo.remote_url,
+                    revision_start,
                 )
+                raise SvnLoaderHistoryAltered(msg)
 
-                if swh_rev and not self.check_history_not_altered(
-                    self.svnrepo, revision_start, swh_rev
-                ):
-                    msg = "History of svn %s@%s altered. " "Skipping..." % (
-                        self.svnrepo.remote_url,
-                        revision_start,
-                    )
-                    raise SvnLoaderHistoryAltered(msg)
-
-                # now we know history is ok, we start at next revision
-                revision_start = revision_start + 1
-                # and the parent become the latest know revision for
-                # that repository
-                revision_parents[revision_start] = [swh_rev["id"]]
+            # now we know history is ok, we start at next revision
+            revision_start = revision_start + 1
+            # and the parent become the latest know revision for
+            # that repository
+            revision_parents[revision_start] = (self.latest_revision.id,)
 
         if revision_start > revision_end and revision_start != 1:
             msg = "%s@%s already injected." % (self.svnrepo.remote_url, revision_end)
@@ -444,14 +391,9 @@ Local repository not cleaned up for investigation: %s"""
         self.origin = Origin(url=self.origin_url if self.origin_url else self.svn_url)
 
     def prepare(self, *args, **kwargs):
-        if self.swh_revision:
-            self.last_known_swh_revision = self.swh_revision
-        else:
-            self.last_known_swh_revision = None
-
-        self.latest_snapshot = self.swh_latest_snapshot_revision(
-            self.origin_url, self.last_known_swh_revision
-        )
+        latest_snapshot_revision = self._latest_snapshot_revision(self.origin_url)
+        if latest_snapshot_revision:
+            self.latest_snapshot, self.latest_revision = latest_snapshot_revision
 
         if self.destination_path:
             local_dirname = self.destination_path
@@ -468,15 +410,15 @@ Local repository not cleaned up for investigation: %s"""
 
         try:
             revision_start, revision_end, revision_parents = self.start_from(
-                self.last_known_swh_revision, self.start_from_scratch
+                self.start_from_scratch
             )
             self.swh_revision_gen = self.process_svn_revisions(
                 self.svnrepo, revision_start, revision_end, revision_parents
             )
         except SvnLoaderUneventful as e:
             self.log.warning(e)
-            if self.latest_snapshot and "snapshot" in self.latest_snapshot:
-                self._snapshot = self.latest_snapshot["snapshot"]
+            if self.latest_snapshot:
+                self._snapshot = self.latest_snapshot
             self.done = True
             self._load_status = "uneventful"
         except SvnLoaderHistoryAltered as e:
@@ -667,23 +609,24 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         self.repo_path = None
         self.truncated_dump = False
 
-    def get_last_loaded_svn_rev(self, svn_url):
+    def get_last_loaded_svn_rev(self, svn_url: str) -> int:
+        """Check if the svn repository has already been visited and return the last
+        loaded svn revision number or -1 otherwise.
+
         """
-        Check if the svn repository has already been visited
-        and return the last loaded svn revision number or -1
-        otherwise.
-        """
-        origin = self.storage.origin_get([svn_url])[0]
+        origin = list(self.storage.origin_get([svn_url]))[0]
         if not origin:
             return -1
-        last_loaded_svn_rev = -1
+        svn_revision = -1
         try:
-            last_swh_rev = self.swh_latest_snapshot_revision(origin.url)["revision"]
-            last_swh_rev_headers = dict(last_swh_rev["extra_headers"])
-            last_loaded_svn_rev = int(last_swh_rev_headers[b"svn_revision"])
+            latest_snapshot_revision = self._latest_snapshot_revision(origin.url)
+            if latest_snapshot_revision:
+                _, latest_revision = latest_snapshot_revision
+            latest_revision_headers = dict(latest_revision.extra_headers)
+            svn_revision = int(latest_revision_headers[b"svn_revision"])
         except Exception:
             pass
-        return last_loaded_svn_rev
+        return svn_revision
 
     def dump_svn_revisions(self, svn_url, last_loaded_svn_rev=-1):
         """

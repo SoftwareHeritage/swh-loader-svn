@@ -1,8 +1,12 @@
-swh-loader-svn (0.3.2-1~swh1~bpo10+1) buster-swh; urgency=medium
+swh-loader-svn (0.3.3-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 0.3.3     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2020-08-24 16:00:11
+    +0200)
+  * Upstream changes:     - v0.3.3     - svn.loader: Simplify and align
+    incremental visit algorithm
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Tue, 28 Jul 2020 06:13:05 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Mon, 24 Aug 2020 14:01:22 +0000
 
 swh-loader-svn (0.3.2-1~swh1) unstable-swh; urgency=medium
 

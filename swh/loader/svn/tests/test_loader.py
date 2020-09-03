@@ -112,12 +112,9 @@ def test_loader_svn_2_visits_no_change(swh_config, datadir, tmp_path):
     assert stats["snapshot"] == 1
 
     # even starting from previous revision...
-    revs = list(
-        loader.storage.revision_get(
-            [hash_to_bytes("95edacc8848369d6fb1608e887d6d2474fd5224f")]
-        )
-    )
-    start_revision = revs[0]
+    start_revision = loader.storage.revision_get(
+        [hash_to_bytes("95edacc8848369d6fb1608e887d6d2474fd5224f")]
+    )[0]
     assert start_revision is not None
 
     loader = SvnLoader(repo_url, swh_revision=start_revision)
@@ -284,12 +281,9 @@ def test_loader_svn_visit_start_from_revision(swh_config, datadir, tmp_path):
         snapshot=GOURMET_SNAPSHOT.id,
     )
 
-    revs = list(
-        loader.storage.revision_get(
-            [hash_to_bytes("95edacc8848369d6fb1608e887d6d2474fd5224f")]
-        )
-    )
-    start_revision = revs[0]
+    start_revision = loader.storage.revision_get(
+        [hash_to_bytes("95edacc8848369d6fb1608e887d6d2474fd5224f")]
+    )[0]
     assert start_revision is not None
 
     archive_path = os.path.join(datadir, "pkg-gourmet-with-updates.tgz")

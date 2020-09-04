@@ -186,10 +186,10 @@ Local repository not cleaned up for investigation: %s"""
             return None
         swh_id = branch.target
 
-        revs = list(storage.revision_get([swh_id]))
-        if not revs or revs[0] is None:
+        revision = storage.revision_get([swh_id])[0]
+        if not revision:
             return None
-        return latest_snapshot, Revision.from_dict(revs[0])
+        return latest_snapshot, revision
 
     def build_swh_revision(self, rev, commit, dir_id, parents):
         """Build the swh revision dictionary.

@@ -60,6 +60,7 @@ swh/loader/svn/tests/data/mediawiki-repo-r407-eol-native-crlf.tgz
 swh/loader/svn/tests/data/pkg-doc-linux-r10.tgz
 swh/loader/svn/tests/data/pkg-doc-linux-r11.tgz
 swh/loader/svn/tests/data/pkg-doc-linux-r12.tgz
+swh/loader/svn/tests/data/pkg-gourmet-add-remove-dir.tgz
 swh/loader/svn/tests/data/pkg-gourmet-tampered-rev6-log.tgz
 swh/loader/svn/tests/data/pkg-gourmet-with-edge-case-links-and-files.tgz
 swh/loader/svn/tests/data/pkg-gourmet-with-external-id.tgz

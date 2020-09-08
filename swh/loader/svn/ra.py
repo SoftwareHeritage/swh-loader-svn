@@ -301,7 +301,7 @@ class BaseDirEditor:
         else:
             del self.directory[path]
             fpath = os.path.join(self.rootpath, path)
-            if isinstance(entry_removed, Directory):
+            if isinstance(entry_removed, from_disk.Directory):
                 shutil.rmtree(fpath)
             else:
                 os.remove(fpath)

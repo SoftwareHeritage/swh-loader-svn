@@ -622,3 +622,15 @@ def test_loader_user_defined_svn_properties(swh_config, datadir, tmp_path):
     assert stats["origin_visit"] == 1
     assert stats["snapshot"] == 1
     assert stats["revision"] == 7
+
+
+def test_loader_svn_dir_added_then_removed(swh_config, datadir, tmp_path):
+    """Loader should handle directory removal when processing a commit"""
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}-add-remove-dir.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    loader = SvnLoader(repo_url, destination_path=tmp_path)
+
+    assert loader.load() == {"status": "eventful"}
+    assert loader.visit_status() == "full"

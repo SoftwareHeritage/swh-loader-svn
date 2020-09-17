@@ -5,21 +5,15 @@
 
 import os
 
-
+from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
 from swh.loader.tests import (
     assert_last_visit_matches,
     check_snapshot,
-    prepare_repository_from_archive,
     get_stats,
-)
-
-from swh.loader.svn.loader import (
-    SvnLoader,
-    SvnLoaderFromRemoteDump,
+    prepare_repository_from_archive,
 )
 from swh.model.hashutil import hash_to_bytes
 from swh.model.model import Snapshot, SnapshotBranch, TargetType
-
 
 GOURMET_SNAPSHOT = Snapshot(
     id=hash_to_bytes("889cacc2731e3312abfb2b1a0c18ade82a949e07"),

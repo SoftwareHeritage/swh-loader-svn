@@ -7,41 +7,37 @@
 swh-storage.
 
 """
+from mmap import ACCESS_WRITE, mmap
 import os
 import pty
 import re
 import shutil
-import tempfile
-
-from mmap import mmap, ACCESS_WRITE
 from subprocess import Popen
+import tempfile
 from typing import Dict, Iterator, List, Optional, Tuple
 
-from swh.model import hashutil
+from swh.loader.core.loader import BaseLoader
+from swh.loader.core.utils import clean_dangling_folders
+from swh.model import from_disk, hashutil
 from swh.model.model import (
     Content,
     Directory,
     Origin,
-    SkippedContent,
     Revision,
+    SkippedContent,
     Snapshot,
     SnapshotBranch,
     TargetType,
 )
-from swh.model import from_disk
-from swh.loader.core.loader import BaseLoader
-from swh.loader.core.utils import clean_dangling_folders
 from swh.storage.algos.snapshot import snapshot_get_latest
 
-from . import svn, converters
+from . import converters, svn
+from .exception import SvnLoaderHistoryAltered, SvnLoaderUneventful
 from .utils import (
-    init_svn_repo_from_dump,
-    init_svn_repo_from_archive_dump,
     OutputStream,
+    init_svn_repo_from_archive_dump,
+    init_svn_repo_from_dump,
 )
-from .exception import SvnLoaderUneventful
-from .exception import SvnLoaderHistoryAltered
-
 
 DEFAULT_BRANCH = b"HEAD"
 

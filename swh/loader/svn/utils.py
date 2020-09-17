@@ -5,11 +5,11 @@
 
 import errno
 import os
-import tempfile
 import shutil
+from subprocess import PIPE, Popen, call
+import tempfile
 
 from dateutil import parser
-from subprocess import PIPE, Popen, call
 
 from swh.model.model import Optional, Timestamp
 

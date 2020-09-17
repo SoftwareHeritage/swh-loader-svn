@@ -5,9 +5,8 @@
 #    --revision 30000 --path swh-asf-30000
 
 import click
-
-from subvertpy.ra import Auth, get_username_provider
 from subvertpy import client
+from subvertpy.ra import Auth, get_username_provider
 
 
 @click.command()

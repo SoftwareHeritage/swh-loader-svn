@@ -11,15 +11,15 @@ commit.
 
 import logging
 import os
-import tempfile
 import shutil
+import tempfile
 
-from subvertpy.ra import RemoteAccess, Auth, get_username_provider
 from subvertpy import client, properties
+from subvertpy.ra import Auth, RemoteAccess, get_username_provider
 
 from swh.model.from_disk import Directory
 
-from . import ra, converters
+from . import converters, ra
 
 # When log message contains empty data
 DEFAULT_AUTHOR_MESSAGE = ""

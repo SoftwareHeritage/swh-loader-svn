@@ -5,11 +5,10 @@
 
 import os
 import pty
-
 from subprocess import Popen
 
-from swh.model.model import Timestamp
 from swh.loader.svn import utils
+from swh.model.model import Timestamp
 
 
 def test_outputstream():

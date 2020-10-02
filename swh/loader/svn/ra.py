@@ -7,21 +7,18 @@
 
 """
 
-import click
 import codecs
 import os
 import shutil
 import tempfile
-
 from typing import List, Tuple
 
+import click
 from subvertpy import delta, properties
-from subvertpy.ra import RemoteAccess, Auth, get_username_provider
+from subvertpy.ra import Auth, RemoteAccess, get_username_provider
 
-from swh.model import hashutil
-from swh.model import from_disk
+from swh.model import from_disk, hashutil
 from swh.model.model import Content, Directory, SkippedContent
-
 
 _eol_style = {"native": b"\n", "CRLF": b"\r\n", "LF": b"\n", "CR": b"\r"}
 

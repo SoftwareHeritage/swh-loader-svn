@@ -18,7 +18,6 @@ setup.cfg
 setup.py
 svn-lib-client-analysis.org
 tox.ini
-version.txt
 bin/init-svn-repository.sh
 bin/swh-svn
 docs/.gitignore

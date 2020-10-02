@@ -7,46 +7,53 @@
 swh-storage.
 
 """
+from mmap import ACCESS_WRITE, mmap
 import os
 import pty
 import re
 import shutil
-import tempfile
-
-from mmap import mmap, ACCESS_WRITE
 from subprocess import Popen
-from typing import Dict, Iterator, List, Optional, Tuple
+import tempfile
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-from swh.model import hashutil
+from swh.core.config import merge_configs
+from swh.loader.core.loader import BaseLoader
+from swh.loader.core.utils import clean_dangling_folders
+from swh.model import from_disk, hashutil
 from swh.model.model import (
     Content,
     Directory,
     Origin,
-    SkippedContent,
     Revision,
+    SkippedContent,
     Snapshot,
     SnapshotBranch,
     TargetType,
 )
-from swh.model import from_disk
-from swh.loader.core.loader import BaseLoader
-from swh.loader.core.utils import clean_dangling_folders
 from swh.storage.algos.snapshot import snapshot_get_latest
 
-from . import svn, converters
+from . import converters, svn
+from .exception import SvnLoaderHistoryAltered, SvnLoaderUneventful
 from .utils import (
-    init_svn_repo_from_dump,
-    init_svn_repo_from_archive_dump,
     OutputStream,
+    init_svn_repo_from_archive_dump,
+    init_svn_repo_from_dump,
 )
-from .exception import SvnLoaderUneventful
-from .exception import SvnLoaderHistoryAltered
-
 
 DEFAULT_BRANCH = b"HEAD"
 
 
 TEMPORARY_DIR_PREFIX_PATTERN = "swh.loader.svn."
+
+
+DEFAULT_CONFIG: Dict[str, Any] = {
+    "temp_directory": "/tmp",
+    "debug": False,  # NOT FOR PRODUCTION: False for production
+    "check_revision": {
+        "status": False,  # True: check the revision, False: don't check
+        "limit": 1000,  # Periodicity check
+    },
+}
 
 
 class SvnLoader(BaseLoader):
@@ -56,20 +63,6 @@ class SvnLoader(BaseLoader):
     update on an already previously loaded repository.
 
     """
-
-    CONFIG_BASE_FILENAME = "loader/svn"
-
-    ADDITIONAL_CONFIG = {
-        "temp_directory": ("str", "/tmp"),
-        "debug": ("bool", False),  # NOT FOR PRODUCTION, False for production
-        "check_revision": (
-            "dict",
-            {
-                "status": False,  # do we check the revision?
-                "limit": 1000,  # at which pace do we check it?
-            },
-        ),
-    }
 
     visit_type = "svn"
 
@@ -83,6 +76,7 @@ class SvnLoader(BaseLoader):
         start_from_scratch=False,
     ):
         super().__init__(logging_class="swh.loader.svn.SvnLoader")
+        self.config = merge_configs(DEFAULT_CONFIG, self.config)
         # technical svn uri to act on svn repository
         self.svn_url = url
         # origin url as unique identifier for origin in swh archive

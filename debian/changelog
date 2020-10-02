@@ -1,3 +1,16 @@
+swh-loader-svn (0.5.0-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.5.0     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2020-10-02 14:16:50
+    +0200)
+  * Upstream changes:     - v0.5.0     - svn.loader: Migrate away from
+    SWHConfig mixin     - tests: Don't check the number of created
+    'person' objects     - python: Reorder imports with isort     - pre-
+    commit: Add isort hook and configuration     - pre-commit: Update
+    flake8 hook configuration
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 02 Oct 2020 12:17:49 +0000
+
 swh-loader-svn (0.4.1-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.4.1     - (tagged by Antoine Lambert

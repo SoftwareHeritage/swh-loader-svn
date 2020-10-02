@@ -5,21 +5,15 @@
 
 import os
 
-
+from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
 from swh.loader.tests import (
     assert_last_visit_matches,
     check_snapshot,
-    prepare_repository_from_archive,
     get_stats,
-)
-
-from swh.loader.svn.loader import (
-    SvnLoader,
-    SvnLoaderFromRemoteDump,
+    prepare_repository_from_archive,
 )
 from swh.model.hashutil import hash_to_bytes
 from swh.model.model import Snapshot, SnapshotBranch, TargetType
-
 
 GOURMET_SNAPSHOT = Snapshot(
     id=hash_to_bytes("889cacc2731e3312abfb2b1a0c18ade82a949e07"),
@@ -66,7 +60,6 @@ def test_loader_svn_new_visit(swh_config, datadir, tmp_path):
         "directory": 17,
         "origin": 1,
         "origin_visit": 1,
-        "person": 1,
         "release": 0,
         "revision": 6,
         "skipped_content": 0,
@@ -226,7 +219,6 @@ def test_loader_svn_visit_with_changes(swh_config, datadir, tmp_path):
         "directory": 28,
         "origin": 1,
         "origin_visit": 2,
-        "person": 2,
         "release": 0,
         "revision": 11,
         "skipped_content": 0,
@@ -316,7 +308,6 @@ def test_loader_svn_visit_start_from_revision(swh_config, datadir, tmp_path):
         "directory": 28,
         "origin": 1,
         "origin_visit": 2,
-        "person": 2,
         "release": 0,
         "revision": 11,
         "skipped_content": 0,

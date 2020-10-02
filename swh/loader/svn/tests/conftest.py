@@ -3,9 +3,9 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-import pytest
-
 from typing import Any, Dict
+
+import pytest
 
 
 @pytest.fixture
@@ -30,9 +30,6 @@ def swh_loader_config(swh_storage_backend_config) -> Dict[str, Any]:
             ],
         },
         "check_revision": {"limit": 100, "status": False},
-        "debug": False,
         "log_db": "dbname=softwareheritage-log",
-        "save_data": False,
-        "save_data_path": "",
         "temp_directory": "/tmp",
     }

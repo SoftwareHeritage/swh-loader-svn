@@ -2,6 +2,5 @@
 # should match https://pypi.python.org/pypi names. For the full spec or
 # dependency lines, see https://pip.readthedocs.org/en/1.1/requirements.html
 click
-retrying
 python-dateutil
 subvertpy >= 0.9.4

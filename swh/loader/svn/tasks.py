@@ -3,11 +3,20 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from datetime import datetime
 from typing import Optional
 
 from celery import shared_task
+import iso8601
 
 from .loader import SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump
+
+
+def convert_to_datetime(date: Optional[str]) -> Optional[datetime]:
+    try:
+        return iso8601.parse_date(date)
+    except Exception:
+        return None
 
 
 @shared_task(name=__name__ + ".LoadSvnRepository")
@@ -41,7 +50,7 @@ def load_svn(
         origin_url=origin_url,
         destination_path=destination_path,
         swh_revision=swh_revision,
-        visit_date=visit_date,
+        visit_date=convert_to_datetime(visit_date),
         start_from_scratch=start_from_scratch,
     )
     return loader.load()
@@ -70,7 +79,7 @@ def load_svn_from_archive(
     loader = SvnLoaderFromDumpArchive.from_configfile(
         url=url,
         archive_path=archive_path,
-        visit_date=visit_date,
+        visit_date=convert_to_datetime(visit_date),
         start_from_scratch=start_from_scratch,
     )
     return loader.load()
@@ -100,7 +109,7 @@ def load_svn_from_remote_dump(
     loader = SvnLoaderFromRemoteDump.from_configfile(
         url=url,
         origin_url=origin_url,
-        visit_date=visit_date,
+        visit_date=convert_to_datetime(visit_date),
         start_from_scratch=start_from_scratch,
     )
     return loader.load()

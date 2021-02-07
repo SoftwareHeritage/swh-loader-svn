@@ -7,6 +7,7 @@
 swh-storage.
 
 """
+from datetime import datetime
 from mmap import ACCESS_WRITE, mmap
 import os
 import pty
@@ -15,8 +16,6 @@ import shutil
 from subprocess import Popen
 import tempfile
 from typing import Dict, Iterator, List, Optional, Tuple
-
-import iso8601
 
 from subvertpy import SubversionException
 
@@ -67,7 +66,7 @@ class SvnLoader(BaseLoader):
         storage: StorageInterface,
         url: str,
         origin_url: Optional[str] = None,
-        visit_date: Optional[str] = None,
+        visit_date: Optional[datetime] = None,
         destination_path: Optional[str] = None,
         swh_revision: Optional[str] = None,
         start_from_scratch: bool = False,
@@ -101,10 +100,7 @@ class SvnLoader(BaseLoader):
         self._last_revision = None
         self._visit_status = "full"
         self._load_status = "uneventful"
-        if visit_date:
-            self.visit_date = iso8601.parse_date(visit_date)
-        else:
-            self.visit_date = None
+        self.visit_date = visit_date
         self.destination_path = destination_path
         self.start_from_scratch = start_from_scratch
         self.snapshot = None
@@ -556,7 +552,7 @@ class SvnLoaderFromDumpArchive(SvnLoader):
         destination_path: Optional[str] = None,
         swh_revision: Optional[str] = None,
         start_from_scratch: bool = False,
-        visit_date: Optional[str] = None,
+        visit_date: Optional[datetime] = None,
         temp_directory: str = "/tmp",
         debug: bool = False,
         check_revision: int = 0,
@@ -615,7 +611,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         destination_path: Optional[str] = None,
         swh_revision: Optional[str] = None,
         start_from_scratch: bool = False,
-        visit_date: Optional[str] = None,
+        visit_date: Optional[datetime] = None,
         temp_directory: str = "/tmp",
         debug: bool = False,
         check_revision: int = 0,

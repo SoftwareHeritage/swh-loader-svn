@@ -4,3 +4,4 @@
 click
 python-dateutil
 subvertpy >= 0.9.4
+iso8601

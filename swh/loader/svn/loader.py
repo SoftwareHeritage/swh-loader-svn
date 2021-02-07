@@ -14,11 +14,12 @@ import re
 import shutil
 from subprocess import Popen
 import tempfile
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
+
+import iso8601
 
 from subvertpy import SubversionException
 
-from swh.core.config import merge_configs
 from swh.loader.core.loader import BaseLoader
 from swh.loader.core.utils import clean_dangling_folders
 from swh.loader.exception import NotFound
@@ -35,6 +36,7 @@ from swh.model.model import (
     TargetType,
 )
 from swh.storage.algos.snapshot import snapshot_get_latest
+from swh.storage.interface import StorageInterface
 
 from . import converters
 from .exception import SvnLoaderHistoryAltered, SvnLoaderUneventful
@@ -50,16 +52,6 @@ DEFAULT_BRANCH = b"HEAD"
 TEMPORARY_DIR_PREFIX_PATTERN = "swh.loader.svn."
 
 
-DEFAULT_CONFIG: Dict[str, Any] = {
-    "temp_directory": "/tmp",
-    "debug": False,  # NOT FOR PRODUCTION: False for production
-    "check_revision": {
-        "status": False,  # True: check the revision, False: don't check
-        "limit": 1000,  # Periodicity check
-    },
-}
-
-
 class SvnLoader(BaseLoader):
     """Swh svn loader.
 
@@ -72,43 +64,49 @@ class SvnLoader(BaseLoader):
 
     def __init__(
         self,
-        url,
-        origin_url=None,
-        visit_date=None,
-        destination_path=None,
-        swh_revision=None,
-        start_from_scratch=False,
+        storage: StorageInterface,
+        url: str,
+        origin_url: Optional[str] = None,
+        visit_date: Optional[str] = None,
+        destination_path: Optional[str] = None,
+        swh_revision: Optional[str] = None,
+        start_from_scratch: bool = False,
+        temp_directory: str = "/tmp",
+        debug: bool = False,
+        check_revision: int = 0,
+        max_content_size: Optional[int] = None,
     ):
-        super().__init__(logging_class="swh.loader.svn.SvnLoader")
-        self.config = merge_configs(DEFAULT_CONFIG, self.config)
+        super().__init__(
+            storage=storage,
+            logging_class="swh.loader.svn.SvnLoader",
+            max_content_size=max_content_size,
+        )
         # technical svn uri to act on svn repository
         self.svn_url = url
         # origin url as unique identifier for origin in swh archive
         self.origin_url = origin_url if origin_url else self.svn_url
-        self.debug = self.config["debug"]
-        self.temp_directory = self.config["temp_directory"]
+        self.debug = debug
+        self.temp_directory = temp_directory
         self.done = False
         self.svnrepo = None
         # Revision check is configurable
-        check_revision = self.config["check_revision"]
-        if check_revision["status"]:
-            self.check_revision = check_revision["limit"]
-        else:
-            self.check_revision = None
+        self.check_revision = check_revision
         # internal state used to store swh objects
-        self._contents = []
-        self._skipped_contents = []
-        self._directories = []
-        self._revisions = []
+        self._contents: List[Content] = []
+        self._skipped_contents: List[SkippedContent] = []
+        self._directories: List[Directory] = []
+        self._revisions: List[Revision] = []
         self._snapshot: Optional[Snapshot] = None
         # internal state, current visit
         self._last_revision = None
         self._visit_status = "full"
         self._load_status = "uneventful"
-        self.visit_date = visit_date
+        if visit_date:
+            self.visit_date = iso8601.parse_date(visit_date)
+        else:
+            self.visit_date = None
         self.destination_path = destination_path
         self.start_from_scratch = start_from_scratch
-        self.max_content_length = self.config["max_content_size"]
         self.snapshot = None
         # state from previous visit
         self.latest_snapshot = None
@@ -248,6 +246,7 @@ Local repository not cleaned up for investigation: %s"""
             SvnLoaderUneventful: Nothing changed since last visit
 
         """
+        assert self.svnrepo is not None, "svnrepo initialized in the `prepare` method"
         revision_head = self.svnrepo.head_revision()
         if revision_head == 0:  # empty repository case
             revision_start = 0
@@ -317,7 +316,8 @@ Local repository not cleaned up for investigation: %s"""
             ValueError if a hash divergence is detected
 
         """
-        if (count % self.check_revision) == 0:  # hash computation check
+        # hash computation check
+        if (self.check_revision != 0 and count % self.check_revision) == 0:
             self.log.debug("Checking hash computations on revision %s..." % rev)
             checked_dir_id = self.swh_revision_hash_tree_at_svn_revision(rev)
             if checked_dir_id != dir_id:
@@ -385,10 +385,10 @@ Local repository not cleaned up for investigation: %s"""
 
             yield _contents, _skipped_contents, _directories, swh_revision
 
-    def prepare_origin_visit(self, *args, **kwargs):
+    def prepare_origin_visit(self):
         self.origin = Origin(url=self.origin_url if self.origin_url else self.svn_url)
 
-    def prepare(self, *args, **kwargs):
+    def prepare(self):
         latest_snapshot_revision = self._latest_snapshot_revision(self.origin_url)
         if latest_snapshot_revision:
             self.latest_snapshot, self.latest_revision = latest_snapshot_revision
@@ -404,7 +404,7 @@ Local repository not cleaned up for investigation: %s"""
 
         try:
             self.svnrepo = SvnRepo(
-                self.svn_url, self.origin_url, local_dirname, self.max_content_length
+                self.svn_url, self.origin_url, local_dirname, self.max_content_size
             )
         except SubversionException as e:
             error_msgs = [
@@ -549,27 +549,37 @@ class SvnLoaderFromDumpArchive(SvnLoader):
 
     def __init__(
         self,
-        url,
-        archive_path,
-        origin_url=None,
-        destination_path=None,
-        swh_revision=None,
-        start_from_scratch=None,
-        visit_date=None,
+        storage: StorageInterface,
+        url: str,
+        archive_path: str,
+        origin_url: Optional[str] = None,
+        destination_path: Optional[str] = None,
+        swh_revision: Optional[str] = None,
+        start_from_scratch: bool = False,
+        visit_date: Optional[str] = None,
+        temp_directory: str = "/tmp",
+        debug: bool = False,
+        check_revision: int = 0,
+        max_content_size: Optional[int] = None,
     ):
         super().__init__(
-            url,
+            storage=storage,
+            url=url,
             origin_url=origin_url,
             destination_path=destination_path,
             swh_revision=swh_revision,
             start_from_scratch=start_from_scratch,
             visit_date=visit_date,
+            temp_directory=temp_directory,
+            debug=debug,
+            check_revision=check_revision,
+            max_content_size=max_content_size,
         )
         self.archive_path = archive_path
         self.temp_dir = None
         self.repo_path = None
 
-    def prepare(self, *args, **kwargs):
+    def prepare(self):
         self.log.info("Archive to mount and load %s" % self.archive_path)
         self.temp_dir, self.repo_path = init_svn_repo_from_archive_dump(
             self.archive_path,
@@ -577,7 +587,7 @@ class SvnLoaderFromDumpArchive(SvnLoader):
             suffix="-%s" % os.getpid(),
             root_dir=self.temp_directory,
         )
-        super().prepare(*args, **kwargs)
+        super().prepare()
 
     def cleanup(self):
         super().cleanup()
@@ -599,20 +609,30 @@ class SvnLoaderFromRemoteDump(SvnLoader):
 
     def __init__(
         self,
-        url,
-        origin_url=None,
-        destination_path=None,
-        swh_revision=None,
-        start_from_scratch=False,
-        visit_date=None,
+        storage: StorageInterface,
+        url: str,
+        origin_url: Optional[str] = None,
+        destination_path: Optional[str] = None,
+        swh_revision: Optional[str] = None,
+        start_from_scratch: bool = False,
+        visit_date: Optional[str] = None,
+        temp_directory: str = "/tmp",
+        debug: bool = False,
+        check_revision: int = 0,
+        max_content_size: Optional[int] = None,
     ):
         super().__init__(
-            url,
+            storage=storage,
+            url=url,
             origin_url=origin_url,
             destination_path=destination_path,
             swh_revision=swh_revision,
             start_from_scratch=start_from_scratch,
             visit_date=visit_date,
+            temp_directory=temp_directory,
+            debug=debug,
+            check_revision=check_revision,
+            max_content_size=max_content_size,
         )
         self.temp_dir = tempfile.mkdtemp(dir=self.temp_directory)
         self.repo_path = None
@@ -730,7 +750,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             "no exploitable dump file has been generated."
         )
 
-    def prepare(self, *args, **kwargs):
+    def prepare(self):
         # First, check if previous revisions have been loaded for the
         # subversion origin and get the number of the last one
         last_loaded_svn_rev = self.get_last_loaded_svn_rev(self.svn_url)
@@ -748,7 +768,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             root_dir=self.temp_dir,
         )
         self.svn_url = "file://%s" % self.repo_path
-        super().prepare(*args, **kwargs)
+        super().prepare()
 
     def cleanup(self):
         super().cleanup()

@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2020  The Software Heritage developers
+# Copyright (C) 2016-2021  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -161,7 +161,7 @@ def test_loader_tampered_repository(swh_config, datadir, tmp_path):
     assert loader2.load() == {"status": "failed"}
 
     assert_last_visit_matches(
-        loader2.storage, repo_url, status="partial", type="svn", snapshot=None,
+        loader2.storage, repo_url, status="failed", type="svn", snapshot=None,
     )
 
     stats = get_stats(loader.storage)

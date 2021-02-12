@@ -1,9 +1,12 @@
-# Copyright (C) 2016-2020  The Software Heritage developers
+# Copyright (C) 2016-2021  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
 import os
+
+import pytest
+from subvertpy import SubversionException
 
 from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
 from swh.loader.tests import (
@@ -34,6 +37,59 @@ GOURMET_UPDATES_SNAPSHOT = Snapshot(
         )
     },
 )
+
+
+def test_loader_svn_not_found_no_mock(swh_config, tmp_path):
+    """Given an unknown repository, the loader visit ends up in status not_found"""
+    unknown_repo_url = "unknown-repository"
+    loader = SvnLoader(unknown_repo_url, destination_path=tmp_path)
+
+    assert loader.load() == {"status": "uneventful"}
+
+    assert_last_visit_matches(
+        loader.storage, unknown_repo_url, status="not_found", type="svn",
+    )
+
+
+@pytest.mark.parametrize(
+    "exception_msg", ["Unable to connect to a repository at URL", "Unknown URL type",]
+)
+def test_loader_svn_not_found(swh_config, tmp_path, exception_msg, mocker):
+    """Given unknown repository issues, the loader visit ends up in status not_found"""
+    mock = mocker.patch("swh.loader.svn.loader.SvnRepo")
+    mock.side_effect = SubversionException(exception_msg, 0)
+
+    unknown_repo_url = "unknown-repository"
+    loader = SvnLoader(unknown_repo_url, destination_path=tmp_path)
+
+    assert loader.load() == {"status": "uneventful"}
+
+    assert_last_visit_matches(
+        loader.storage, unknown_repo_url, status="not_found", type="svn",
+    )
+
+
+@pytest.mark.parametrize(
+    "exception",
+    [
+        SubversionException("Irrelevant message, considered a failure", 10),
+        SubversionException("Present but fails to read, considered a failure", 20),
+        ValueError("considered a failure"),
+    ],
+)
+def test_loader_svn_failures(swh_config, tmp_path, exception, mocker):
+    """Given any errors raised, the loader visit ends up in status failed"""
+    mock = mocker.patch("swh.loader.svn.loader.SvnRepo")
+    mock.side_effect = exception
+
+    existing_repo_url = "existing-repo-url"
+    loader = SvnLoader(existing_repo_url, destination_path=tmp_path)
+
+    assert loader.load() == {"status": "failed"}
+
+    assert_last_visit_matches(
+        loader.storage, existing_repo_url, status="failed", type="svn",
+    )
 
 
 def test_loader_svn_new_visit(swh_config, datadir, tmp_path):
@@ -161,7 +217,7 @@ def test_loader_tampered_repository(swh_config, datadir, tmp_path):
     assert loader2.load() == {"status": "failed"}
 
     assert_last_visit_matches(
-        loader2.storage, repo_url, status="partial", type="svn", snapshot=None,
+        loader2.storage, repo_url, status="failed", type="svn", snapshot=None,
     )
 
     stats = get_stats(loader.storage)

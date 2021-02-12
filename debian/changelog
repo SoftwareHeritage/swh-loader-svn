@@ -1,3 +1,9 @@
+swh-loader-svn (0.6.0-1~swh2) unstable-swh; urgency=medium
+
+  * Update dependencies
+
+ -- Antoine R. Dumont (@ardumont) <ardumont@softwareheritage.org>  Fri, 12 Feb 2021 18:05:59 +0100
+
 swh-loader-svn (0.6.0-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.6.0     - (tagged by Antoine R. Dumont

@@ -1,8 +1,20 @@
-swh-loader-svn (0.5.0-1~swh1~bpo10+1) buster-swh; urgency=medium
+swh-loader-svn (0.6.0-1~swh2) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * Update dependencies
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 02 Oct 2020 12:19:00 +0000
+ -- Antoine R. Dumont (@ardumont) <ardumont@softwareheritage.org>  Fri, 12 Feb 2021 18:05:59 +0100
+
+swh-loader-svn (0.6.0-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.6.0     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2021-02-12 17:31:53
+    +0100)
+  * Upstream changes:     - v0.6.0     - svn.loader: Mark visit status
+    as not_found when relevant     - svn.loader: Mark visit status as
+    failed     - Drop the retrying dependency     - tox.ini: pin black
+    to the pre-commit version (19.10b0) to avoid flip-flops
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 12 Feb 2021 16:33:45 +0000
 
 swh-loader-svn (0.5.0-1~swh1) unstable-swh; urgency=medium
 

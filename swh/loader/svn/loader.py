@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2020  The Software Heritage developers
+# Copyright (C) 2015-2021  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -16,9 +16,13 @@ from subprocess import Popen
 import tempfile
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
+from subvertpy import SubversionException
+
 from swh.core.config import merge_configs
 from swh.loader.core.loader import BaseLoader
 from swh.loader.core.utils import clean_dangling_folders
+from swh.loader.exception import NotFound
+from swh.loader.svn.svn import SvnRepo
 from swh.model import from_disk, hashutil
 from swh.model.model import (
     Content,
@@ -32,7 +36,7 @@ from swh.model.model import (
 )
 from swh.storage.algos.snapshot import snapshot_get_latest
 
-from . import converters, svn
+from . import converters
 from .exception import SvnLoaderHistoryAltered, SvnLoaderUneventful
 from .utils import (
     OutputStream,
@@ -398,9 +402,20 @@ Local repository not cleaned up for investigation: %s"""
                 dir=self.temp_directory,
             )
 
-        self.svnrepo = svn.SvnRepo(
-            self.svn_url, self.origin_url, local_dirname, self.max_content_length
-        )
+        try:
+            self.svnrepo = SvnRepo(
+                self.svn_url, self.origin_url, local_dirname, self.max_content_length
+            )
+        except SubversionException as e:
+            error_msgs = [
+                "Unable to connect to a repository at URL",
+                "Unknown URL type",
+            ]
+            for msg in error_msgs:
+                if msg in e.args[0]:
+                    self._load_status = "uneventful"
+                    raise NotFound(e)
+            raise
 
         try:
             revision_start, revision_end, revision_parents = self.start_from(

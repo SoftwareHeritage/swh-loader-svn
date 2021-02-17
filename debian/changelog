@@ -1,8 +1,13 @@
-swh-loader-svn (0.6.0-1~swh2~bpo10+1) buster-swh; urgency=medium
+swh-loader-svn (0.7.0-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 0.7.0     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2021-02-17 18:19:35
+    +0100)
+  * Upstream changes:     - v0.7.0     - loader: Expect visit_date as an
+    optional date in constructors     - Rework loader instantiation
+    logic according to loader core api
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 12 Feb 2021 17:09:41 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Wed, 17 Feb 2021 17:23:16 +0000
 
 swh-loader-svn (0.6.0-1~swh2) unstable-swh; urgency=medium
 

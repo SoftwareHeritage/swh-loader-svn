@@ -45,12 +45,12 @@ def build_swh_revision(
 ) -> Revision:
     """Given a svn revision, build a swh revision.
 
-    This adds an ['metadata']['extra-headers'] entry with the
+    This adds an 'extra-headers' entry with the
     repository's uuid and the svn revision.
 
     Args:
         - rev: the svn revision number
-        - commit: the commit metadata
+        - commit: the commit data: revision id, date, author, and message
         - repo_uuid: The repository's uuid
         - dir_id: the tree's hash identifier
         - parents: the revision's parents identifier

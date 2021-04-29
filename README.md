@@ -1,23 +1,25 @@
 swh-loader-svn
 ==============
 
-Documents are in the ./docs folder:
-- Specification: ./docs/swh-loader-svn.txt
+The Software Heritage SVN Loader is a tool and a library to walk a remote svn repository
+and inject into the SWH dataset all contained files that weren't known before.
 
-# Configuration file
+The main entry points are
 
-## Location
+- :class:`swh.loader.svn.loader.SvnLoader` for the main svn loader which ingests content out of
+  a remote svn repository
 
-Either:
-- /etc/softwareheritage/
-- ~/.config/swh/
-- ~/.swh/
+- :class:`swh.loader.svn.loader.SvnLoaderFromDumpArchive` which mounts a repository out of a
+  svn dump prior to ingest it.
 
-Note: Will call that location $SWH_CONFIG_PATH
+- :class:`swh.loader.svn.loader.SvnLoaderFromRemoteDump` which mounts a repository with
+  svnrdump prior to ingest its content.
 
-## Configuration sample
+# CLI run
 
-$SWH_CONFIG_PATH/loader/svn.yml:
+With the configuration:
+
+/tmp/loader_svn.yml:
 ```
 storage:
   cls: remote
@@ -25,47 +27,9 @@ storage:
     url: http://localhost:5002/
 ```
 
-## Local run
-
-### local svn repository
+Run:
 
 ```
-$ python3
-repo = 'pyang-repo-r343-eol-native-mixed-lf-crlf'
-#repo = 'zipeg-gae'
-origin_url = 'http://%s.googlecode.com' % repo
-local_repo_path = '/home/storage/svn/repo'
-svn_url = 'file://%s/%s' % (local_repo_path, repo)
-
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-from swh.loader.svn.tasks import LoadSvnRepository
-
-t = LoadSvnRepository()
-t.run(svn_url=svn_url,
-      origin_url=origin_url, visit_date='2016-05-03T15:16:32+00:00',
-      start_from_scratch=True)
-```
-
-### Mount and load an archive repository dump
-
-```
-$ python3
-repo = '0-512-md'
-archive_name = '%s-repo.svndump.gz' % repo
-archive_path = '/home/storage/svn/dumps/%s' % archive_name
-origin_url = 'http://%s.googlecode.com' % repo
-svn_url = 'file://%s' % repo
-
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-from swh.loader.svn.tasks import MountAndLoadSvnRepository
-
-t = MountAndLoadSvnRepository()
-t.run(archive_path=archive_path,
-      origin_url=origin_url,
-      visit_date='2016-05-03T15:16:32+00:00',
-      start_from_scratch=True)
+swh loader --config-file /tmp/loader_svn.yml \
+    run svn <svn-repository-url>
 ```

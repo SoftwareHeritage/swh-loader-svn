@@ -193,8 +193,8 @@ Local repository not cleaned up for investigation: %s"""
           svn revision number.
 
         Args:
-            rev (dict): the svn revision
-            commit (dict): the commit metadata
+            rev (int): the svn revision number
+            commit (dict): the commit data: revision id, date, author, and message
             dir_id (bytes): the upper tree's hash identifier
             parents ([bytes]): the parents' identifiers
 

@@ -281,7 +281,7 @@ Local repository not cleaned up for investigation: %s"""
             # that repository
             revision_parents[revision_start] = (self.latest_revision.id,)
 
-        if revision_start > revision_end and revision_start != 1:
+        if revision_start > revision_end:
             msg = "%s@%s already injected." % (self.svnrepo.remote_url, revision_end)
             raise SvnLoaderUneventful(msg)
 

@@ -46,9 +46,9 @@ from .utils import (
 )
 
 DEFAULT_BRANCH = b"HEAD"
-
-
 TEMPORARY_DIR_PREFIX_PATTERN = "swh.loader.svn."
+SUBVERSION_ERROR = re.compile(r".*(E[0-9]{6}):.*")
+SUBVERSION_NOT_FOUND = "E170013"
 
 
 class SvnLoader(BaseLoader):
@@ -659,6 +659,9 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         If the svnrdump command failed somehow,
         the produced dump file is analyzed to determine if a partial
         loading is still feasible.
+
+        Raises:
+            NotFound when the repository is no longer found at url
         """
         # Build the svnrdump command line
         svnrdump_cmd = ["svnrdump", "dump", svn_url]
@@ -676,11 +679,17 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             os.close(stderr_w)
             stderr_stream = OutputStream(stderr_r)
             readable = True
+            error_codes: List[str] = []
+            error_messages: List[str] = []
             while readable:
                 lines, readable = stderr_stream.read_lines()
                 stderr_lines += lines
                 for line in lines:
                     self.log.debug(line)
+                    match = SUBVERSION_ERROR.search(line)
+                    if match:
+                        error_codes.append(match.group(1))
+                        error_messages.append(line)
             svnrdump.wait()
             os.close(stderr_r)
 
@@ -741,9 +750,14 @@ class SvnLoaderFromRemoteDump(SvnLoader):
                     % (last_dumped_rev, last_loaded_svn_rev)
                 )
 
+        if SUBVERSION_NOT_FOUND in error_codes:
+            raise NotFound(
+                f"{SUBVERSION_NOT_FOUND}: Repository never existed or disappeared"
+            )
+
         raise Exception(
             "An error occurred when running svnrdump and "
-            "no exploitable dump file has been generated."
+            "no exploitable dump file has been generated.\n" + "\n".join(error_messages)
         )
 
     def prepare(self):

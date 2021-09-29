@@ -41,13 +41,13 @@ GOURMET_UPDATES_SNAPSHOT = Snapshot(
 
 def test_loader_svn_not_found_no_mock(swh_storage, tmp_path):
     """Given an unknown repository, the loader visit ends up in status not_found"""
-    unknown_repo_url = "unknown-repository"
-    loader = SvnLoader(swh_storage, unknown_repo_url, destination_path=tmp_path)
+    repo_url = "unknown-repository"
+    loader = SvnLoader(swh_storage, repo_url, destination_path=tmp_path)
 
     assert loader.load() == {"status": "uneventful"}
 
     assert_last_visit_matches(
-        swh_storage, unknown_repo_url, status="not_found", type="svn",
+        swh_storage, repo_url, status="not_found", type="svn",
     )
 
 
@@ -89,6 +89,21 @@ def test_loader_svn_failures(swh_storage, tmp_path, exception, mocker):
 
     assert_last_visit_matches(
         swh_storage, existing_repo_url, status="failed", type="svn",
+    )
+
+
+def test_loader_svnrdump_not_found(swh_storage, tmp_path, mocker):
+    """Loading from remote dump which does not exist should end up as not_found visit"""
+    unknown_repo_url = "file:///tmp/svn.code.sf.net/p/white-rats-studios/svn"
+
+    loader = SvnLoaderFromRemoteDump(
+        swh_storage, unknown_repo_url, destination_path=tmp_path
+    )
+
+    assert loader.load() == {"status": "uneventful"}
+
+    assert_last_visit_matches(
+        swh_storage, unknown_repo_url, status="not_found", type="svn",
     )
 
 

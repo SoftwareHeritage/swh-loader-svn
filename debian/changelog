@@ -1,3 +1,15 @@
+swh-loader-svn (0.7.2-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.7.2     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2021-09-30 10:07:44
+    +0200)
+  * Upstream changes:     - v0.7.2     - SvnLoaderFromRemoteDump: Fix
+    failed visit which should be an uneventful visit     - svn: Capture
+    svnrdump failure as not_found instead of failed     - mypy: Fix
+    errors with release >= v0.900
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 30 Sep 2021 08:10:27 +0000
+
 swh-loader-svn (0.7.1-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.7.1     - (tagged by Antoine Lambert

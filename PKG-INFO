@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: swh.loader.svn
-Version: 0.7.1
+Version: 0.7.2
 Summary: Software Heritage Loader SVN
 Home-page: https://forge.softwareheritage.org/diffusion/DLDSVN
 Author: Software Heritage developers
@@ -10,42 +10,6 @@ Project-URL: Bug Reports, https://forge.softwareheritage.org/maniphest
 Project-URL: Funding, https://www.softwareheritage.org/donate
 Project-URL: Source, https://forge.softwareheritage.org/source/swh-loader-svn
 Project-URL: Documentation, https://docs.softwareheritage.org/devel/swh-loader-svn/
-Description: swh-loader-svn
-        ==============
-        
-        The Software Heritage SVN Loader is a tool and a library to walk a remote svn repository
-        and inject into the SWH dataset all contained files that weren't known before.
-        
-        The main entry points are
-        
-        - :class:`swh.loader.svn.loader.SvnLoader` for the main svn loader which ingests content out of
-          a remote svn repository
-        
-        - :class:`swh.loader.svn.loader.SvnLoaderFromDumpArchive` which mounts a repository out of a
-          svn dump prior to ingest it.
-        
-        - :class:`swh.loader.svn.loader.SvnLoaderFromRemoteDump` which mounts a repository with
-          svnrdump prior to ingest its content.
-        
-        # CLI run
-        
-        With the configuration:
-        
-        /tmp/loader_svn.yml:
-        ```
-        storage:
-          cls: remote
-          args:
-            url: http://localhost:5002/
-        ```
-        
-        Run:
-        
-        ```
-        swh loader --config-file /tmp/loader_svn.yml \
-            run svn <svn-repository-url>
-        ```
-        
 Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3
 Classifier: Intended Audience :: Developers
@@ -55,3 +19,43 @@ Classifier: Development Status :: 5 - Production/Stable
 Requires-Python: >=3.7
 Description-Content-Type: text/markdown
 Provides-Extra: testing
+License-File: LICENSE
+License-File: AUTHORS
+
+swh-loader-svn
+==============
+
+The Software Heritage SVN Loader is a tool and a library to walk a remote svn repository
+and inject into the SWH dataset all contained files that weren't known before.
+
+The main entry points are
+
+- :class:`swh.loader.svn.loader.SvnLoader` for the main svn loader which ingests content out of
+  a remote svn repository
+
+- :class:`swh.loader.svn.loader.SvnLoaderFromDumpArchive` which mounts a repository out of a
+  svn dump prior to ingest it.
+
+- :class:`swh.loader.svn.loader.SvnLoaderFromRemoteDump` which mounts a repository with
+  svnrdump prior to ingest its content.
+
+# CLI run
+
+With the configuration:
+
+/tmp/loader_svn.yml:
+```
+storage:
+  cls: remote
+  args:
+    url: http://localhost:5002/
+```
+
+Run:
+
+```
+swh loader --config-file /tmp/loader_svn.yml \
+    run svn <svn-repository-url>
+```
+
+

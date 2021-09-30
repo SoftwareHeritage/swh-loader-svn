@@ -9,6 +9,7 @@ import pytest
 from subvertpy import SubversionException
 
 from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
+from swh.loader.svn.utils import init_svn_repo_from_dump
 from swh.loader.tests import (
     assert_last_visit_matches,
     check_snapshot,
@@ -41,13 +42,13 @@ GOURMET_UPDATES_SNAPSHOT = Snapshot(
 
 def test_loader_svn_not_found_no_mock(swh_storage, tmp_path):
     """Given an unknown repository, the loader visit ends up in status not_found"""
-    unknown_repo_url = "unknown-repository"
-    loader = SvnLoader(swh_storage, unknown_repo_url, destination_path=tmp_path)
+    repo_url = "unknown-repository"
+    loader = SvnLoader(swh_storage, repo_url, destination_path=tmp_path)
 
     assert loader.load() == {"status": "uneventful"}
 
     assert_last_visit_matches(
-        swh_storage, unknown_repo_url, status="not_found", type="svn",
+        swh_storage, repo_url, status="not_found", type="svn",
     )
 
 
@@ -90,6 +91,60 @@ def test_loader_svn_failures(swh_storage, tmp_path, exception, mocker):
     assert_last_visit_matches(
         swh_storage, existing_repo_url, status="failed", type="svn",
     )
+
+
+def test_loader_svnrdump_not_found(swh_storage, tmp_path, mocker):
+    """Loading from remote dump which does not exist should end up as not_found visit"""
+    unknown_repo_url = "file:///tmp/svn.code.sf.net/p/white-rats-studios/svn"
+
+    loader = SvnLoaderFromRemoteDump(
+        swh_storage, unknown_repo_url, destination_path=tmp_path
+    )
+
+    assert loader.load() == {"status": "uneventful"}
+
+    assert_last_visit_matches(
+        swh_storage, unknown_repo_url, status="not_found", type="svn",
+    )
+
+
+def test_loader_svnrdump_no_such_revision(swh_storage, tmp_path, datadir):
+    """Visit multiple times an origin with the remote loader should not raise.
+
+    It used to fail the ingestion on the second visit with a "No such revision x,
+    160006" message.
+
+    """
+
+    archive_dump = os.path.join(datadir, "penguinsdbtools2018.dump.gz")
+    loading_path = str(tmp_path / "loading")
+
+    # Prepare the dump as a local svn repository for test purposes
+    temp_dir, repo_path = init_svn_repo_from_dump(
+        archive_dump, root_dir=tmp_path, gzip=True
+    )
+    repo_url = f"file://{repo_path}"
+
+    loader = SvnLoaderFromRemoteDump(
+        swh_storage, repo_url, destination_path=loading_path
+    )
+    assert loader.load() == {"status": "eventful"}
+    actual_visit = assert_last_visit_matches(
+        swh_storage, repo_url, status="full", type="svn",
+    )
+
+    loader2 = SvnLoaderFromRemoteDump(
+        swh_storage, repo_url, destination_path=loading_path
+    )
+    # Visiting a second time the same repository should be uneventful...
+    assert loader2.load() == {"status": "uneventful"}
+    actual_visit2 = assert_last_visit_matches(
+        swh_storage, repo_url, status="full", type="svn",
+    )
+
+    assert actual_visit.snapshot is not None
+    # ... with the same snapshot as the first visit
+    assert actual_visit2.snapshot == actual_visit.snapshot
 
 
 def test_loader_svn_new_visit(swh_storage, datadir, tmp_path):

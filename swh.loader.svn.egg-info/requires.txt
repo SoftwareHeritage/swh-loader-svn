@@ -12,3 +12,5 @@ pytest
 pytest-mock
 pytest-postgresql
 swh.core[http]>=0.0.61
+types-click
+types-python-dateutil

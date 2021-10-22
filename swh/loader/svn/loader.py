@@ -583,6 +583,7 @@ class SvnLoaderFromDumpArchive(SvnLoader):
             suffix="-%s" % os.getpid(),
             root_dir=self.temp_directory,
         )
+        self.svn_url = f"file://{self.repo_path}"
         super().prepare()
 
     def cleanup(self):

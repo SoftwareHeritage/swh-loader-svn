@@ -4,11 +4,16 @@
 # See top-level LICENSE file for more information
 
 import os
+import subprocess
 
 import pytest
 from subvertpy import SubversionException
 
-from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
+from swh.loader.svn.loader import (
+    SvnLoader,
+    SvnLoaderFromDumpArchive,
+    SvnLoaderFromRemoteDump,
+)
 from swh.loader.svn.utils import init_svn_repo_from_dump
 from swh.loader.tests import (
     assert_last_visit_matches,
@@ -633,7 +638,7 @@ def test_loader_svn_with_wrong_symlinks(swh_storage, datadir, tmp_path):
     assert stats["revision"] == 21
 
 
-def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
+def test_loader_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
     """Repository with wrong symlinks should be ingested ok nonetheless
 
     Edge case:
@@ -742,3 +747,46 @@ def test_loader_svn_dir_added_then_removed(swh_storage, datadir, tmp_path):
 
     assert loader.load() == {"status": "eventful"}
     assert loader.visit_status() == "full"
+
+
+def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+    origin_url = f"svn://{archive_name}"
+    dump_filename = f"{archive_name}.dump"
+
+    with open(os.path.join(tmp_path, dump_filename), "wb") as dump_file:
+        # create compressed dump file of pkg-gourmet repo
+        subprocess.run(["svnrdump", "dump", repo_url], stdout=dump_file)
+        subprocess.run(["gzip", dump_filename], cwd=tmp_path)
+
+        # load svn repo from that compressed dump file
+        loader = SvnLoaderFromDumpArchive(
+            swh_storage,
+            url=origin_url,
+            archive_path=os.path.join(tmp_path, f"{dump_filename}.gz"),
+        )
+
+        assert loader.load() == {"status": "eventful"}
+
+        assert_last_visit_matches(
+            loader.storage,
+            origin_url,
+            status="full",
+            type="svn",
+            snapshot=GOURMET_SNAPSHOT.id,
+        )
+
+        check_snapshot(GOURMET_SNAPSHOT, loader.storage)
+
+        assert get_stats(loader.storage) == {
+            "content": 19,
+            "directory": 17,
+            "origin": 1,
+            "origin_visit": 1,
+            "release": 0,
+            "revision": 6,
+            "skipped_content": 0,
+            "snapshot": 1,
+        }

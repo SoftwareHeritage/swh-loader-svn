@@ -128,8 +128,8 @@ class SvnLoader(BaseLoader):
         if self.debug:
             self.log.error(
                 """NOT FOR PRODUCTION - debug flag activated
-Local repository not cleaned up for investigation: %s"""
-                % (self.svnrepo.local_url.decode("utf-8"),)
+Local repository not cleaned up for investigation: %s""",
+                self.svnrepo.local_url.decode("utf-8"),
             )
             return
         self.svnrepo.clean_fs()
@@ -262,8 +262,9 @@ Local repository not cleaned up for investigation: %s"""
             }
 
             self.log.debug(
-                "svn export --ignore-keywords %s@%s"
-                % (self.svnrepo.remote_url, revision_start)
+                "svn export --ignore-keywords %s@%s",
+                self.svnrepo.remote_url,
+                revision_start,
             )
 
             if not self.check_history_not_altered(
@@ -286,8 +287,10 @@ Local repository not cleaned up for investigation: %s"""
             raise SvnLoaderUneventful(msg)
 
         self.log.info(
-            "Processing revisions [%s-%s] for %s"
-            % (revision_start, revision_end, self.svnrepo)
+            "Processing revisions [%s-%s] for %s",
+            revision_start,
+            revision_end,
+            self.svnrepo,
         )
 
         return revision_start, revision_end, revision_parents
@@ -314,7 +317,7 @@ Local repository not cleaned up for investigation: %s"""
         """
         # hash computation check
         if (self.check_revision != 0 and count % self.check_revision) == 0:
-            self.log.debug("Checking hash computations on revision %s..." % rev)
+            self.log.debug("Checking hash computations on revision %s...", rev)
             checked_dir_id = self.swh_revision_hash_tree_at_svn_revision(rev)
             if checked_dir_id != dir_id:
                 err = (
@@ -365,12 +368,10 @@ Local repository not cleaned up for investigation: %s"""
             )
 
             self.log.debug(
-                "rev: %s, swhrev: %s, dir: %s"
-                % (
-                    rev,
-                    hashutil.hash_to_hex(swh_revision.id),
-                    hashutil.hash_to_hex(dir_id),
-                )
+                "rev: %s, swhrev: %s, dir: %s",
+                rev,
+                hashutil.hash_to_hex(swh_revision.id),
+                hashutil.hash_to_hex(dir_id),
             )
 
             if self.check_revision:
@@ -524,7 +525,7 @@ Local repository not cleaned up for investigation: %s"""
             raise ValueError(
                 "generate_and_load_snapshot called with null revision and snapshot!"
             )
-        self.log.debug("snapshot: %s" % snap)
+        self.log.debug("snapshot: %s", snap)
         self.storage.snapshot_add([snap])
         return snap
 
@@ -576,7 +577,7 @@ class SvnLoaderFromDumpArchive(SvnLoader):
         self.repo_path = None
 
     def prepare(self):
-        self.log.info("Archive to mount and load %s" % self.archive_path)
+        self.log.info("Archive to mount and load %s", self.archive_path)
         self.temp_dir, self.repo_path = init_svn_repo_from_archive_dump(
             self.archive_path,
             prefix=TEMPORARY_DIR_PREFIX_PATTERN,
@@ -590,11 +591,11 @@ class SvnLoaderFromDumpArchive(SvnLoader):
         super().cleanup()
 
         if self.temp_dir and os.path.exists(self.temp_dir):
-            msg = "Clean up temporary directory dump %s for project %s" % (
+            self.log.debug(
+                "Clean up temporary directory dump %s for project %s",
                 self.temp_dir,
                 os.path.basename(self.repo_path),
             )
-            self.log.debug(msg)
             shutil.rmtree(self.temp_dir)
 
 
@@ -673,7 +674,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         dump_name = "".join(c for c in svn_url if c.isalnum())
         dump_path = "%s/%s.svndump" % (dump_temp_dir, dump_name)
         stderr_lines = []
-        self.log.debug("Executing %s" % " ".join(svnrdump_cmd))
+        self.log.debug("Executing %s", " ".join(svnrdump_cmd))
         with open(dump_path, "wb") as dump_file:
             stderr_r, stderr_w = pty.openpty()
             svnrdump = Popen(svnrdump_cmd, stdout=dump_file, stderr=stderr_w)

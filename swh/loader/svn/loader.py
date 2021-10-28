@@ -69,12 +69,20 @@ class SvnLoader(BaseLoader):
         visit_date: Optional[datetime] = None,
         destination_path: Optional[str] = None,
         swh_revision: Optional[str] = None,
-        start_from_scratch: bool = False,
+        incremental: bool = True,
         temp_directory: str = "/tmp",
         debug: bool = False,
         check_revision: int = 0,
         max_content_size: Optional[int] = None,
     ):
+        """Load an svn repository.
+
+        Args:
+            ...
+            incremental: If True, the default, starts from the last snapshot (if any).
+                Otherwise, starts from the initial commit of the repository.
+
+        """
         super().__init__(
             storage=storage,
             logging_class="swh.loader.svn.SvnLoader",
@@ -102,7 +110,7 @@ class SvnLoader(BaseLoader):
         self._load_status = "uneventful"
         self.visit_date = visit_date
         self.destination_path = destination_path
-        self.start_from_scratch = start_from_scratch
+        self.incremental = incremental
         self.snapshot = None
         # state from previous visit
         self.latest_snapshot = None
@@ -224,13 +232,8 @@ Local repository not cleaned up for investigation: %s""",
         swh_revision_id = swh_revision.id
         return swh_revision_id == revision_id
 
-    def start_from(
-        self, start_from_scratch: bool = False
-    ) -> Tuple[int, int, Dict[int, Tuple[bytes, ...]]]:
+    def start_from(self) -> Tuple[int, int, Dict[int, Tuple[bytes, ...]]]:
         """Determine from where to start the loading.
-
-        Args:
-            start_from_scratch: As opposed to start from the last snapshot
 
         Returns:
             tuple (revision_start, revision_end, revision_parents)
@@ -254,7 +257,7 @@ Local repository not cleaned up for investigation: %s""",
         revision_parents: Dict[int, Tuple[bytes, ...]] = {revision_start: ()}
 
         # start from a previous revision if any
-        if not start_from_scratch and self.latest_revision is not None:
+        if self.incremental and self.latest_revision is not None:
             extra_headers = dict(self.latest_revision.extra_headers)
             revision_start = int(extra_headers[b"svn_revision"])
             revision_parents = {
@@ -415,9 +418,7 @@ Local repository not cleaned up for investigation: %s""",
             raise
 
         try:
-            revision_start, revision_end, revision_parents = self.start_from(
-                self.start_from_scratch
-            )
+            revision_start, revision_end, revision_parents = self.start_from()
             self.swh_revision_gen = self.process_svn_revisions(
                 self.svnrepo, revision_start, revision_end, revision_parents
             )
@@ -552,7 +553,7 @@ class SvnLoaderFromDumpArchive(SvnLoader):
         origin_url: Optional[str] = None,
         destination_path: Optional[str] = None,
         swh_revision: Optional[str] = None,
-        start_from_scratch: bool = False,
+        incremental: bool = False,
         visit_date: Optional[datetime] = None,
         temp_directory: str = "/tmp",
         debug: bool = False,
@@ -565,7 +566,7 @@ class SvnLoaderFromDumpArchive(SvnLoader):
             origin_url=origin_url,
             destination_path=destination_path,
             swh_revision=swh_revision,
-            start_from_scratch=start_from_scratch,
+            incremental=incremental,
             visit_date=visit_date,
             temp_directory=temp_directory,
             debug=debug,
@@ -612,7 +613,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         origin_url: Optional[str] = None,
         destination_path: Optional[str] = None,
         swh_revision: Optional[str] = None,
-        start_from_scratch: bool = False,
+        incremental: bool = True,
         visit_date: Optional[datetime] = None,
         temp_directory: str = "/tmp",
         debug: bool = False,
@@ -625,7 +626,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             origin_url=origin_url,
             destination_path=destination_path,
             swh_revision=swh_revision,
-            start_from_scratch=start_from_scratch,
+            incremental=incremental,
             visit_date=visit_date,
             temp_directory=temp_directory,
             debug=debug,

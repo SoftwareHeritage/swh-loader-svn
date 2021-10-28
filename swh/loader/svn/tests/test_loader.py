@@ -343,13 +343,9 @@ def test_loader_svn_visit_with_changes(swh_storage, datadir, tmp_path):
 
     check_snapshot(GOURMET_UPDATES_SNAPSHOT, loader.storage)
 
-    # Start from scratch loading yields the same result
-
+    # Let's start the ingestion from the start, this should yield the same result
     loader = SvnLoader(
-        swh_storage,
-        repo_updated_url,
-        origin_url=repo_initial_url,
-        start_from_scratch=True,
+        swh_storage, repo_updated_url, origin_url=repo_initial_url, incremental=False,
     )
     assert loader.load() == {"status": "eventful"}
     visit_status3 = assert_last_visit_matches(

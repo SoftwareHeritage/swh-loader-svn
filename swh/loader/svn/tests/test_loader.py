@@ -3,11 +3,16 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from enum import Enum
+from io import BytesIO
 import os
 import subprocess
+from typing import Dict, List
 
 import pytest
-from subvertpy import SubversionException
+from subvertpy import SubversionException, delta, repos
+from subvertpy.ra import Auth, RemoteAccess, get_username_provider
+from typing_extensions import TypedDict
 
 from swh.loader.svn.loader import (
     SvnLoader,
@@ -786,3 +791,119 @@ def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
             "skipped_content": 0,
             "snapshot": 1,
         }
+
+
+class CommitChangeType(Enum):
+    AddOrUpdate = 1
+    Delete = 2
+
+
+class CommitChange(TypedDict, total=False):
+    change_type: CommitChangeType
+    path: str
+    properties: Dict[str, str]
+    data: bytes
+
+
+def add_commit(repo_url: str, message: str, changes: List[CommitChange]) -> None:
+    conn = RemoteAccess(repo_url, auth=Auth([get_username_provider()]))
+    editor = conn.get_commit_editor({"svn:log": message})
+    root = editor.open_root()
+    for change in changes:
+        if change["change_type"] == CommitChangeType.Delete:
+            root.delete_entry(change["path"].rstrip("/"))
+        else:
+            dir_change = change["path"].endswith("/")
+            split_path = change["path"].rstrip("/").split("/")
+            for i in range(len(split_path)):
+                path = "/".join(split_path[0 : i + 1])
+                if i < len(split_path) - 1:
+                    try:
+                        root.add_directory(path).close()
+                    except SubversionException:
+                        pass
+                else:
+                    if dir_change:
+                        root.add_directory(path).close()
+                    else:
+                        try:
+                            file = root.add_file(path)
+                        except SubversionException:
+                            file = root.open_file(path)
+                        if "properties" in change:
+                            for prop, value in change["properties"].items():
+                                file.change_prop(prop, value)
+                        txdelta = file.apply_textdelta()
+                        delta.send_stream(BytesIO(change["data"]), txdelta)
+                        file.close()
+    root.close()
+    editor.close()
+
+
+def test_loader_eol_style_file_property_handling_edge_case(swh_storage, tmp_path):
+    # create a repository
+    repo_path = os.path.join(tmp_path, "tmprepo")
+    repos.create(repo_path)
+    repo_url = f"file://{repo_path}"
+
+    # # first commit
+    add_commit(
+        repo_url,
+        (
+            "Add a directory containing a file with CRLF end of line "
+            "and set svn:eol-style property to native so CRLF will be "
+            "replaced by LF in the file when exporting the revision"
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="directory/file_with_crlf_eol.txt",
+                properties={"svn:eol-style": "native"},
+                data=b"Hello world!\r\n",
+            )
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Remove previously added directory and file",
+        [CommitChange(change_type=CommitChangeType.Delete, path="directory/",)],
+    )
+
+    # third commit
+    add_commit(
+        repo_url,
+        (
+            "Add again same directory containing same file with CRLF end of line "
+            "but do not set svn:eol-style property value so CRLF will not be "
+            "replaced by LF when exporting the revision"
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="directory/file_with_crlf_eol.txt",
+                data=b"Hello world!\r\n",
+            )
+        ],
+    )
+
+    # instantiate a svn loader checking after each processed revision that
+    # the repository filesystem it reconstructed does not differ from a subversion
+    # export of that revision
+    loader = SvnLoader(
+        swh_storage, repo_url, destination_path=tmp_path, check_revision=1
+    )
+
+    assert loader.load() == {"status": "eventful"}
+    assert loader.visit_status() == "full"
+    assert get_stats(loader.storage) == {
+        "content": 2,
+        "directory": 5,
+        "origin": 1,
+        "origin_visit": 1,
+        "release": 0,
+        "revision": 3,
+        "skipped_content": 0,
+        "snapshot": 1,
+    }

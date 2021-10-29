@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2020  The Software Heritage developers
+# Copyright (C) 2016-2021  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -302,8 +302,14 @@ class BaseDirEditor:
                 shutil.rmtree(fpath)
             else:
                 os.remove(fpath)
-        if path in EOL_STYLE:
-            del EOL_STYLE[path]
+
+        # when deleting a directory ensure to remove any eol style setting for the
+        # file it contains as they can be added again later in another revision
+        # without the svn:eol-style property set
+        fullpath = os.path.join(self.rootpath, path)
+        for eol_path in list(EOL_STYLE):
+            if eol_path.startswith(fullpath):
+                del EOL_STYLE[eol_path]
 
     def update_checksum(self):
         raise NotImplementedError("This should be implemented.")

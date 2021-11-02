@@ -834,8 +834,9 @@ def add_commit(repo_url: str, message: str, changes: List[CommitChange]) -> None
                         if "properties" in change:
                             for prop, value in change["properties"].items():
                                 file.change_prop(prop, value)
-                        txdelta = file.apply_textdelta()
-                        delta.send_stream(BytesIO(change["data"]), txdelta)
+                        if "data" in change:
+                            txdelta = file.apply_textdelta()
+                            delta.send_stream(BytesIO(change["data"]), txdelta)
                         file.close()
     root.close()
     editor.close()
@@ -980,4 +981,98 @@ def test_loader_eol_style_on_svn_link_handling(swh_storage, tmp_path):
             paths[b"directory/file_with_crlf_eol.txt"]["sha1"]
         )
         == b"../file_with_crlf_eol.txt"
+    )
+
+
+def test_loader_svn_special_property_unset(swh_storage, tmp_path):
+    # create a repository
+    repo_path = os.path.join(tmp_path, "tmprepo")
+    repos.create(repo_path)
+    repo_url = f"file://{repo_path}"
+
+    # first commit
+    add_commit(
+        repo_url,
+        (
+            "Create a regular file, a link to a file and a link to an "
+            "external file. Set the svn:special property on the links."
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="file.txt",
+                data=b"Hello world!\n",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="link.txt",
+                properties={"svn:special": "*"},
+                data=b"link ./file.txt",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="external_link.txt",
+                properties={"svn:special": "*"},
+                data=b"link /home/user/data.txt",
+            ),
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Unset the svn:special property on the links.",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="link.txt",
+                properties={"svn:special": None},
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="external_link.txt",
+                properties={"svn:special": None},
+            ),
+        ],
+    )
+
+    # instantiate a svn loader checking after each processed revision that
+    # the repository filesystem it reconstructed does not differ from a subversion
+    # export of that revision
+    loader = SvnLoader(
+        swh_storage, repo_url, destination_path=tmp_path, check_revision=1
+    )
+
+    assert loader.load() == {"status": "eventful"}
+    assert loader.visit_status() == "full"
+
+    # check loaded objects are those expected
+    assert get_stats(loader.storage) == {
+        "content": 5,
+        "directory": 2,
+        "origin": 1,
+        "origin_visit": 1,
+        "release": 0,
+        "revision": 2,
+        "skipped_content": 0,
+        "snapshot": 1,
+    }
+
+    root_dir = loader.snapshot.branches[b"HEAD"].target
+    revision = loader.storage.revision_get([root_dir])[0]
+
+    paths = {}
+    for entry in loader.storage.directory_ls(revision.directory, recursive=True):
+        paths[entry["name"]] = entry
+
+    assert paths[b"link.txt"]["perms"] == DentryPerms.content
+    assert (
+        loader.storage.content_get_data(paths[b"link.txt"]["sha1"])
+        == b"link ./file.txt"
+    )
+
+    assert paths[b"external_link.txt"]["perms"] == DentryPerms.content
+    assert (
+        loader.storage.content_get_data(paths[b"external_link.txt"]["sha1"])
+        == b"link /home/user/data.txt"
     )

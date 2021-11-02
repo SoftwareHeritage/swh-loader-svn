@@ -150,7 +150,7 @@ class FileEditor:
         elif key == properties.PROP_SPECIAL:
             # Possibly a symbolic link. We cannot check further at
             # that moment though, patch(s) not being applied yet
-            self.link = True
+            self.link = value is not None
         elif key == SVN_PROPERTY_EOL:
             # backup end of line style for file
             EOL_STYLE[self.fullpath] = value
@@ -227,6 +227,10 @@ class FileEditor:
                 self.__make_symlink(src)
             else:  # not a real link...
                 self.link = False
+        elif os.path.islink(self.fullpath):
+            # path was a symbolic link in previous revision but got the property
+            # svn:special unset in current one, revert its content to svn link format
+            self.__make_svnlink()
 
         if not is_link:  # if a link, do nothing regarding flag
             if self.executable == EXEC_FLAG:

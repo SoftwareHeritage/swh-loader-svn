@@ -26,6 +26,7 @@ from swh.loader.tests import (
     get_stats,
     prepare_repository_from_archive,
 )
+from swh.model.from_disk import DentryPerms
 from swh.model.hashutil import hash_to_bytes
 from swh.model.model import Snapshot, SnapshotBranch, TargetType
 
@@ -907,3 +908,76 @@ def test_loader_eol_style_file_property_handling_edge_case(swh_storage, tmp_path
         "skipped_content": 0,
         "snapshot": 1,
     }
+
+
+def test_loader_eol_style_on_svn_link_handling(swh_storage, tmp_path):
+    # create a repository
+    repo_path = os.path.join(tmp_path, "tmprepo")
+    repos.create(repo_path)
+    repo_url = f"file://{repo_path}"
+
+    # first commit
+    add_commit(
+        repo_url,
+        (
+            "Add a regular file, a directory and a link to the regular file "
+            "in the directory. Set svn:eol-style property for the regular "
+            "file and the link. Set svn:special property for the link."
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="file_with_crlf_eol.txt",
+                properties={"svn:eol-style": "native"},
+                data=b"Hello world!\r\n",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="directory/file_with_crlf_eol.txt",
+                properties={"svn:eol-style": "native", "svn:special": "*"},
+                data=b"link ../file_with_crlf_eol.txt",
+            ),
+        ],
+    )
+
+    # instantiate a svn loader checking after each processed revision that
+    # the repository filesystem it reconstructed does not differ from a subversion
+    # export of that revision
+    loader = SvnLoader(
+        swh_storage, repo_url, destination_path=tmp_path, check_revision=1
+    )
+
+    assert loader.load() == {"status": "eventful"}
+    assert loader.visit_status() == "full"
+
+    # check loaded objects are those expected
+    assert get_stats(loader.storage) == {
+        "content": 2,
+        "directory": 2,
+        "origin": 1,
+        "origin_visit": 1,
+        "release": 0,
+        "revision": 1,
+        "skipped_content": 0,
+        "snapshot": 1,
+    }
+
+    root_dir = loader.snapshot.branches[b"HEAD"].target
+    revision = loader.storage.revision_get([root_dir])[0]
+
+    paths = {}
+    for entry in loader.storage.directory_ls(revision.directory, recursive=True):
+        paths[entry["name"]] = entry
+
+    assert (
+        loader.storage.content_get_data(paths[b"file_with_crlf_eol.txt"]["sha1"])
+        == b"Hello world!\n"
+    )
+
+    assert paths[b"directory/file_with_crlf_eol.txt"]["perms"] == DentryPerms.symlink
+    assert (
+        loader.storage.content_get_data(
+            paths[b"directory/file_with_crlf_eol.txt"]["sha1"]
+        )
+        == b"../file_with_crlf_eol.txt"
+    )

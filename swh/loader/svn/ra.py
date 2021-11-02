@@ -236,7 +236,7 @@ class FileEditor:
 
         # And now compute file's checksums
         eol_style = EOL_STYLE.get(self.fullpath, None)
-        if eol_style:
+        if eol_style and not is_link:
             # ensure to normalize line endings as defined by svn:eol-style
             # property to get the same file checksum as after an export
             # or checkout operation with subversion

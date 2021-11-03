@@ -19,6 +19,7 @@ from swh.loader.svn.loader import (
     SvnLoaderFromDumpArchive,
     SvnLoaderFromRemoteDump,
 )
+from swh.loader.svn.svn import SvnRepo
 from swh.loader.svn.utils import init_svn_repo_from_dump
 from swh.loader.tests import (
     assert_last_visit_matches,
@@ -1134,3 +1135,47 @@ def test_loader_invalid_svn_eol_style_property_value(swh_storage, tmp_path):
         loader.storage.content_get_data(paths[filename.encode()]["sha1"])
         == file_content
     )
+
+
+def test_loader_first_revision_is_not_number_one(swh_storage, mocker, tmp_path):
+    class SvnRepoSkipFirstRevision(SvnRepo):
+        def logs(self, revision_start, revision_end):
+            """Overrides logs method to skip revision number one in yielded revisions"""
+            yield from super().logs(revision_start + 1, revision_end)
+
+    from swh.loader.svn import loader
+
+    mocker.patch.object(loader, "SvnRepo", SvnRepoSkipFirstRevision)
+    # create a repository
+    repo_path = os.path.join(tmp_path, "tmprepo")
+    repos.create(repo_path)
+    repo_url = f"file://{repo_path}"
+
+    for filename in ("foo", "bar", "baz"):
+        add_commit(
+            repo_url,
+            f"Add {filename} file",
+            [
+                CommitChange(
+                    change_type=CommitChangeType.AddOrUpdate,
+                    path=filename,
+                    data=f"{filename}\n".encode(),
+                )
+            ],
+        )
+
+    loader = SvnLoader(swh_storage, repo_url, destination_path=tmp_path)
+
+    assert loader.load() == {"status": "eventful"}
+    assert loader.visit_status() == "full"
+
+    assert get_stats(loader.storage) == {
+        "content": 2,
+        "directory": 2,
+        "origin": 1,
+        "origin_visit": 1,
+        "release": 0,
+        "revision": 2,
+        "skipped_content": 0,
+        "snapshot": 1,
+    }

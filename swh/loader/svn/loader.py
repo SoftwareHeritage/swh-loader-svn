@@ -371,7 +371,7 @@ Local repository not cleaned up for investigation: %s""",
             # compute the fs tree's checksums
             dir_id = root_directory.hash
             swh_revision = self.build_swh_revision(
-                rev, commit, dir_id, revision_parents[rev]
+                rev, commit, dir_id, revision_parents.get(rev, ())
             )
 
             self.log.debug(

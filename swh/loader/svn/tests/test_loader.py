@@ -1179,3 +1179,58 @@ def test_loader_first_revision_is_not_number_one(swh_storage, mocker, tmp_path):
         "skipped_content": 0,
         "snapshot": 1,
     }
+
+
+def test_loader_svn_special_property_on_binary_file_with_null_byte(
+    swh_storage, tmp_path
+):
+    """When a file has the svn:special property set but is not a svn link,
+    it will be truncated when performing an export operation if it contains
+    a null byte. Indeed, subversion will treat the file content as text but
+    it might be a binary file containing null bytes."""
+
+    # create a repository
+    repo_path = os.path.join(tmp_path, "tmprepo")
+    repos.create(repo_path)
+    repo_url = f"file://{repo_path}"
+
+    data = (
+        b"!<symlink>\xff\xfea\x00p\x00t\x00-\x00c\x00y\x00g\x00.\x00s\x00h\x00\x00\x00"
+    )
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Add a non svn link binary file and set the svn:special property on it",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="binary_file",
+                properties={"svn:special": "*"},
+                data=data,
+            ),
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Remove the svn:special property on the previously added file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="binary_file",
+                properties={"svn:special": None},
+            ),
+        ],
+    )
+
+    # instantiate a svn loader checking after each processed revision that
+    # the repository filesystem it reconstructed does not differ from a subversion
+    # export of that revision
+    loader = SvnLoader(
+        swh_storage, repo_url, destination_path=tmp_path, check_revision=1
+    )
+
+    assert loader.load() == {"status": "eventful"}
+    assert loader.visit_status() == "full"

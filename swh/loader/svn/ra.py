@@ -11,7 +11,7 @@ import codecs
 import os
 import shutil
 import tempfile
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import click
 from subvertpy import delta, properties
@@ -134,6 +134,9 @@ class FileEditor:
 
     __slots__ = ["directory", "path", "fullpath", "executable", "link"]
 
+    # keep track of non link file content with svn:special property set
+    svn_special_path_non_link_data: Dict[str, bytes] = {}
+
     def __init__(self, directory, rootpath, path):
         self.directory = directory
         self.path = path
@@ -226,12 +229,32 @@ class FileEditor:
             is_link, src = is_file_an_svnlink_p(self.fullpath)
             if is_link:
                 self.__make_symlink(src)
-            else:  # not a real link...
+            else:  # not a real link ...
                 self.link = False
+                # when a file with the svn:special property set is not a svn link,
+                # the svn export operation will extract a truncated version of that file
+                # if it contains a null byte (see create_special_file_from_stream
+                # implementation in libsvn_subr/subst.c), so ensure to produce the
+                # same file as the export operation.
+                with open(self.fullpath, "rb") as f:
+                    content = f.read()
+                with open(self.fullpath, "wb") as f:
+                    exported_data = content.split(b"\x00")[0]
+                    if exported_data != content:
+                        # keep track of original file content in order to restore
+                        # it if the svn:special property gets unset in another revision
+                        self.svn_special_path_non_link_data[self.fullpath] = content
+                    f.write(exported_data)
         elif os.path.islink(self.fullpath):
             # path was a symbolic link in previous revision but got the property
             # svn:special unset in current one, revert its content to svn link format
             self.__make_svnlink()
+        elif self.fullpath in self.svn_special_path_non_link_data:
+            # path was a non link file with the svn:special property previously set
+            # and got truncated on export, restore its original content
+            with open(self.fullpath, "wb") as f:
+                f.write(self.svn_special_path_non_link_data[self.fullpath])
+                del self.svn_special_path_non_link_data[self.fullpath]
 
         if not is_link:  # if a link, do nothing regarding flag
             if self.executable == EXEC_FLAG:

@@ -130,6 +130,7 @@ def test_loader_svnrdump_no_such_revision(swh_storage, tmp_path, datadir):
 
     archive_dump = os.path.join(datadir, "penguinsdbtools2018.dump.gz")
     loading_path = str(tmp_path / "loading")
+    os.mkdir(loading_path)
 
     # Prepare the dump as a local svn repository for test purposes
     temp_dir, repo_path = init_svn_repo_from_dump(
@@ -1166,8 +1167,12 @@ def test_loader_first_revision_is_not_number_one(swh_storage, mocker, tmp_path):
 
     loader = SvnLoader(swh_storage, repo_url, destination_path=tmp_path)
 
-    assert loader.load() == {"status": "eventful"}
-    assert loader.visit_status() == "full"
+    # post loading will detect an issue and make a partial visit with a snapshot
+    assert loader.load() == {"status": "failed"}
+
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="partial", type="svn",
+    )
 
     assert get_stats(loader.storage) == {
         "content": 2,
@@ -1234,3 +1239,27 @@ def test_loader_svn_special_property_on_binary_file_with_null_byte(
 
     assert loader.load() == {"status": "eventful"}
     assert loader.visit_status() == "full"
+
+
+def test_loader_last_revision_divergence(swh_storage, datadir, tmp_path):
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    class SvnLoaderRevisionDivergence(SvnLoader):
+        def _check_revision_divergence(self, count, rev, dir_id):
+            raise ValueError("revision divergence detected")
+
+    loader = SvnLoaderRevisionDivergence(
+        swh_storage, repo_url, destination_path=tmp_path
+    )
+
+    assert loader.load() == {"status": "failed"}
+
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="partial",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
+    )

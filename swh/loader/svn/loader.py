@@ -542,6 +542,20 @@ Local repository not cleaned up for investigation: %s""",
     def visit_status(self):
         return self._visit_status
 
+    def post_load(self, success: bool = True) -> None:
+        if success and self._last_revision is not None:
+            # force revision divergence check
+            self.check_revision = 1
+            # check if the reconstructed filesystem for the last loaded revision is
+            # consistent with the one obtained with a svn export operation, if it is
+            # not an exception will be raised to report the issue and mark the visit
+            # as partial
+            self._check_revision_divergence(
+                self.check_revision,
+                int(dict(self._last_revision.extra_headers)[b"svn_revision"]),
+                self._last_revision.directory,
+            )
+
 
 class SvnLoaderFromDumpArchive(SvnLoader):
     """Uncompress an archive containing an svn dump, mount the svn dump as

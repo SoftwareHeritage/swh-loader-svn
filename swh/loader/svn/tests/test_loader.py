@@ -254,17 +254,17 @@ def test_loader_tampered_repository(swh_storage, datadir, tmp_path):
        commit log [1].  This results in a hash divergence which is
        detected at startup after a new run for the same origin.
 
-       In effect, that stops the loading and do nothing.
+       In effect, this will perform a complete reloading of the repository.
 
-    [1] Tampering with revision 6 log message following:
+       [1] Tampering with revision 6 log message following:
 
-    ```
+       ```
         tar xvf pkg-gourmet.tgz  # initial repository ingested
         cd pkg-gourmet/
         echo "Tampering with commit log message for fun and profit" > log.txt
         svnadmin setlog . -r 6 log.txt --bypass-hooks
         tar cvf pkg-gourmet-tampered-rev6-log.tgz pkg-gourmet/
-    ```
+       ```
     """
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
@@ -274,22 +274,34 @@ def test_loader_tampered_repository(swh_storage, datadir, tmp_path):
     assert loader.load() == {"status": "eventful"}
     check_snapshot(GOURMET_SNAPSHOT, loader.storage)
 
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
+    )
+
     archive_path2 = os.path.join(datadir, "pkg-gourmet-tampered-rev6-log.tgz")
     repo_tampered_url = prepare_repository_from_archive(
         archive_path2, archive_name, tmp_path
     )
 
     loader2 = SvnLoader(swh_storage, repo_tampered_url, origin_url=repo_url)
-    assert loader2.load() == {"status": "failed"}
+    assert loader2.load() == {"status": "eventful"}
 
     assert_last_visit_matches(
-        loader2.storage, repo_url, status="failed", type="svn", snapshot=None,
+        loader2.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=hash_to_bytes("c499eebc1e201024d47d24053ac0080049305897"),
     )
 
     stats = get_stats(loader.storage)
     assert stats["origin"] == 1
     assert stats["origin_visit"] == 2
-    assert stats["snapshot"] == 1
+    assert stats["snapshot"] == 2
 
 
 def test_loader_svn_visit_with_changes(swh_storage, datadir, tmp_path):

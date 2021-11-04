@@ -273,11 +273,15 @@ Local repository not cleaned up for investigation: %s""",
             if not self.check_history_not_altered(
                 self.svnrepo, revision_start, self.latest_revision
             ):
-                msg = "History of svn %s@%s altered. Skipping..." % (
+                self.log.debug(
+                    (
+                        "History of svn %s@%s altered. "
+                        "A complete reloading of the repository will be performed."
+                    ),
                     self.svnrepo.remote_url,
                     revision_start,
                 )
-                raise SvnLoaderHistoryAltered(msg)
+                revision_start = self.svnrepo.initial_revision()
 
             # now we know history is ok, we start at next revision
             revision_start = revision_start + 1

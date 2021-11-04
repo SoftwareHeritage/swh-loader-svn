@@ -111,7 +111,7 @@ class SvnLoader(BaseLoader):
         self.visit_date = visit_date
         self.destination_path = destination_path
         self.incremental = incremental
-        self.snapshot = None
+        self.snapshot: Optional[Snapshot] = None
         # state from previous visit
         self.latest_snapshot = None
         self.latest_revision = None

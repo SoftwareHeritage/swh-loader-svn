@@ -36,11 +36,12 @@ def _normalize_line_endings(lines, eol_style="native"):
     Returns:
         bytes: lines with endings normalized
     """
-    lines = lines.replace(_eol_style["CRLF"], _eol_style["LF"]).replace(
-        _eol_style["CR"], _eol_style["LF"]
-    )
-    if _eol_style[eol_style] != _eol_style["LF"]:
-        lines = lines.replace(_eol_style["LF"], _eol_style[eol_style])
+    if eol_style in _eol_style:
+        lines = lines.replace(_eol_style["CRLF"], _eol_style["LF"]).replace(
+            _eol_style["CR"], _eol_style["LF"]
+        )
+        if _eol_style[eol_style] != _eol_style["LF"]:
+            lines = lines.replace(_eol_style["LF"], _eol_style[eol_style])
 
     return lines
 

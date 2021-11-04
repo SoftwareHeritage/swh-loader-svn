@@ -7,7 +7,7 @@ from enum import Enum
 from io import BytesIO
 import os
 import subprocess
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import pytest
 from subvertpy import SubversionException, delta, repos
@@ -911,6 +911,18 @@ def test_loader_eol_style_file_property_handling_edge_case(swh_storage, tmp_path
     }
 
 
+def get_head_revision_paths_info(loader: SvnLoader) -> Dict[bytes, Dict[str, Any]]:
+    assert loader.snapshot is not None
+    root_dir = loader.snapshot.branches[b"HEAD"].target
+    revision = loader.storage.revision_get([root_dir])[0]
+    assert revision is not None
+
+    paths = {}
+    for entry in loader.storage.directory_ls(revision.directory, recursive=True):
+        paths[entry["name"]] = entry
+    return paths
+
+
 def test_loader_eol_style_on_svn_link_handling(swh_storage, tmp_path):
     # create a repository
     repo_path = os.path.join(tmp_path, "tmprepo")
@@ -963,12 +975,7 @@ def test_loader_eol_style_on_svn_link_handling(swh_storage, tmp_path):
         "snapshot": 1,
     }
 
-    root_dir = loader.snapshot.branches[b"HEAD"].target
-    revision = loader.storage.revision_get([root_dir])[0]
-
-    paths = {}
-    for entry in loader.storage.directory_ls(revision.directory, recursive=True):
-        paths[entry["name"]] = entry
+    paths = get_head_revision_paths_info(loader)
 
     assert (
         loader.storage.content_get_data(paths[b"file_with_crlf_eol.txt"]["sha1"])
@@ -1058,12 +1065,7 @@ def test_loader_svn_special_property_unset(swh_storage, tmp_path):
         "snapshot": 1,
     }
 
-    root_dir = loader.snapshot.branches[b"HEAD"].target
-    revision = loader.storage.revision_get([root_dir])[0]
-
-    paths = {}
-    for entry in loader.storage.directory_ls(revision.directory, recursive=True):
-        paths[entry["name"]] = entry
+    paths = get_head_revision_paths_info(loader)
 
     assert paths[b"link.txt"]["perms"] == DentryPerms.content
     assert (
@@ -1075,4 +1077,48 @@ def test_loader_svn_special_property_unset(swh_storage, tmp_path):
     assert (
         loader.storage.content_get_data(paths[b"external_link.txt"]["sha1"])
         == b"link /home/user/data.txt"
+    )
+
+
+def test_loader_invalid_svn_eol_style_property_value(swh_storage, tmp_path):
+    # create a repository
+    repo_path = os.path.join(tmp_path, "tmprepo")
+    repos.create(repo_path)
+    repo_url = f"file://{repo_path}"
+
+    filename = "file_with_crlf_eol.txt"
+    file_content = b"Hello world!\r\n"
+
+    # # first commit
+    add_commit(
+        repo_url,
+        (
+            "Add a file with CRLF end of line and set svn:eol-style property "
+            "to an invalid value."
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path=filename,
+                properties={"svn:eol-style": "foo"},
+                data=file_content,
+            )
+        ],
+    )
+
+    # instantiate a svn loader checking after each processed revision that
+    # the repository filesystem it reconstructed does not differ from a subversion
+    # export of that revision
+    loader = SvnLoader(
+        swh_storage, repo_url, destination_path=tmp_path, check_revision=1
+    )
+
+    assert loader.load() == {"status": "eventful"}
+    assert loader.visit_status() == "full"
+
+    paths = get_head_revision_paths_info(loader)
+    # end of lines should not have been processed
+    assert (
+        loader.storage.content_get_data(paths[filename.encode()]["sha1"])
+        == file_content
     )

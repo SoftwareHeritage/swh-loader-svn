@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2020  The Software Heritage developers
+# Copyright (C) 2015-2021  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -23,6 +23,9 @@ from . import converters, ra
 
 # When log message contains empty data
 DEFAULT_AUTHOR_MESSAGE = ""
+
+
+logger = logging.getLogger(__name__)
 
 
 class SvnRepo:
@@ -264,5 +267,5 @@ class SvnRepo:
         """
         dirname = local_dirname if local_dirname else self.local_dirname
         if os.path.exists(dirname):
-            logging.debug("cleanup %s" % dirname)
+            logger.debug("cleanup %s", dirname)
             shutil.rmtree(dirname)

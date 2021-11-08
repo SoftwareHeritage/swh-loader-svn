@@ -87,7 +87,7 @@ etc...
 |--------------+------------------------------------------+------------------------------------------|
 
 For the revision, cheating a little.
-That is adapting swh.model.identifiers.revision_identifiers to print the commit's manifest:
+That is adapting swh.model.model.Revisions.compute_hash to print the commit's manifest:
 
 #+BEGIN_SRC sh
 b'tree 669a71cce6c424a81ba42b7dc5d560d32252f0ca\nauthor seanius 1138341038.645397 +0000\ncommitter seanius 1138341038.645397 +0000\nsvn_repo_uuid 3187e211-bb14-4c82-9596-0b59d67cd7f4\nsvn_revision 1\n\nmaking dir structure...'

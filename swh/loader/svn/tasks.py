@@ -27,22 +27,22 @@ def load_svn(
     destination_path: Optional[str] = None,
     swh_revision: Optional[str] = None,
     visit_date: Optional[str] = None,
-    start_from_scratch: Optional[bool] = False,
+    incremental: Optional[bool] = True,
 ):
     """Import a svn repository
 
     Args:
-        - url: (mandatory) svn's repository url to ingest data from
-        - origin_url: Optional original url override to use as origin reference
-            in the archive. If not provided, "url" is used as origin.
-        - destination_path: (optional) root directory to
-          locally retrieve svn's data
-        - swh_revision: (optional) extra revision hex to
-          start from. See swh.loader.svn.SvnLoader.process
-          docstring
-        - visit_date: Optional date to override the visit date
-        - start_from_scratch: Flag to allow starting back the svn repository from the
-          start
+        url: (mandatory) svn's repository url to ingest data from
+        origin_url: Optional original url override to use as origin reference in the
+            archive. If not provided, "url" is used as origin.
+        destination_path: (optional) root directory to locally retrieve svn's data
+        swh_revision: (optional) extra revision hex to start from. See
+          swh.loader.svn.SvnLoader.process docstring
+        visit_date: Optional date to override the visit date
+        incremental: If True, the default, starts from the last snapshot (if any).
+            Otherwise, starts from the initial commit of the repository.
+
+
 
     """
     loader = SvnLoader.from_configfile(
@@ -51,7 +51,7 @@ def load_svn(
         destination_path=destination_path,
         swh_revision=swh_revision,
         visit_date=convert_to_datetime(visit_date),
-        start_from_scratch=start_from_scratch,
+        incremental=incremental,
     )
     return loader.load()
 
@@ -62,25 +62,25 @@ def load_svn_from_archive(
     url: Optional[str] = None,
     archive_path: Optional[str] = None,
     visit_date: Optional[str] = None,
-    start_from_scratch: Optional[bool] = False,
+    incremental: Optional[bool] = True,
 ):
     """1. Mount an svn dump from archive as a local svn repository
        2. Load it through the svn loader
        3. Clean up mounted svn repository archive
 
     Args:
-        - url: origin url
-        - archive_path: Path on disk to the archive holdin the svn repository to ingest
-        - visit_date: Optional date to override the visit date
-        - start_from_scratch: Flag to allow starting back the svn repository from the
-          start
+        url: origin url
+        archive_path: Path on disk to the archive holdin the svn repository to ingest
+        visit_date: Optional date to override the visit date
+        incremental: If True, the default, starts from the last snapshot (if any).
+            Otherwise, starts from the initial commit of the repository.
 
     """
     loader = SvnLoaderFromDumpArchive.from_configfile(
         url=url,
         archive_path=archive_path,
         visit_date=convert_to_datetime(visit_date),
-        start_from_scratch=start_from_scratch,
+        incremental=incremental,
     )
     return loader.load()
 
@@ -91,25 +91,25 @@ def load_svn_from_remote_dump(
     url: Optional[str] = None,
     origin_url: Optional[str] = None,
     visit_date: Optional[str] = None,
-    start_from_scratch: Optional[bool] = False,
+    incremental: Optional[bool] = True,
 ):
     """1. Mount a remote svn dump as a local svn repository.
        2. Load it through the svn loader.
        3. Clean up mounted svn repository archive.
 
     Args:
-        - url: (mandatory) svn's repository url to ingest data from
-        - origin_url: Optional original url override to use as origin reference
+        url: (mandatory) svn's repository url to ingest data from
+        origin_url: Optional original url override to use as origin reference
             in the archive. If not provided, "url" is used as origin.
-        - visit_date: Optional date to override the visit date
-        - start_from_scratch: Flag to allow starting back the svn repository from the
-          start
+        visit_date: Optional date to override the visit date
+        incremental: If True, the default, starts from the last snapshot (if any).
+            Otherwise, starts from the initial commit of the repository.
 
     """
     loader = SvnLoaderFromRemoteDump.from_configfile(
         url=url,
         origin_url=origin_url,
         visit_date=convert_to_datetime(visit_date),
-        start_from_scratch=start_from_scratch,
+        incremental=incremental,
     )
     return loader.load()

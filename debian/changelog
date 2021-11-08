@@ -1,3 +1,23 @@
+swh-loader-svn (0.7.3-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.7.3     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2021-11-08 17:29:05
+    +0100)
+  * Upstream changes:     - v0.7.3     - loader: Implement post_load to
+    check for revision divergence     - ra: Fix export of non link file
+    with svn:special property set     - loader: Fix error when first
+    revision number is not one     - loader: Perform a complete
+    reloading when detecting altered history     - ra: Handle invalid
+    values for svn:eol-style property     - ra: Handle unsetting
+    svn:special property on svn links     - ra: Do not process end of
+    lines for svn links     - ra: Fix edge case in svn:eol-style
+    property handling     - loader: Rename start_from_scratch parameter
+    to incremental     - loader: Let logging instructions do the
+    formatting     - loader: Fix SvnLoaderFromDumpArchive and add test
+    - Remove reference to deprecated swh.model.identifiers module
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Mon, 08 Nov 2021 16:32:19 +0000
+
 swh-loader-svn (0.7.2-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.7.2     - (tagged by Antoine R. Dumont

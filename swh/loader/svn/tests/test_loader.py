@@ -762,7 +762,9 @@ def test_loader_svn_dir_added_then_removed(swh_storage, datadir, tmp_path):
     loader = SvnLoader(swh_storage, repo_url, destination_path=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
-    assert loader.visit_status() == "full"
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
 
 
 def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
@@ -912,7 +914,10 @@ def test_loader_eol_style_file_property_handling_edge_case(swh_storage, tmp_path
     )
 
     assert loader.load() == {"status": "eventful"}
-    assert loader.visit_status() == "full"
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+
     assert get_stats(loader.storage) == {
         "content": 2,
         "directory": 5,
@@ -975,7 +980,9 @@ def test_loader_eol_style_on_svn_link_handling(swh_storage, tmp_path):
     )
 
     assert loader.load() == {"status": "eventful"}
-    assert loader.visit_status() == "full"
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
 
     # check loaded objects are those expected
     assert get_stats(loader.storage) == {
@@ -1065,7 +1072,9 @@ def test_loader_svn_special_property_unset(swh_storage, tmp_path):
     )
 
     assert loader.load() == {"status": "eventful"}
-    assert loader.visit_status() == "full"
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
 
     # check loaded objects are those expected
     assert get_stats(loader.storage) == {
@@ -1128,7 +1137,9 @@ def test_loader_invalid_svn_eol_style_property_value(swh_storage, tmp_path):
     )
 
     assert loader.load() == {"status": "eventful"}
-    assert loader.visit_status() == "full"
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
 
     paths = get_head_revision_paths_info(loader)
     # end of lines should not have been processed
@@ -1238,7 +1249,9 @@ def test_loader_svn_special_property_on_binary_file_with_null_byte(
     )
 
     assert loader.load() == {"status": "eventful"}
-    assert loader.visit_status() == "full"
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
 
 
 def test_loader_last_revision_divergence(swh_storage, datadir, tmp_path):

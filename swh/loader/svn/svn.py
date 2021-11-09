@@ -32,13 +32,19 @@ class SvnRepo:
     """Svn repository representation.
 
     Args:
-        remote_url (str):
-        origin_url (str): Associated origin identifier
-        local_dirname (str): Path to write intermediary svn action results
+        remote_url: Remove svn repository url
+        origin_url: Associated origin identifier
+        local_dirname: Path to write intermediary svn action results
 
     """
 
-    def __init__(self, remote_url, origin_url, local_dirname, max_content_length):
+    def __init__(
+        self,
+        remote_url: str,
+        origin_url: str,
+        local_dirname: str,
+        max_content_length: int,
+    ):
         self.remote_url = remote_url.rstrip("/")
         self.origin_url = origin_url
 

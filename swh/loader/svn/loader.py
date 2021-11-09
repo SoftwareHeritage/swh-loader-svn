@@ -737,8 +737,9 @@ class SvnLoaderFromRemoteDump(SvnLoader):
                         "but revisions range %s:%s are available in "
                         "the generated dump file and will be loaded "
                         "into the archive."
-                    )
-                    % (last_loaded_svn_rev + 1, last_dumped_rev)
+                    ),
+                    last_loaded_svn_rev + 1,
+                    last_dumped_rev,
                 )
                 # Truncate the dump file after the last successfully dumped
                 # revision to avoid the loading of corrupted data
@@ -747,8 +748,8 @@ class SvnLoaderFromRemoteDump(SvnLoader):
                         "Truncating dump file after the last "
                         "successfully dumped revision (%s) to avoid "
                         "the loading of corrupted data"
-                    )
-                    % last_dumped_rev
+                    ),
+                    last_dumped_rev,
                 )
 
                 with open(dump_path, "r+b") as f:

@@ -1,17 +1,21 @@
-# Copyright (C) 2016-2020  The Software Heritage developers
+# Copyright (C) 2016-2021  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
 import errno
+import logging
 import os
 import shutil
 from subprocess import PIPE, Popen, call
 import tempfile
+from typing import Tuple
 
 from dateutil import parser
 
 from swh.model.model import Optional, Timestamp
+
+logger = logging.getLogger(__name__)
 
 
 def strdate_to_timestamp(strdate: Optional[str]) -> Timestamp:
@@ -80,20 +84,33 @@ class OutputStream:
 
 
 def init_svn_repo_from_dump(
-    dump_path, prefix=None, suffix=None, root_dir="/tmp", gzip=False
-):
-    """Given a path to a svn dump.
-    Initialize an svn repository with the content of said dump.
+    dump_path: str,
+    prefix: Optional[str] = None,
+    suffix: Optional[str] = None,
+    root_dir: str = "/tmp",
+    gzip: bool = False,
+    cleanup_dump: bool = True,
+) -> Tuple[str, str]:
+    """Given a path to a svn dump, initialize an svn repository with the content of said
+    dump.
+
+    Args:
+        dump_path: The dump to the path
+        prefix: optional prefix file name for the working directory
+        suffix: optional suffix file name for the working directory
+        root_dir: the root directory where the working directory is created
+        gzip: Boolean to determine whether we treat the dump as compressed or not.
+        cleanup_dump: Whether we want this function call to clean up the dump at the end
+            of the repository initialization.
+
+    Raises:
+        ValueError in case of failure to run the command to uncompress and load the
+        dump.
 
     Returns:
         A tuple:
-        - temporary folder (str): containing the mounted repository
-        - repo_path (str): path to the mounted repository inside the
-                           temporary folder
-
-    Raises:
-        ValueError in case of failure to run the command to uncompress
-        and load the dump.
+        - temporary folder: containing the mounted repository
+        - repo_path: path to the mounted repository inside the temporary folder
 
     """
     project_name = os.path.basename(os.path.dirname(dump_path))
@@ -128,25 +145,51 @@ def init_svn_repo_from_dump(
     except Exception as e:
         shutil.rmtree(temp_dir)
         raise e
+    finally:
+        if cleanup_dump:
+            try:
+                # At this time, the temporary svn repository is mounted from the dump or
+                # the svn repository failed to mount. Either way, we can drop the dump.
+                os.remove(dump_path)
+                assert not os.path.exists(dump_path)
+            except OSError as e:
+                logger.warn("Failure to remove the dump %s: %s", dump_path, e)
 
 
 def init_svn_repo_from_archive_dump(
-    archive_path, prefix=None, suffix=None, root_dir="/tmp"
-):
-    """Given a path to an archive containing an svn dump.
-    Initialize an svn repository with the content of said dump.
+    archive_path: str,
+    prefix: Optional[str] = None,
+    suffix: Optional[str] = None,
+    root_dir: str = "/tmp",
+    cleanup_dump: bool = True,
+) -> Tuple[str, str]:
+    """Given a path to an archive containing an svn dump, initializes an svn repository
+    with the content of the uncompressed dump.
 
-    Returns:
-        A tuple:
-        - temporary folder (str): containing the mounted repository
-        - repo_path (str): path to the mounted repository inside the
-                           temporary folder
-
+    Args:
+        archive_path: The archive svn dump path
+        prefix: optional prefix file name for the working directory
+        suffix: optional suffix file name for the working directory
+        root_dir: the root directory where the working directory is created
+        gzip: Boolean to determine whether we treat the dump as compressed or not.
+        cleanup_dump: Whether we want this function call to clean up the dump at the end
+            of the repository initialization.
     Raises:
         ValueError in case of failure to run the command to uncompress
         and load the dump.
 
+    Returns:
+        A tuple:
+        - temporary folder: containing the mounted repository
+        - repo_path: path to the mounted repository inside the
+            temporary folder
+
     """
     return init_svn_repo_from_dump(
-        archive_path, prefix=prefix, suffix=suffix, root_dir=root_dir, gzip=True
+        archive_path,
+        prefix=prefix,
+        suffix=suffix,
+        root_dir=root_dir,
+        gzip=True,
+        cleanup_dump=cleanup_dump,
     )

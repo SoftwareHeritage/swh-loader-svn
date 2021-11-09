@@ -2,10 +2,10 @@
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
-
 from enum import Enum
 from io import BytesIO
 import os
+import shutil
 import subprocess
 from typing import Any, Dict, List
 
@@ -127,8 +127,13 @@ def test_loader_svnrdump_no_such_revision(swh_storage, tmp_path, datadir):
     160006" message.
 
     """
+    archive_ori_dump = os.path.join(datadir, "penguinsdbtools2018.dump.gz")
+    archive_dump_dir = os.path.join(tmp_path, "dump")
+    os.mkdir(archive_dump_dir)
+    archive_dump = os.path.join(archive_dump_dir, "penguinsdbtools2018.dump.gz")
+    # loader now drops the dump as soon as it's mounted so we need to make a copy first
+    shutil.copyfile(archive_ori_dump, archive_dump)
 
-    archive_dump = os.path.join(datadir, "penguinsdbtools2018.dump.gz")
     loading_path = str(tmp_path / "loading")
     os.mkdir(loading_path)
 

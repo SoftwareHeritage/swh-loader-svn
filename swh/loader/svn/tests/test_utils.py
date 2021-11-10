@@ -51,7 +51,7 @@ def test_init_svn_repo_from_dump(datadir, tmp_path):
     dump_path = os.path.join(datadir, dump_name)
 
     tmp_repo, repo_path = utils.init_svn_repo_from_dump(
-        dump_path, gzip=True, cleanup_dump=False
+        dump_path, gzip=True, cleanup_dump=False, root_dir=tmp_path
     )
 
     assert os.path.exists(dump_path), "Dump path should still exists"
@@ -69,7 +69,9 @@ def test_init_svn_repo_from_dump_and_cleanup(datadir, tmp_path):
     assert os.path.exists(dump_path)
     assert os.path.exists(dump_ori_path)
 
-    tmp_repo, repo_path = utils.init_svn_repo_from_dump(dump_path, gzip=True)
+    tmp_repo, repo_path = utils.init_svn_repo_from_dump(
+        dump_path, gzip=True, root_dir=tmp_path
+    )
 
     assert not os.path.exists(dump_path), "Dump path should no longer exists"
     assert os.path.exists(repo_path), "Repository should exists"
@@ -94,7 +96,9 @@ def test_init_svn_repo_from_dump_and_cleanup_already_done(
     assert os.path.exists(dump_path)
     assert os.path.exists(dump_ori_path)
 
-    tmp_repo, repo_path = utils.init_svn_repo_from_dump(dump_path, gzip=True)
+    tmp_repo, repo_path = utils.init_svn_repo_from_dump(
+        dump_path, gzip=True, root_dir=tmp_path
+    )
 
     assert os.path.exists(repo_path), "Repository should exists"
     assert os.path.exists(dump_ori_path), "Original dump path should still exists"
@@ -110,7 +114,7 @@ def test_init_svn_repo_from_archive_dump(datadir, tmp_path):
     dump_path = os.path.join(datadir, dump_name)
 
     tmp_repo, repo_path = utils.init_svn_repo_from_archive_dump(
-        dump_path, cleanup_dump=False
+        dump_path, cleanup_dump=False, root_dir=tmp_path
     )
 
     assert os.path.exists(dump_path), "Dump path should still exists"
@@ -128,7 +132,9 @@ def test_init_svn_repo_from_archive_dump_and_cleanup(datadir, tmp_path):
     assert os.path.exists(dump_path)
     assert os.path.exists(dump_ori_path)
 
-    tmp_repo, repo_path = utils.init_svn_repo_from_archive_dump(dump_path)
+    tmp_repo, repo_path = utils.init_svn_repo_from_archive_dump(
+        dump_path, root_dir=tmp_path
+    )
 
     assert not os.path.exists(dump_path), "Dump path should no longer exists"
     assert os.path.exists(repo_path), "Repository should exists"

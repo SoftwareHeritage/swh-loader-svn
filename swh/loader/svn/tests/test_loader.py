@@ -204,7 +204,7 @@ def test_loader_svn_2_visits_no_change(swh_storage, datadir, tmp_path):
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url)
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     visit_status1 = assert_last_visit_matches(
@@ -237,7 +237,7 @@ def test_loader_svn_2_visits_no_change(swh_storage, datadir, tmp_path):
     )[0]
     assert start_revision is not None
 
-    loader = SvnLoader(swh_storage, repo_url)
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
     assert loader.load() == {"status": "uneventful"}
 
     stats = get_stats(loader.storage)
@@ -275,7 +275,7 @@ def test_loader_tampered_repository(swh_storage, datadir, tmp_path):
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url)
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
     assert loader.load() == {"status": "eventful"}
     check_snapshot(GOURMET_SNAPSHOT, loader.storage)
 
@@ -292,7 +292,9 @@ def test_loader_tampered_repository(swh_storage, datadir, tmp_path):
         archive_path2, archive_name, tmp_path
     )
 
-    loader2 = SvnLoader(swh_storage, repo_tampered_url, origin_url=repo_url)
+    loader2 = SvnLoader(
+        swh_storage, repo_tampered_url, origin_url=repo_url, temp_directory=tmp_path
+    )
     assert loader2.load() == {"status": "eventful"}
 
     assert_last_visit_matches(
@@ -322,7 +324,7 @@ def test_loader_svn_visit_with_changes(swh_storage, datadir, tmp_path):
     )
 
     # repo_initial_url becomes the origin_url we want to visit some more below
-    loader = SvnLoader(swh_storage, repo_initial_url)
+    loader = SvnLoader(swh_storage, repo_initial_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     visit_status1 = assert_last_visit_matches(
@@ -338,7 +340,12 @@ def test_loader_svn_visit_with_changes(swh_storage, datadir, tmp_path):
         archive_path, "pkg-gourmet", tmp_path
     )
 
-    loader = SvnLoader(swh_storage, repo_updated_url, origin_url=repo_initial_url,)
+    loader = SvnLoader(
+        swh_storage,
+        repo_updated_url,
+        origin_url=repo_initial_url,
+        temp_directory=tmp_path,
+    )
 
     assert loader.load() == {"status": "eventful"}
     visit_status2 = assert_last_visit_matches(
@@ -368,7 +375,11 @@ def test_loader_svn_visit_with_changes(swh_storage, datadir, tmp_path):
 
     # Let's start the ingestion from the start, this should yield the same result
     loader = SvnLoader(
-        swh_storage, repo_updated_url, origin_url=repo_initial_url, incremental=False,
+        swh_storage,
+        repo_updated_url,
+        origin_url=repo_initial_url,
+        incremental=False,
+        temp_directory=tmp_path,
     )
     assert loader.load() == {"status": "eventful"}
     visit_status3 = assert_last_visit_matches(
@@ -400,7 +411,7 @@ def test_loader_svn_visit_start_from_revision(swh_storage, datadir, tmp_path):
     )
 
     # repo_initial_url becomes the origin_url we want to visit some more below
-    loader = SvnLoader(swh_storage, repo_initial_url)
+    loader = SvnLoader(swh_storage, repo_initial_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     visit_status1 = assert_last_visit_matches(
@@ -422,7 +433,12 @@ def test_loader_svn_visit_start_from_revision(swh_storage, datadir, tmp_path):
     )
 
     # we'll start from start_revision
-    loader = SvnLoader(swh_storage, repo_updated_url, origin_url=repo_initial_url,)
+    loader = SvnLoader(
+        swh_storage,
+        repo_updated_url,
+        origin_url=repo_initial_url,
+        temp_directory=tmp_path,
+    )
 
     assert loader.load() == {"status": "eventful"}
 
@@ -464,7 +480,7 @@ def test_loader_svn_visit_with_eol_style(swh_storage, datadir, tmp_path):
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url)
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     mediawiki_snapshot = Snapshot(
@@ -504,7 +520,7 @@ def test_loader_svn_visit_with_mixed_crlf_lf(swh_storage, datadir, tmp_path):
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url)
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     pyang_snapshot = Snapshot(
@@ -536,7 +552,7 @@ def test_loader_svn_with_external_properties(swh_storage, datadir, tmp_path):
     archive_path = os.path.join(datadir, "pkg-gourmet-with-external-id.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url)
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     gourmet_externals_snapshot = Snapshot(
@@ -582,7 +598,7 @@ def test_loader_svn_with_symlink(swh_storage, datadir, tmp_path):
     )
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url)
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     gourmet_edge_cases_snapshot = Snapshot(
@@ -623,7 +639,7 @@ def test_loader_svn_with_wrong_symlinks(swh_storage, datadir, tmp_path):
     archive_path = os.path.join(datadir, "pkg-gourmet-with-wrong-link-cases.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url)
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     gourmet_wrong_links_snapshot = Snapshot(
@@ -664,7 +680,9 @@ def test_loader_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loaderFromDump = SvnLoaderFromRemoteDump(swh_storage, repo_url)
+    loaderFromDump = SvnLoaderFromRemoteDump(
+        swh_storage, repo_url, temp_directory=tmp_path
+    )
     assert loaderFromDump.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loaderFromDump.storage,
@@ -675,7 +693,9 @@ def test_loader_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
     )
 
     origin_url = repo_url + "2"  # rename to another origin
-    loader = SvnLoader(swh_storage, repo_url, origin_url=origin_url)
+    loader = SvnLoader(
+        swh_storage, repo_url, origin_url=origin_url, temp_directory=tmp_path
+    )
     assert loader.load() == {"status": "eventful"}  # because are working on new origin
     assert_last_visit_matches(
         loader.storage,
@@ -692,7 +712,9 @@ def test_loader_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
     assert stats["origin_visit"] == 2
     assert stats["snapshot"] == 1
 
-    loader = SvnLoader(swh_storage, repo_url)  # no change on the origin-url
+    loader = SvnLoader(
+        swh_storage, repo_url, temp_directory=tmp_path
+    )  # no change on the origin-url
     assert loader.load() == {"status": "uneventful"}
     assert_last_visit_matches(
         loader.storage,
@@ -708,7 +730,9 @@ def test_loader_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
     assert stats["snapshot"] == 1
 
     # second visit from the dump should be uneventful
-    loaderFromDump = SvnLoaderFromRemoteDump(swh_storage, repo_url)
+    loaderFromDump = SvnLoaderFromRemoteDump(
+        swh_storage, repo_url, temp_directory=tmp_path
+    )
     assert loaderFromDump.load() == {"status": "uneventful"}
 
 

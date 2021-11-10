@@ -668,6 +668,80 @@ def test_loader_svn_with_wrong_symlinks(swh_storage, datadir, tmp_path):
     assert stats["revision"] == 21
 
 
+def test_loader_svn_cleanup_loader(swh_storage, datadir, tmp_path):
+    """Loader should clean up its working directory after the load
+
+    """
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    loading_temp_directory = str(tmp_path / "loading")
+    os.mkdir(loading_temp_directory)
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=loading_temp_directory)
+    assert loader.load() == {"status": "eventful"}
+
+    # the root temporary directory still exists
+    assert os.path.exists(loader.temp_directory)
+    # but it should be empty
+    assert os.listdir(loader.temp_directory) == []
+
+
+def test_loader_svn_cleanup_loader_from_remote_dump(swh_storage, datadir, tmp_path):
+    """Loader should clean up its working directory after the load
+
+    """
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    loading_temp_directory = str(tmp_path / "loading")
+    os.mkdir(loading_temp_directory)
+
+    loader = SvnLoaderFromRemoteDump(
+        swh_storage, repo_url, temp_directory=loading_temp_directory
+    )
+    assert loader.load() == {"status": "eventful"}
+
+    # the root temporary directory still exists
+    assert os.path.exists(loader.temp_directory)
+    # but it should be empty
+    assert os.listdir(loader.temp_directory) == []
+    # the internal temp_dir should be cleaned up though
+    assert not os.path.exists(loader.temp_dir)
+
+
+def test_loader_svn_cleanup_loader_from_dump_archive(swh_storage, datadir, tmp_path):
+    """Loader should clean up its working directory after the load
+
+    """
+    archive_ori_dump = os.path.join(datadir, "penguinsdbtools2018.dump.gz")
+    archive_dump_dir = os.path.join(tmp_path, "dump")
+    os.mkdir(archive_dump_dir)
+    archive_dump = os.path.join(archive_dump_dir, "penguinsdbtools2018.dump.gz")
+    # loader now drops the dump as soon as it's mounted so we need to make a copy first
+    shutil.copyfile(archive_ori_dump, archive_dump)
+
+    loading_path = str(tmp_path / "loading")
+    os.mkdir(loading_path)
+
+    # Prepare the dump as a local svn repository for test purposes
+    temp_dir, repo_path = init_svn_repo_from_dump(
+        archive_dump, root_dir=tmp_path, gzip=True
+    )
+    repo_url = f"file://{repo_path}"
+
+    loader = SvnLoaderFromRemoteDump(swh_storage, repo_url, temp_directory=loading_path)
+    assert loader.load() == {"status": "eventful"}
+
+    # the root temporary directory still exists
+    assert os.path.exists(loader.temp_directory)
+    # but it should be empty
+    assert os.listdir(loader.temp_directory) == []
+    # the internal temp_dir should be cleaned up though
+    assert not os.path.exists(loader.temp_dir)
+
+
 def test_loader_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
     """Repository with wrong symlinks should be ingested ok nonetheless
 

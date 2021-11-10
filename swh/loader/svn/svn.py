@@ -13,11 +13,19 @@ import logging
 import os
 import shutil
 import tempfile
+from typing import Dict, Iterator, List, Optional, Tuple, Union
 
 from subvertpy import client, properties
 from subvertpy.ra import Auth, RemoteAccess, get_username_provider
 
-from swh.model.from_disk import Directory
+from swh.model.from_disk import Directory as DirectoryFromDisk
+from swh.model.model import (
+    Content,
+    Directory,
+    Person,
+    SkippedContent,
+    TimestampWithTimezone,
+)
 
 from . import converters, ra
 
@@ -74,23 +82,23 @@ class SvnRepo:
             }
         )
 
-    def head_revision(self):
+    def head_revision(self) -> int:
         """Retrieve current head revision.
 
         """
         return self.conn.get_latest_revnum()
 
-    def initial_revision(self):
+    def initial_revision(self) -> int:
         """Retrieve the initial revision from which the remote url appeared.
 
         """
         return 1
 
-    def convert_commit_message(self, msg):
+    def convert_commit_message(self, msg: Union[str, bytes]) -> bytes:
         """Simply encode the commit message.
 
         Args:
-            msg (str): the commit message to convert.
+            msg: the commit message to convert.
 
         Returns:
             The transformed message as bytes.
@@ -100,12 +108,12 @@ class SvnRepo:
             return msg
         return msg.encode("utf-8")
 
-    def convert_commit_date(self, date):
+    def convert_commit_date(self, date: str) -> TimestampWithTimezone:
         """Convert the message commit date into a timestamp in swh format.
         The precision is kept.
 
         Args:
-            date (str): the commit date to convert.
+            date: the commit date to convert.
 
         Returns:
             The transformed date.
@@ -113,19 +121,19 @@ class SvnRepo:
         """
         return converters.svn_date_to_swh_date(date)
 
-    def convert_commit_author(self, author):
+    def convert_commit_author(self, author: Optional[bytes]) -> Person:
         """Convert the commit author into an swh person.
 
         Args:
-            author (str): the commit author to convert.
+            author: the commit author to convert.
 
         Returns:
-            Person: a model object
+            Person as model object
 
         """
         return converters.svn_author_to_swh_person(author)
 
-    def __to_entry(self, log_entry):
+    def __to_entry(self, log_entry: Tuple) -> Dict:
         changed_paths, rev, revprops, has_children = log_entry
 
         author_date = self.convert_commit_date(
@@ -147,7 +155,7 @@ class SvnRepo:
             "message": message,
         }
 
-    def logs(self, revision_start, revision_end):
+    def logs(self, revision_start: int, revision_end: int) -> Iterator[Dict]:
         """Stream svn logs between revision_start and revision_end by chunks of
         block_size logs.
 
@@ -178,7 +186,7 @@ class SvnRepo:
         ):
             yield self.__to_entry(log_entry)
 
-    def export(self, revision):
+    def export(self, revision: int) -> None:
         """Export the repository to a given version.
 
         """
@@ -189,10 +197,10 @@ class SvnRepo:
             ignore_keywords=True,
         )
 
-    def export_temporary(self, revision):
-        """Export the repository to a given revision in a temporary location.
-        This is up to the caller of this function to clean up the
-        temporary location when done (cf. self.clean_fs method)
+    def export_temporary(self, revision: int) -> Tuple[str, bytes]:
+        """Export the repository to a given revision in a temporary location. This is up
+        to the caller of this function to clean up the temporary location when done (cf.
+        self.clean_fs method)
 
         Args:
             revision: Revision to export at
@@ -203,7 +211,7 @@ class SvnRepo:
 
         """
         local_dirname = tempfile.mkdtemp(
-            prefix="check-revision-%s." % revision, dir=self.local_dirname
+            dir=self.local_dirname, prefix=f"check-revision-{revision}."
         )
         local_name = os.path.basename(self.remote_url)
         local_url = os.path.join(local_dirname, local_name)
@@ -212,7 +220,18 @@ class SvnRepo:
         )
         return local_dirname, os.fsencode(local_url)
 
-    def swh_hash_data_per_revision(self, start_revision, end_revision):
+    def swh_hash_data_per_revision(
+        self, start_revision: int, end_revision: int
+    ) -> Iterator[
+        Tuple[
+            int,
+            Optional[int],
+            Dict,
+            Tuple[List[Content], List[SkippedContent], List[Directory]],
+            DirectoryFromDisk,
+        ],
+    ]:
+
         """Compute swh hash data per each revision between start_revision and
         end_revision.
 
@@ -221,11 +240,14 @@ class SvnRepo:
             end_revision: ending revision
 
         Yields:
-            tuple (rev, nextrev, commit, objects_per_path)
+            Tuple (rev, nextrev, commit, objects_per_path):
+
             - rev: current revision
-            - nextrev: next revision
+            - nextrev: next revision or None if we reached end_revision.
             - commit: commit data (author, date, message) for such revision
-            - objects_per_path: dictionary of path, swh hash data with type
+            - objects_per_path: Tuple of list of objects between start_revision and
+              end_revision
+            - complete Directory representation
 
         """
         for commit in self.logs(start_revision, end_revision):
@@ -239,16 +261,20 @@ class SvnRepo:
 
             yield rev, nextrev, commit, objects, self.swhreplay.directory
 
-    def swh_hash_data_at_revision(self, revision):
-        """Compute the hash data at revision.
+    def swh_hash_data_at_revision(
+        self, revision: int
+    ) -> Iterator[Tuple[Dict, DirectoryFromDisk]]:
+        """Compute the information at a given svn revision. This is expected to be used
+        for update only.
 
-        Expected to be used for update only.
+        Yields:
+            The tuple (commit dictionary, targeted directory object).
 
         """
-        # Update the disk at revision
+        # Update disk representation of the repository at revision id
         self.export(revision)
         # Compute the current hashes on disk
-        directory = Directory.from_disk(
+        directory = DirectoryFromDisk.from_disk(
             path=os.fsencode(self.local_url), max_content_length=self.max_content_length
         )
 
@@ -260,18 +286,17 @@ class SvnRepo:
         # Retrieve the commit information for revision
         commit = list(self.logs(revision, revision))[0]
 
-        yield revision, revision + 1, commit, {}, directory
+        yield commit, directory
 
-    def clean_fs(self, local_dirname=None):
+    def clean_fs(self, local_dirname: Optional[str] = None) -> None:
         """Clean up the local working copy.
 
         Args:
-            local_dirname (str): Path to remove recursively if
-            provided. Otherwise, remove the temporary upper root tree
-            used for svn repository loading.
+            local_dirname: Path to remove recursively if provided. Otherwise, remove the
+                temporary upper root tree used for svn repository loading.
 
         """
-        dirname = local_dirname if local_dirname else self.local_dirname
+        dirname = local_dirname or self.local_dirname
         if os.path.exists(dirname):
             logger.debug("cleanup %s", dirname)
             shutil.rmtree(dirname)

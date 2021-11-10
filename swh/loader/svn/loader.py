@@ -234,7 +234,7 @@ Local repository not cleaned up for investigation: %s""",
         hash_data_per_revs = svnrepo.swh_hash_data_at_revision(revision_start)
 
         rev = revision_start
-        rev, _, commit, _, root_dir = list(hash_data_per_revs)[0]
+        commit, root_dir = list(hash_data_per_revs)[0]
 
         dir_id = root_dir.hash
         swh_revision = self.build_swh_revision(rev, commit, dir_id, parents)
@@ -402,9 +402,9 @@ Local repository not cleaned up for investigation: %s""",
             self.latest_snapshot, self.latest_revision = latest_snapshot_revision
 
         local_dirname = tempfile.mkdtemp(
-            suffix="-%s" % os.getpid(),
-            prefix=TEMPORARY_DIR_PREFIX_PATTERN,
             dir=self.temp_directory,
+            prefix=TEMPORARY_DIR_PREFIX_PATTERN,
+            suffix="-%s" % os.getpid(),
         )
 
         try:

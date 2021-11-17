@@ -401,11 +401,7 @@ Local repository not cleaned up for investigation: %s""",
         if latest_snapshot_revision:
             self.latest_snapshot, self.latest_revision = latest_snapshot_revision
 
-        local_dirname = tempfile.mkdtemp(
-            dir=self.temp_directory,
-            prefix=TEMPORARY_DIR_PREFIX_PATTERN,
-            suffix="-%s" % os.getpid(),
-        )
+        local_dirname = self._create_tmp_dir(self.temp_directory)
 
         try:
             self.svnrepo = SvnRepo(
@@ -554,6 +550,13 @@ Local repository not cleaned up for investigation: %s""",
                 self._last_revision.directory,
             )
 
+    def _create_tmp_dir(self, root_tmp_dir: str) -> str:
+        return tempfile.mkdtemp(
+            dir=root_tmp_dir,
+            prefix=TEMPORARY_DIR_PREFIX_PATTERN,
+            suffix="-%s" % os.getpid(),
+        )
+
 
 class SvnLoaderFromDumpArchive(SvnLoader):
     """Uncompress an archive containing an svn dump, mount the svn dump as a local svn
@@ -641,7 +644,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             check_revision=check_revision,
             max_content_size=max_content_size,
         )
-        self.temp_dir = tempfile.mkdtemp(dir=self.temp_directory)
+        self.temp_dir = self._create_tmp_dir(self.temp_directory)
         self.repo_path = None
         self.truncated_dump = False
 

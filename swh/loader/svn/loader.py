@@ -15,7 +15,7 @@ import re
 import shutil
 from subprocess import Popen
 import tempfile
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
 from subvertpy import SubversionException
 
@@ -52,9 +52,7 @@ SUBVERSION_NOT_FOUND = "E170013"
 
 
 class SvnLoader(BaseLoader):
-    """Swh svn loader.
-
-    The repository is either remote or local.  The loader deals with
+    """SVN loader. The repository is either remote or local. The loader deals with
     update on an already previously loaded repository.
 
     """
@@ -67,20 +65,28 @@ class SvnLoader(BaseLoader):
         url: str,
         origin_url: Optional[str] = None,
         visit_date: Optional[datetime] = None,
-        destination_path: Optional[str] = None,
-        swh_revision: Optional[str] = None,
         incremental: bool = True,
         temp_directory: str = "/tmp",
         debug: bool = False,
         check_revision: int = 0,
         max_content_size: Optional[int] = None,
     ):
-        """Load an svn repository.
+        """Load a svn repository (either remote or local).
 
         Args:
-            ...
+            url: The default origin url
+            origin_url: Optional original url override to use as origin reference in the
+                archive. If not provided, "url" is used as origin.
+            visit_date: Optional date to override the visit date
             incremental: If True, the default, starts from the last snapshot (if any).
                 Otherwise, starts from the initial commit of the repository.
+            temp_directory: The temporary directory to use as root directory for working
+                directory computations
+            debug: If true, run the loader in debug mode. At the end of the loading, the
+                temporary working directory is not cleaned up to ease inspection.
+                Defaults to false.
+            check_revision: The number of svn commits between checks for hash divergence
+            max_content_size: Default max content size allowed
 
         """
         super().__init__(
@@ -109,7 +115,6 @@ class SvnLoader(BaseLoader):
         self._visit_status = "full"
         self._load_status = "uneventful"
         self.visit_date = visit_date
-        self.destination_path = destination_path
         self.incremental = incremental
         self.snapshot: Optional[Snapshot] = None
         # state from previous visit
@@ -142,16 +147,17 @@ Local repository not cleaned up for investigation: %s""",
             return
         self.svnrepo.clean_fs()
 
-    def swh_revision_hash_tree_at_svn_revision(self, revision):
+    def swh_revision_hash_tree_at_svn_revision(self, revision: int) -> bytes:
         """Compute and return the hash tree at a given svn revision.
 
         Args:
-            rev (int): the svn revision we want to check
+            rev: the svn revision we want to check
 
         Returns:
             The hash tree directory as bytes.
 
         """
+        assert self.svnrepo is not None
         local_dirname, local_url = self.svnrepo.export_temporary(revision)
         h = from_disk.Directory.from_disk(path=local_url).hash
         self.svnrepo.clean_fs(local_dirname)
@@ -191,7 +197,9 @@ Local repository not cleaned up for investigation: %s""",
             return None
         return latest_snapshot, revision
 
-    def build_swh_revision(self, rev, commit, dir_id, parents):
+    def build_swh_revision(
+        self, rev: int, commit: Dict, dir_id: bytes, parents: Sequence[bytes]
+    ) -> Revision:
         """Build the swh revision dictionary.
 
         This adds:
@@ -201,21 +209,22 @@ Local repository not cleaned up for investigation: %s""",
           svn revision number.
 
         Args:
-            rev (int): the svn revision number
-            commit (dict): the commit data: revision id, date, author, and message
-            dir_id (bytes): the upper tree's hash identifier
-            parents ([bytes]): the parents' identifiers
+            rev: the svn revision number
+            commit: the commit data: revision id, date, author, and message
+            dir_id: the upper tree's hash identifier
+            parents: the parents' identifiers
 
         Returns:
             The swh revision corresponding to the svn revision.
 
         """
+        assert self.svnrepo is not None
         return converters.build_swh_revision(
             rev, commit, self.svnrepo.uuid, dir_id, parents
         )
 
     def check_history_not_altered(
-        self, svnrepo, revision_start: int, swh_rev: Revision
+        self, svnrepo: SvnRepo, revision_start: int, swh_rev: Revision
     ) -> bool:
         """Given a svn repository, check if the history was modified in between visits.
 
@@ -225,7 +234,7 @@ Local repository not cleaned up for investigation: %s""",
         hash_data_per_revs = svnrepo.swh_hash_data_at_revision(revision_start)
 
         rev = revision_start
-        rev, _, commit, _, root_dir = list(hash_data_per_revs)[0]
+        commit, root_dir = list(hash_data_per_revs)[0]
 
         dir_id = root_dir.hash
         swh_revision = self.build_swh_revision(rev, commit, dir_id, parents)
@@ -302,40 +311,31 @@ Local repository not cleaned up for investigation: %s""",
 
         return revision_start, revision_end, revision_parents
 
-    def _check_revision_divergence(self, count, rev, dir_id):
+    def _check_revision_divergence(self, rev: int, dir_id: bytes) -> None:
         """Check for hash revision computation divergence.
 
-           The Rationale behind this is that svn can trigger unknown
-           edge cases (mixed CRLF, svn properties, etc...).  Those are
-           not always easy to spot. Adding a check will help in
-           spotting missing edge cases.
+           The Rationale behind this is that svn can trigger unknown edge cases (mixed
+           CRLF, svn properties, etc...). Those are not always easy to spot. Adding a
+           regular check will help spotting potential missing edge cases.
 
         Args:
-            count (int): The number of revisions done so far
-            rev (dict): The actual revision we are computing from
-            dir_id (bytes): The actual directory for the given revision
-
-        Returns:
-            False if no hash divergence detected
+            rev: The actual revision we are computing from
+            dir_id: The actual directory for the given revision
 
         Raises
             ValueError if a hash divergence is detected
 
         """
-        # hash computation check
-        if (self.check_revision != 0 and count % self.check_revision) == 0:
-            self.log.debug("Checking hash computations on revision %s...", rev)
-            checked_dir_id = self.swh_revision_hash_tree_at_svn_revision(rev)
-            if checked_dir_id != dir_id:
-                err = (
-                    "Hash tree computation divergence detected "
-                    "(%s != %s), stopping!"
-                    % (
-                        hashutil.hash_to_hex(dir_id),
-                        hashutil.hash_to_hex(checked_dir_id),
-                    )
-                )
-                raise ValueError(err)
+
+        self.log.debug("Checking hash computations on revision %s...", rev)
+        checked_dir_id = self.swh_revision_hash_tree_at_svn_revision(rev)
+        if checked_dir_id != dir_id:
+            err = (
+                "Hash tree computation divergence detected "
+                "(%s != %s), stopping!"
+                % (hashutil.hash_to_hex(dir_id), hashutil.hash_to_hex(checked_dir_id),)
+            )
+            raise ValueError(err)
 
     def process_svn_revisions(
         self, svnrepo, revision_start, revision_end, revision_parents
@@ -381,8 +381,12 @@ Local repository not cleaned up for investigation: %s""",
                 hashutil.hash_to_hex(dir_id),
             )
 
-            if self.check_revision:
-                self._check_revision_divergence(count, rev, dir_id)
+            if (
+                self.check_revision
+                and self.check_revision != 0
+                and count % self.check_revision == 0
+            ):
+                self._check_revision_divergence(rev, dir_id)
 
             if nextrev:
                 revision_parents[nextrev] = [swh_revision.id]
@@ -397,14 +401,7 @@ Local repository not cleaned up for investigation: %s""",
         if latest_snapshot_revision:
             self.latest_snapshot, self.latest_revision = latest_snapshot_revision
 
-        if self.destination_path:
-            local_dirname = self.destination_path
-        else:
-            local_dirname = tempfile.mkdtemp(
-                suffix="-%s" % os.getpid(),
-                prefix=TEMPORARY_DIR_PREFIX_PATTERN,
-                dir=self.temp_directory,
-            )
+        local_dirname = self._create_tmp_dir(self.temp_directory)
 
         try:
             self.svnrepo = SvnRepo(
@@ -544,22 +541,26 @@ Local repository not cleaned up for investigation: %s""",
 
     def post_load(self, success: bool = True) -> None:
         if success and self._last_revision is not None:
-            # force revision divergence check
-            self.check_revision = 1
             # check if the reconstructed filesystem for the last loaded revision is
-            # consistent with the one obtained with a svn export operation, if it is
-            # not an exception will be raised to report the issue and mark the visit
-            # as partial
+            # consistent with the one obtained with a svn export operation. If it is not
+            # the case, an exception will be raised to report the issue and mark the
+            # visit as partial
             self._check_revision_divergence(
-                self.check_revision,
                 int(dict(self._last_revision.extra_headers)[b"svn_revision"]),
                 self._last_revision.directory,
             )
 
+    def _create_tmp_dir(self, root_tmp_dir: str) -> str:
+        return tempfile.mkdtemp(
+            dir=root_tmp_dir,
+            prefix=TEMPORARY_DIR_PREFIX_PATTERN,
+            suffix="-%s" % os.getpid(),
+        )
+
 
 class SvnLoaderFromDumpArchive(SvnLoader):
-    """Uncompress an archive containing an svn dump, mount the svn dump as
-       an svn repository and load said repository.
+    """Uncompress an archive containing an svn dump, mount the svn dump as a local svn
+       repository and load that repository.
 
     """
 
@@ -569,8 +570,6 @@ class SvnLoaderFromDumpArchive(SvnLoader):
         url: str,
         archive_path: str,
         origin_url: Optional[str] = None,
-        destination_path: Optional[str] = None,
-        swh_revision: Optional[str] = None,
         incremental: bool = False,
         visit_date: Optional[datetime] = None,
         temp_directory: str = "/tmp",
@@ -582,8 +581,6 @@ class SvnLoaderFromDumpArchive(SvnLoader):
             storage=storage,
             url=url,
             origin_url=origin_url,
-            destination_path=destination_path,
-            swh_revision=swh_revision,
             incremental=incremental,
             visit_date=visit_date,
             temp_directory=temp_directory,
@@ -619,9 +616,9 @@ class SvnLoaderFromDumpArchive(SvnLoader):
 
 
 class SvnLoaderFromRemoteDump(SvnLoader):
-    """
-    Create a subversion repository dump using the svnrdump utility,
-    mount it locally and load the repository from it.
+    """Create a subversion repository dump out of a remote svn repository (using the
+    svnrdump utility). Then, mount the repository locally and load that repository.
+
     """
 
     def __init__(
@@ -629,8 +626,6 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         storage: StorageInterface,
         url: str,
         origin_url: Optional[str] = None,
-        destination_path: Optional[str] = None,
-        swh_revision: Optional[str] = None,
         incremental: bool = True,
         visit_date: Optional[datetime] = None,
         temp_directory: str = "/tmp",
@@ -642,8 +637,6 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             storage=storage,
             url=url,
             origin_url=origin_url,
-            destination_path=destination_path,
-            swh_revision=swh_revision,
             incremental=incremental,
             visit_date=visit_date,
             temp_directory=temp_directory,
@@ -651,7 +644,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             check_revision=check_revision,
             max_content_size=max_content_size,
         )
-        self.temp_dir = tempfile.mkdtemp(dir=self.temp_directory)
+        self.temp_dir = self._create_tmp_dir(self.temp_directory)
         self.repo_path = None
         self.truncated_dump = False
 
@@ -674,15 +667,17 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             pass
         return svn_revision
 
-    def dump_svn_revisions(self, svn_url, last_loaded_svn_rev=-1):
-        """
-        Generate a subversion dump file using the svnrdump tool.
-        If the svnrdump command failed somehow,
-        the produced dump file is analyzed to determine if a partial
-        loading is still feasible.
+    def dump_svn_revisions(self, svn_url: str, last_loaded_svn_rev: int = -1) -> str:
+        """Generate a subversion dump file using the svnrdump tool. If the svnrdump
+        command failed somehow, the produced dump file is analyzed to determine if a
+        partial loading is still feasible.
 
         Raises:
             NotFound when the repository is no longer found at url
+
+        Returns:
+            The dump_path of the repository mounted
+
         """
         # Build the svnrdump command line
         svnrdump_cmd = ["svnrdump", "dump", svn_url]

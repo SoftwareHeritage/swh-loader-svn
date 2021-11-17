@@ -8,10 +8,11 @@
 """
 
 import codecs
+import dataclasses
 import os
 import shutil
 import tempfile
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import click
 from subvertpy import delta, properties
@@ -123,8 +124,17 @@ NOEXEC_FLAG = 2
 
 SVN_PROPERTY_EOL = "svn:eol-style"
 
-# EOL state check mess
-EOL_STYLE = {}
+
+@dataclasses.dataclass
+class FileState:
+    """Persists some file states (eg. end of lines style) across revisions while
+    replaying them."""
+
+    eol_style: Optional[str] = None
+    """EOL state check mess"""
+
+    svn_special_path_non_link_data: Optional[bytes] = None
+    """keep track of non link file content with svn:special property set"""
 
 
 class FileEditor:
@@ -132,18 +142,23 @@ class FileEditor:
 
     """
 
-    __slots__ = ["directory", "path", "fullpath", "executable", "link"]
+    __slots__ = [
+        "directory",
+        "path",
+        "fullpath",
+        "executable",
+        "link",
+        "state",
+    ]
 
-    # keep track of non link file content with svn:special property set
-    svn_special_path_non_link_data: Dict[str, bytes] = {}
-
-    def __init__(self, directory, rootpath, path):
+    def __init__(self, directory, rootpath, path, state: FileState):
         self.directory = directory
         self.path = path
         # default value: 0, 1: set the flag, 2: remove the exec flag
         self.executable = DEFAULT_FLAG
         self.link = None
         self.fullpath = os.path.join(rootpath, path)
+        self.state = state
 
     def change_prop(self, key, value):
         if key == properties.PROP_EXECUTABLE:
@@ -157,7 +172,7 @@ class FileEditor:
             self.link = value is not None
         elif key == SVN_PROPERTY_EOL:
             # backup end of line style for file
-            EOL_STYLE[self.fullpath] = value
+            self.state.eol_style = value
 
     def __make_symlink(self, src):
         """Convert the svnlink to a symlink on disk.
@@ -243,18 +258,18 @@ class FileEditor:
                     if exported_data != content:
                         # keep track of original file content in order to restore
                         # it if the svn:special property gets unset in another revision
-                        self.svn_special_path_non_link_data[self.fullpath] = content
+                        self.state.svn_special_path_non_link_data = content
                     f.write(exported_data)
         elif os.path.islink(self.fullpath):
             # path was a symbolic link in previous revision but got the property
             # svn:special unset in current one, revert its content to svn link format
             self.__make_svnlink()
-        elif self.fullpath in self.svn_special_path_non_link_data:
+        elif self.state.svn_special_path_non_link_data is not None:
             # path was a non link file with the svn:special property previously set
             # and got truncated on export, restore its original content
             with open(self.fullpath, "wb") as f:
-                f.write(self.svn_special_path_non_link_data[self.fullpath])
-                del self.svn_special_path_non_link_data[self.fullpath]
+                f.write(self.state.svn_special_path_non_link_data)
+                self.state.svn_special_path_non_link_data = None
 
         if not is_link:  # if a link, do nothing regarding flag
             if self.executable == EXEC_FLAG:
@@ -263,14 +278,13 @@ class FileEditor:
                 os.chmod(self.fullpath, 0o644)
 
         # And now compute file's checksums
-        eol_style = EOL_STYLE.get(self.fullpath, None)
-        if eol_style and not is_link:
+        if self.state.eol_style and not is_link:
             # ensure to normalize line endings as defined by svn:eol-style
             # property to get the same file checksum as after an export
             # or checkout operation with subversion
             with open(self.fullpath, "rb") as f:
                 data = f.read()
-                data = _normalize_line_endings(data, eol_style)
+                data = _normalize_line_endings(data, self.state.eol_style)
                 mode = os.lstat(self.fullpath).st_mode
                 self.directory[self.path] = from_disk.Content.from_bytes(
                     mode=mode, data=data
@@ -301,11 +315,12 @@ class BaseDirEditor:
 
     __slots__ = ["directory", "rootpath"]
 
-    def __init__(self, directory, rootpath):
+    def __init__(self, directory, rootpath, file_states: Dict[str, FileState]):
         self.directory = directory
         self.rootpath = rootpath
         # build directory on init
         os.makedirs(rootpath, exist_ok=True)
+        self.file_states = file_states
 
     def remove_child(self, path):
         """Remove a path from the current objects.
@@ -331,13 +346,13 @@ class BaseDirEditor:
             else:
                 os.remove(fpath)
 
-        # when deleting a directory ensure to remove any eol style setting for the
+        # when deleting a directory ensure to remove any svn property for the
         # file it contains as they can be added again later in another revision
-        # without the svn:eol-style property set
+        # without the same property set
         fullpath = os.path.join(self.rootpath, path)
-        for eol_path in list(EOL_STYLE):
-            if eol_path.startswith(fullpath):
-                del EOL_STYLE[eol_path]
+        for state_path in list(self.file_states):
+            if state_path.startswith(fullpath):
+                del self.file_states[state_path]
 
     def update_checksum(self):
         raise NotImplementedError("This should be implemented.")
@@ -354,7 +369,13 @@ class BaseDirEditor:
         """
         path = os.fsencode(args[0])
         self.directory[path] = from_disk.Content()
-        return FileEditor(self.directory, rootpath=self.rootpath, path=path)
+        fullpath = os.path.join(self.rootpath, path)
+        return FileEditor(
+            self.directory,
+            rootpath=self.rootpath,
+            path=path,
+            state=self.file_states[fullpath],
+        )
 
     def add_file(self, path, copyfrom_path=None, copyfrom_rev=-1):
         """Creating a new file.
@@ -362,7 +383,11 @@ class BaseDirEditor:
         """
         path = os.fsencode(path)
         self.directory[path] = from_disk.Content()
-        return FileEditor(self.directory, self.rootpath, path)
+        fullpath = os.path.join(self.rootpath, path)
+        self.file_states[fullpath] = FileState()
+        return FileEditor(
+            self.directory, self.rootpath, path, state=self.file_states[fullpath]
+        )
 
     def change_prop(self, key, value):
         """Change property callback on directory.
@@ -375,6 +400,8 @@ class BaseDirEditor:
         """Remove a path.
 
         """
+        fullpath = os.path.join(self.rootpath, path.encode("utf-8"))
+        self.file_states.pop(fullpath, None)
         self.remove_child(path.encode("utf-8"))
 
     def close(self):
@@ -429,6 +456,7 @@ class Editor:
     def __init__(self, rootpath, directory):
         self.rootpath = rootpath
         self.directory = directory
+        self.file_states: Dict[str, FileState] = {}
 
     def set_target_revision(self, revnum):
         pass
@@ -440,7 +468,9 @@ class Editor:
         pass
 
     def open_root(self, base_revnum):
-        return DirEditor(self.directory, rootpath=self.rootpath)
+        return DirEditor(
+            self.directory, rootpath=self.rootpath, file_states=self.file_states
+        )
 
 
 class Replay:

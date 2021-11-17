@@ -24,8 +24,6 @@ def load_svn(
     *,
     url: Optional[str] = None,
     origin_url: Optional[str] = None,
-    destination_path: Optional[str] = None,
-    swh_revision: Optional[str] = None,
     visit_date: Optional[str] = None,
     incremental: Optional[bool] = True,
 ):
@@ -35,9 +33,6 @@ def load_svn(
         url: (mandatory) svn's repository url to ingest data from
         origin_url: Optional original url override to use as origin reference in the
             archive. If not provided, "url" is used as origin.
-        destination_path: (optional) root directory to locally retrieve svn's data
-        swh_revision: (optional) extra revision hex to start from. See
-          swh.loader.svn.SvnLoader.process docstring
         visit_date: Optional date to override the visit date
         incremental: If True, the default, starts from the last snapshot (if any).
             Otherwise, starts from the initial commit of the repository.
@@ -48,8 +43,6 @@ def load_svn(
     loader = SvnLoader.from_configfile(
         url=url,
         origin_url=origin_url,
-        destination_path=destination_path,
-        swh_revision=swh_revision,
         visit_date=convert_to_datetime(visit_date),
         incremental=incremental,
     )

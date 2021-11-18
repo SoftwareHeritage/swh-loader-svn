@@ -742,14 +742,7 @@ def test_loader_svn_cleanup_loader_from_dump_archive(swh_storage, datadir, tmp_p
     assert not os.path.exists(loader.temp_dir)
 
 
-def test_loader_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
-    """Repository with wrong symlinks should be ingested ok nonetheless
-
-    Edge case:
-       - wrong symbolic link
-       - wrong symbolic link with empty space names
-
-    """
+def test_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
@@ -808,6 +801,59 @@ def test_loader_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
         swh_storage, repo_url, temp_directory=tmp_path
     )
     assert loaderFromDump.load() == {"status": "uneventful"}
+
+
+def test_svn_loader_from_remote_dump_multiple_load_on_stale_repo(
+    swh_storage, datadir, tmp_path, mocker
+):
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    # first load: a dump file will be created, mounted to a local repository
+    # and the latter will be loaded into the archive
+    loaderFromDump = SvnLoaderFromRemoteDump(
+        swh_storage, repo_url, temp_directory=tmp_path
+    )
+    assert loaderFromDump.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loaderFromDump.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
+    )
+
+    # second load on same repository: the loader will detect there is no changes
+    # since last load and will skip the dump, mount and load phases
+    loaderFromDump = SvnLoaderFromRemoteDump(
+        swh_storage, repo_url, temp_directory=tmp_path
+    )
+
+    loaderFromDump.dump_svn_revisions = mocker.MagicMock()
+    init_svn_repo_from_dump = mocker.patch(
+        "swh.loader.svn.loader.init_svn_repo_from_dump"
+    )
+    loaderFromDump.process_svn_revisions = mocker.MagicMock()
+    loaderFromDump._check_revision_divergence = mocker.MagicMock()
+
+    assert loaderFromDump.load() == {"status": "uneventful"}
+    assert_last_visit_matches(
+        loaderFromDump.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
+    )
+
+    # no dump
+    loaderFromDump.dump_svn_revisions.assert_not_called()
+    # no mount
+    init_svn_repo_from_dump.assert_not_called()
+    # no loading
+    loaderFromDump.process_svn_revisions.assert_not_called()
+    # no redundant post_load processing
+    loaderFromDump._check_revision_divergence.assert_not_called()
 
 
 def test_loader_user_defined_svn_properties(swh_storage, datadir, tmp_path):

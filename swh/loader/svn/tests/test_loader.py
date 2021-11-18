@@ -302,7 +302,7 @@ def test_loader_tampered_repository(swh_storage, datadir, tmp_path):
         repo_url,
         status="full",
         type="svn",
-        snapshot=hash_to_bytes("c499eebc1e201024d47d24053ac0080049305897"),
+        snapshot=hash_to_bytes("5aa61959e788e281fd6e187053d0f46c68e8d8bb"),
     )
 
     stats = get_stats(loader.storage)

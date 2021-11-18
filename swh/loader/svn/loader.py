@@ -289,7 +289,7 @@ Local repository not cleaned up for investigation: %s""",
                     self.svnrepo.remote_url,
                     revision_start,
                 )
-                revision_start = self.svnrepo.initial_revision()
+                revision_start = 0
 
             # now we know history is ok, we start at next revision
             revision_start = revision_start + 1

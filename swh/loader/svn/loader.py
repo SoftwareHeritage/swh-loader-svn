@@ -783,8 +783,8 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         # subversion origin and get the number of the last one
         last_loaded_svn_rev = self.get_last_loaded_svn_rev(self.svn_url)
 
-        # Then check if the last loaded revision in the archive is different
-        # from the last revision on the remote subversion server.
+        # Then for stale repository, check if the last loaded revision in the archive
+        # is different from the last revision on the remote subversion server.
         # Skip the dump of all revisions and the loading process if they are identical
         # to save some disk space and processing time.
         last_loaded_snp_and_rev = self._latest_snapshot_revision(self.origin_url)
@@ -793,7 +793,10 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             self.svnrepo = SvnRepo(
                 self.origin_url, self.origin_url, self.temp_dir, self.max_content_size
             )
-            if self.check_history_not_altered(last_loaded_svn_rev, last_loaded_rev):
+            stale_repository = self.svnrepo.head_revision() == last_loaded_svn_rev
+            if stale_repository and self.check_history_not_altered(
+                last_loaded_svn_rev, last_loaded_rev
+            ):
                 self._snapshot = last_loaded_snp
                 self._last_revision = last_loaded_rev
                 self.done = True

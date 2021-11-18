@@ -803,7 +803,7 @@ def test_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
     assert loaderFromDump.load() == {"status": "uneventful"}
 
 
-def test_svn_loader_from_remote_dump_multiple_load_on_stale_repo(
+def test_svn_loader_from_remote_dump_incremental_load_on_stale_repo(
     swh_storage, datadir, tmp_path, mocker
 ):
     archive_name = "pkg-gourmet"
@@ -854,6 +854,36 @@ def test_svn_loader_from_remote_dump_multiple_load_on_stale_repo(
     loaderFromDump.process_svn_revisions.assert_not_called()
     # no redundant post_load processing
     loaderFromDump._check_revision_divergence.assert_not_called()
+
+
+def test_svn_loader_from_remote_dump_incremental_load_on_non_stale_repo(
+    swh_storage, datadir, tmp_path, mocker
+):
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    # first load
+    loader = SvnLoaderFromRemoteDump(swh_storage, repo_url, temp_directory=tmp_path)
+    loader.load()
+
+    archive_path = os.path.join(datadir, "pkg-gourmet-with-updates.tgz")
+    repo_updated_url = prepare_repository_from_archive(
+        archive_path, archive_name, tmp_path
+    )
+
+    # second load
+    loader = SvnLoaderFromRemoteDump(
+        swh_storage, repo_updated_url, temp_directory=tmp_path
+    )
+
+    dump_svn_revisions = mocker.spy(loader, "dump_svn_revisions")
+    process_svn_revisions = mocker.spy(loader, "process_svn_revisions")
+
+    loader.load()
+
+    dump_svn_revisions.assert_called()
+    process_svn_revisions.assert_called()
 
 
 def test_loader_user_defined_svn_properties(swh_storage, datadir, tmp_path):

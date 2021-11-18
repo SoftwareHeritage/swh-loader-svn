@@ -1361,3 +1361,52 @@ def test_loader_last_revision_divergence(swh_storage, datadir, tmp_path):
         type="svn",
         snapshot=GOURMET_SNAPSHOT.id,
     )
+
+
+def test_loader_delete_directory_while_file_has_same_prefix(swh_storage, tmp_path):
+    # create a repository
+    repo_path = os.path.join(tmp_path, "tmprepo")
+    repos.create(repo_path)
+    repo_url = f"file://{repo_path}"
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Add a file and a directory with same prefix",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="foo/bar.c",
+                data=b'#include "../foo.c"',
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="foo.c",
+                data=b"int foo() {return 0;}",
+            ),
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Delete previously added directory and update file content",
+        [
+            CommitChange(change_type=CommitChangeType.Delete, path="foo"),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="foo.c",
+                data=b"int foo() {return 1;}",
+            ),
+        ],
+    )
+
+    # instantiate a svn loader checking after each processed revision that
+    # the repository filesystem it reconstructed does not differ from a subversion
+    # export of that revision
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )

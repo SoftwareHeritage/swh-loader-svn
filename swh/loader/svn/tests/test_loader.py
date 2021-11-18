@@ -1456,3 +1456,75 @@ def test_loader_delete_directory_while_file_has_same_prefix(swh_storage, tmp_pat
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+
+
+def test_svn_loader_incremental(swh_storage, tmp_path):
+    # create a repository
+    repo_path = os.path.join(tmp_path, "tmprepo")
+    repos.create(repo_path)
+    repo_url = f"file://{repo_path}"
+
+    # first commit
+    add_commit(
+        repo_url,
+        (
+            "Add a directory containing a file with CRLF end of line "
+            "and set svn:eol-style property to native so CRLF will be "
+            "replaced by LF in the file when exporting the revision"
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="file_with_crlf_eol.txt",
+                properties={"svn:eol-style": "native"},
+                data=b"Hello world!\r\n",
+            )
+        ],
+    )
+
+    # first load
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Modify previously added file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="file_with_crlf_eol.txt",
+                data=b"Hello World!\r\n",
+            )
+        ],
+    )
+
+    # second load, incremental
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+
+    # third commit
+    add_commit(
+        repo_url,
+        "Unset svn:eol-style property on file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="file_with_crlf_eol.txt",
+                properties={"svn:eol-style": None},
+            )
+        ],
+    )
+
+    # third load, incremental
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )

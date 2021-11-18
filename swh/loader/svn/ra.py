@@ -351,7 +351,7 @@ class BaseDirEditor:
         # without the same property set
         fullpath = os.path.join(self.rootpath, path)
         for state_path in list(self.file_states):
-            if state_path.startswith(fullpath):
+            if state_path.startswith(fullpath + b"/"):
                 del self.file_states[state_path]
 
     def update_checksum(self):

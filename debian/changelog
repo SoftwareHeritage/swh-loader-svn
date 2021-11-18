@@ -1,3 +1,13 @@
+swh-loader-svn (0.9.1-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.9.1     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2021-11-18 14:19:23
+    +0100)
+  * Upstream changes:     - v0.9.1     - ra: Prevent erroneous removing
+    of file state
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 18 Nov 2021 13:22:06 +0000
+
 swh-loader-svn (0.9.0-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.9.0     - (tagged by Antoine Lambert

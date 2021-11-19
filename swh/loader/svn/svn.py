@@ -250,7 +250,11 @@ class SvnRepo:
             - complete Directory representation
 
         """
-        for commit in self.logs(start_revision, end_revision):
+        # even in incremental loading mode, we need to replay the whole set of
+        # path modifications from first revision to restore possible file states induced
+        # by setting svn properties on those files (end of line style for instance)
+        first_revision = 1 if start_revision else 0  # handle empty repository edge case
+        for commit in self.logs(first_revision, end_revision):
             rev = commit["rev"]
             objects = self.swhreplay.compute_objects(rev)
 
@@ -259,7 +263,10 @@ class SvnRepo:
             else:
                 nextrev = rev + 1
 
-            yield rev, nextrev, commit, objects, self.swhreplay.directory
+            if rev >= start_revision:
+                # start yielding new data to archive once we reached the revision to
+                # resume the loading from
+                yield rev, nextrev, commit, objects, self.swhreplay.directory
 
     def swh_hash_data_at_revision(
         self, revision: int

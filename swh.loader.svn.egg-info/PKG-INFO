@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: swh.loader.svn
-Version: 0.9.1
+Version: 0.10.0
 Summary: Software Heritage Loader SVN
 Home-page: https://forge.softwareheritage.org/diffusion/DLDSVN
 Author: Software Heritage developers

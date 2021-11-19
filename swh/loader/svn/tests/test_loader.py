@@ -302,7 +302,7 @@ def test_loader_tampered_repository(swh_storage, datadir, tmp_path):
         repo_url,
         status="full",
         type="svn",
-        snapshot=hash_to_bytes("c499eebc1e201024d47d24053ac0080049305897"),
+        snapshot=hash_to_bytes("5aa61959e788e281fd6e187053d0f46c68e8d8bb"),
     )
 
     stats = get_stats(loader.storage)
@@ -742,14 +742,7 @@ def test_loader_svn_cleanup_loader_from_dump_archive(swh_storage, datadir, tmp_p
     assert not os.path.exists(loader.temp_dir)
 
 
-def test_loader_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
-    """Repository with wrong symlinks should be ingested ok nonetheless
-
-    Edge case:
-       - wrong symbolic link
-       - wrong symbolic link with empty space names
-
-    """
+def test_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
@@ -808,6 +801,89 @@ def test_loader_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
         swh_storage, repo_url, temp_directory=tmp_path
     )
     assert loaderFromDump.load() == {"status": "uneventful"}
+
+
+def test_svn_loader_from_remote_dump_incremental_load_on_stale_repo(
+    swh_storage, datadir, tmp_path, mocker
+):
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    # first load: a dump file will be created, mounted to a local repository
+    # and the latter will be loaded into the archive
+    loaderFromDump = SvnLoaderFromRemoteDump(
+        swh_storage, repo_url, temp_directory=tmp_path
+    )
+    assert loaderFromDump.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loaderFromDump.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
+    )
+
+    # second load on same repository: the loader will detect there is no changes
+    # since last load and will skip the dump, mount and load phases
+    loaderFromDump = SvnLoaderFromRemoteDump(
+        swh_storage, repo_url, temp_directory=tmp_path
+    )
+
+    loaderFromDump.dump_svn_revisions = mocker.MagicMock()
+    init_svn_repo_from_dump = mocker.patch(
+        "swh.loader.svn.loader.init_svn_repo_from_dump"
+    )
+    loaderFromDump.process_svn_revisions = mocker.MagicMock()
+    loaderFromDump._check_revision_divergence = mocker.MagicMock()
+
+    assert loaderFromDump.load() == {"status": "uneventful"}
+    assert_last_visit_matches(
+        loaderFromDump.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
+    )
+
+    # no dump
+    loaderFromDump.dump_svn_revisions.assert_not_called()
+    # no mount
+    init_svn_repo_from_dump.assert_not_called()
+    # no loading
+    loaderFromDump.process_svn_revisions.assert_not_called()
+    # no redundant post_load processing
+    loaderFromDump._check_revision_divergence.assert_not_called()
+
+
+def test_svn_loader_from_remote_dump_incremental_load_on_non_stale_repo(
+    swh_storage, datadir, tmp_path, mocker
+):
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    # first load
+    loader = SvnLoaderFromRemoteDump(swh_storage, repo_url, temp_directory=tmp_path)
+    loader.load()
+
+    archive_path = os.path.join(datadir, "pkg-gourmet-with-updates.tgz")
+    repo_updated_url = prepare_repository_from_archive(
+        archive_path, archive_name, tmp_path
+    )
+
+    # second load
+    loader = SvnLoaderFromRemoteDump(
+        swh_storage, repo_updated_url, temp_directory=tmp_path
+    )
+
+    dump_svn_revisions = mocker.spy(loader, "dump_svn_revisions")
+    process_svn_revisions = mocker.spy(loader, "process_svn_revisions")
+
+    loader.load()
+
+    dump_svn_revisions.assert_called()
+    process_svn_revisions.assert_called()
 
 
 def test_loader_user_defined_svn_properties(swh_storage, datadir, tmp_path):
@@ -1406,6 +1482,78 @@ def test_loader_delete_directory_while_file_has_same_prefix(swh_storage, tmp_pat
     # export of that revision
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
 
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+
+
+def test_svn_loader_incremental(swh_storage, tmp_path):
+    # create a repository
+    repo_path = os.path.join(tmp_path, "tmprepo")
+    repos.create(repo_path)
+    repo_url = f"file://{repo_path}"
+
+    # first commit
+    add_commit(
+        repo_url,
+        (
+            "Add a directory containing a file with CRLF end of line "
+            "and set svn:eol-style property to native so CRLF will be "
+            "replaced by LF in the file when exporting the revision"
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="file_with_crlf_eol.txt",
+                properties={"svn:eol-style": "native"},
+                data=b"Hello world!\r\n",
+            )
+        ],
+    )
+
+    # first load
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Modify previously added file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="file_with_crlf_eol.txt",
+                data=b"Hello World!\r\n",
+            )
+        ],
+    )
+
+    # second load, incremental
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+
+    # third commit
+    add_commit(
+        repo_url,
+        "Unset svn:eol-style property on file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="file_with_crlf_eol.txt",
+                properties={"svn:eol-style": None},
+            )
+        ],
+    )
+
+    # third load, incremental
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",

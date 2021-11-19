@@ -102,6 +102,7 @@ class SvnLoader(BaseLoader):
         self.temp_directory = temp_directory
         self.done = False
         self.svnrepo = None
+        self.skip_post_load = False
         # Revision check is configurable
         self.check_revision = check_revision
         # internal state used to store swh objects
@@ -223,15 +224,15 @@ Local repository not cleaned up for investigation: %s""",
             rev, commit, self.svnrepo.uuid, dir_id, parents
         )
 
-    def check_history_not_altered(
-        self, svnrepo: SvnRepo, revision_start: int, swh_rev: Revision
-    ) -> bool:
+    def check_history_not_altered(self, revision_start: int, swh_rev: Revision) -> bool:
         """Given a svn repository, check if the history was modified in between visits.
 
         """
         revision_id = swh_rev.id
         parents = swh_rev.parents
-        hash_data_per_revs = svnrepo.swh_hash_data_at_revision(revision_start)
+
+        assert self.svnrepo is not None
+        hash_data_per_revs = self.svnrepo.swh_hash_data_at_revision(revision_start)
 
         rev = revision_start
         commit, root_dir = list(hash_data_per_revs)[0]
@@ -279,9 +280,7 @@ Local repository not cleaned up for investigation: %s""",
                 revision_start,
             )
 
-            if not self.check_history_not_altered(
-                self.svnrepo, revision_start, self.latest_revision
-            ):
+            if not self.check_history_not_altered(revision_start, self.latest_revision):
                 self.log.debug(
                     (
                         "History of svn %s@%s altered. "
@@ -290,7 +289,7 @@ Local repository not cleaned up for investigation: %s""",
                     self.svnrepo.remote_url,
                     revision_start,
                 )
-                revision_start = self.svnrepo.initial_revision()
+                revision_start = 0
 
             # now we know history is ok, we start at next revision
             revision_start = revision_start + 1
@@ -540,6 +539,8 @@ Local repository not cleaned up for investigation: %s""",
         return self._visit_status
 
     def post_load(self, success: bool = True) -> None:
+        if self.skip_post_load:
+            return
         if success and self._last_revision is not None:
             # check if the reconstructed filesystem for the last loaded revision is
             # consistent with the one obtained with a svn export operation. If it is not
@@ -781,6 +782,26 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         # First, check if previous revisions have been loaded for the
         # subversion origin and get the number of the last one
         last_loaded_svn_rev = self.get_last_loaded_svn_rev(self.svn_url)
+
+        # Then for stale repository, check if the last loaded revision in the archive
+        # is different from the last revision on the remote subversion server.
+        # Skip the dump of all revisions and the loading process if they are identical
+        # to save some disk space and processing time.
+        last_loaded_snp_and_rev = self._latest_snapshot_revision(self.origin_url)
+        if last_loaded_snp_and_rev is not None:
+            last_loaded_snp, last_loaded_rev = last_loaded_snp_and_rev
+            self.svnrepo = SvnRepo(
+                self.origin_url, self.origin_url, self.temp_dir, self.max_content_size
+            )
+            stale_repository = self.svnrepo.head_revision() == last_loaded_svn_rev
+            if stale_repository and self.check_history_not_altered(
+                last_loaded_svn_rev, last_loaded_rev
+            ):
+                self._snapshot = last_loaded_snp
+                self._last_revision = last_loaded_rev
+                self.done = True
+                self.skip_post_load = True
+                return
 
         # Then try to generate a dump file containing relevant svn revisions
         # to load, an exception will be thrown if something wrong happened

@@ -1,8 +1,10 @@
-swh-loader-svn (0.9.1-1~swh1~bpo10+1) buster-swh; urgency=medium
+swh-loader-svn (0.10.0-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 0.10.0     - (tagged by Antoine Lambert
+    <anlambert@softwareheritage.org> on 2021-11-19 11:58:43 +0100)
+  * Upstream changes:     - version 0.10.0
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 18 Nov 2021 13:44:01 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 19 Nov 2021 11:03:18 +0000
 
 swh-loader-svn (0.9.1-1~swh1) unstable-swh; urgency=medium
 

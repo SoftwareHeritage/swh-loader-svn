@@ -13,7 +13,10 @@ from .loader import SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump
 
 
 def convert_to_datetime(date: Optional[str]) -> Optional[datetime]:
+    if date is None:
+        return None
     try:
+        assert isinstance(date, str)
         return iso8601.parse_date(date)
     except Exception:
         return None

@@ -186,17 +186,6 @@ class SvnRepo:
         ):
             yield self.__to_entry(log_entry)
 
-    def export(self, revision: int) -> None:
-        """Export the repository to a given version.
-
-        """
-        self.client.export(
-            self.remote_url,
-            to=self.local_url.decode("utf-8"),
-            rev=revision,
-            ignore_keywords=True,
-        )
-
     def export_temporary(self, revision: int) -> Tuple[str, bytes]:
         """Export the repository to a given revision in a temporary location. This is up
         to the caller of this function to clean up the temporary location when done (cf.
@@ -272,26 +261,24 @@ class SvnRepo:
         self, revision: int
     ) -> Iterator[Tuple[Dict, DirectoryFromDisk]]:
         """Compute the information at a given svn revision. This is expected to be used
-        for update only.
+        for checks only.
 
         Yields:
             The tuple (commit dictionary, targeted directory object).
 
         """
         # Update disk representation of the repository at revision id
-        self.export(revision)
+        local_dirname, local_url = self.export_temporary(revision)
         # Compute the current hashes on disk
         directory = DirectoryFromDisk.from_disk(
-            path=os.fsencode(self.local_url), max_content_length=self.max_content_length
-        )
-
-        # Update the replay collaborator with the right state
-        self.swhreplay = ra.Replay(
-            conn=self.conn, rootpath=self.local_url, directory=directory
+            path=local_url, max_content_length=self.max_content_length
         )
 
         # Retrieve the commit information for revision
         commit = list(self.logs(revision, revision))[0]
+
+        # Clean export directory
+        self.clean_fs(local_dirname)
 
         yield commit, directory
 

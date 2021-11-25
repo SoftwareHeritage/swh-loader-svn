@@ -1558,3 +1558,64 @@ def test_svn_loader_incremental(swh_storage, tmp_path):
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+
+
+def test_svn_loader_incremental_replay_start_with_empty_directory(
+    swh_storage, mocker, tmp_path
+):
+    # create a repository
+    repo_path = os.path.join(tmp_path, "tmprepo")
+    repos.create(repo_path)
+    repo_url = f"file://{repo_path}"
+
+    # first commit
+    add_commit(
+        repo_url,
+        ("Add a file"),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate, path="foo.txt", data=b"foo\n",
+            )
+        ],
+    )
+
+    # first load
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Modify previously added file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate, path="foo.txt", data=b"bar\n",
+            )
+        ],
+    )
+
+    class SvnRepoCheckReplayStartWithEmptyDirectory(SvnRepo):
+        def swh_hash_data_per_revision(self, start_revision: int, end_revision: int):
+            """Overrides swh_hash_data_per_revision method to grab the content
+            of the directory where the svn revisions will be replayed before that
+            process starts."""
+            self.replay_dir_content_before_start = [
+                os.path.join(root, name)
+                for root, _, files in os.walk(self.local_url)
+                for name in files
+            ]
+            yield from super().swh_hash_data_per_revision(start_revision, end_revision)
+
+    from swh.loader.svn import loader
+
+    mocker.patch.object(loader, "SvnRepo", SvnRepoCheckReplayStartWithEmptyDirectory)
+
+    # second load, incremental
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    loader.load()
+
+    # check work directory was empty before replaying revisions
+    assert loader.svnrepo.replay_dir_content_before_start == []

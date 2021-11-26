@@ -136,6 +136,9 @@ class FileState:
     svn_special_path_non_link_data: Optional[bytes] = None
     """keep track of non link file content with svn:special property set"""
 
+    executable: int = DEFAULT_FLAG
+    """keep track if file is executable when setting svn:executable property"""
+
 
 class FileEditor:
     """File Editor in charge of updating file on disk and memory objects.
@@ -155,7 +158,6 @@ class FileEditor:
         self.directory = directory
         self.path = path
         # default value: 0, 1: set the flag, 2: remove the exec flag
-        self.executable = DEFAULT_FLAG
         self.link = None
         self.fullpath = os.path.join(rootpath, path)
         self.state = state
@@ -163,9 +165,9 @@ class FileEditor:
     def change_prop(self, key, value):
         if key == properties.PROP_EXECUTABLE:
             if value is None:  # bit flip off
-                self.executable = NOEXEC_FLAG
+                self.state.executable = NOEXEC_FLAG
             else:
-                self.executable = EXEC_FLAG
+                self.state.executable = EXEC_FLAG
         elif key == properties.PROP_SPECIAL:
             # Possibly a symbolic link. We cannot check further at
             # that moment though, patch(s) not being applied yet
@@ -272,9 +274,9 @@ class FileEditor:
                 self.state.svn_special_path_non_link_data = None
 
         if not is_link:  # if a link, do nothing regarding flag
-            if self.executable == EXEC_FLAG:
+            if self.state.executable == EXEC_FLAG:
                 os.chmod(self.fullpath, 0o755)
-            elif self.executable == NOEXEC_FLAG:
+            elif self.state.executable == NOEXEC_FLAG:
                 os.chmod(self.fullpath, 0o644)
 
         # And now compute file's checksums

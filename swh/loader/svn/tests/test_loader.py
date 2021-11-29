@@ -1619,3 +1619,162 @@ def test_svn_loader_incremental_replay_start_with_empty_directory(
 
     # check work directory was empty before replaying revisions
     assert loader.svnrepo.replay_dir_content_before_start == []
+
+
+def test_loader_svn_executable_property_on_svn_link_handling(swh_storage, tmp_path):
+    # create a repository
+    repo_path = os.path.join(tmp_path, "tmprepo")
+    repos.create(repo_path)
+    repo_url = f"file://{repo_path}"
+
+    # first commit
+    add_commit(
+        repo_url,
+        (
+            "Add an executable file and a svn link to it."
+            "Set svn:executable property for both paths."
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="hello-world",
+                properties={"svn:executable": "*"},
+                data=b"#!/bin/bash\necho Hello World !",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="hello",
+                properties={"svn:executable": "*", "svn:special": "*"},
+                data=b"link hello-world",
+            ),
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        (
+            "Remove executable file, unset link and replace it with executable content."
+            "As the link was previously marked as executable, execution rights should"
+            "be set after turning it to a regular file."
+        ),
+        [
+            CommitChange(change_type=CommitChangeType.Delete, path="hello-world"),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="hello",
+                properties={"svn:special": None},
+                data=b"#!/bin/bash\necho Hello World !",
+            ),
+        ],
+    )
+
+    # instantiate a svn loader checking after each processed revision that
+    # the repository filesystem it reconstructed does not differ from a subversion
+    # export of that revision
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+
+
+def test_loader_svn_add_property_on_link(swh_storage, tmp_path):
+    # create a repository
+    repo_path = os.path.join(tmp_path, "tmprepo")
+    repos.create(repo_path)
+    repo_url = f"file://{repo_path}"
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Add an executable file and a svn link to it.",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="hello-world",
+                properties={"svn:executable": "*"},
+                data=b"#!/bin/bash\necho Hello World !",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="hello",
+                properties={"svn:special": "*"},
+                data=b"link hello-world",
+            ),
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Set svn:eol-style property on link",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="hello",
+                properties={"svn:eol-style": "native"},
+            ),
+        ],
+    )
+
+    # instantiate a svn loader checking after each processed revision that
+    # the repository filesystem it reconstructed does not differ from a subversion
+    # export of that revision
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+
+
+def test_loader_svn_link_parsing(swh_storage, tmp_path):
+    # create a repository
+    repo_path = os.path.join(tmp_path, "tmprepo")
+    repos.create(repo_path)
+    repo_url = f"file://{repo_path}"
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Add an executable file and a svn link to it.",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="hello-world",
+                properties={"svn:executable": "*"},
+                data=b"#!/bin/bash\necho Hello World !",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="hello",
+                properties={"svn:special": "*"},
+                data=b"link hello-world",
+            ),
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Update svn link content",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="hello",
+                data=b"link hello-world\r\n",
+            ),
+        ],
+    )
+
+    # instantiate a svn loader checking after each processed revision that
+    # the repository filesystem it reconstructed does not differ from a subversion
+    # export of that revision
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )

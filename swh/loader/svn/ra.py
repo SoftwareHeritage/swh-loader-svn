@@ -136,8 +136,12 @@ class FileState:
     svn_special_path_non_link_data: Optional[bytes] = None
     """keep track of non link file content with svn:special property set"""
 
+    # default value: 0, 1: set the flag, 2: remove the exec flag
     executable: int = DEFAULT_FLAG
     """keep track if file is executable when setting svn:executable property"""
+
+    link: bool = False
+    """keep track if file is a svn link when setting svn:special property"""
 
 
 class FileEditor:
@@ -157,8 +161,6 @@ class FileEditor:
     def __init__(self, directory, rootpath, path, state: FileState):
         self.directory = directory
         self.path = path
-        # default value: 0, 1: set the flag, 2: remove the exec flag
-        self.link = None
         self.fullpath = os.path.join(rootpath, path)
         self.state = state
 
@@ -171,7 +173,7 @@ class FileEditor:
         elif key == properties.PROP_SPECIAL:
             # Possibly a symbolic link. We cannot check further at
             # that moment though, patch(s) not being applied yet
-            self.link = value is not None
+            self.state.link = value is not None
         elif key == SVN_PROPERTY_EOL:
             # backup end of line style for file
             self.state.eol_style = value
@@ -217,7 +219,7 @@ class FileEditor:
                 # real svn symlink for potential patching in later
                 # commits
                 sbuf = self.__make_svnlink()
-                self.link = True
+                self.state.link = True
             else:
                 with open(self.fullpath, "rb") as f:
                     sbuf = f.read()
@@ -238,16 +240,14 @@ class FileEditor:
           computation purposes)
 
         """
-        is_link = None
 
-        if self.link:
+        if self.state.link:
             # can only check now that the link is a real one
             # since patch has been applied
             is_link, src = is_file_an_svnlink_p(self.fullpath)
             if is_link:
                 self.__make_symlink(src)
             else:  # not a real link ...
-                self.link = False
                 # when a file with the svn:special property set is not a svn link,
                 # the svn export operation will extract a truncated version of that file
                 # if it contains a null byte (see create_special_file_from_stream
@@ -273,6 +273,7 @@ class FileEditor:
                 f.write(self.state.svn_special_path_non_link_data)
                 self.state.svn_special_path_non_link_data = None
 
+        is_link = os.path.islink(self.fullpath)
         if not is_link:  # if a link, do nothing regarding flag
             if self.state.executable == EXEC_FLAG:
                 os.chmod(self.fullpath, 0o755)

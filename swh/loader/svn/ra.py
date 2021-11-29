@@ -84,7 +84,8 @@ def read_svn_link(data):
 
     """
     split_byte = b" "
-    filetype, *src = data.split(split_byte)
+    first_line = data.split(b"\n")[0]
+    filetype, *src = first_line.split(split_byte)
     src = split_byte.join(src)
     return filetype, src
 

@@ -392,6 +392,11 @@ Local repository not cleaned up for investigation: %s""",
 
             yield _contents, _skipped_contents, _directories, swh_revision
 
+        if not self.debug and self.svnrepo:
+            # clean directory where revisions were replayed to gain some disk space
+            # before the post_load operation
+            self.svnrepo.clean_fs(self.svnrepo.local_url)
+
     def prepare_origin_visit(self):
         self.origin = Origin(url=self.origin_url if self.origin_url else self.svn_url)
 

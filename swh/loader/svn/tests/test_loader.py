@@ -1778,3 +1778,35 @@ def test_loader_svn_link_parsing(swh_storage, tmp_path):
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+
+
+def test_loader_svn_empty_local_dir_before_post_load(swh_storage, datadir, tmp_path):
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    class SvnLoaderPostLoadLocalDirIsEmpty(SvnLoader):
+        def post_load(self, success=True):
+            if success:
+                self.local_dirname_content = [
+                    os.path.join(root, name)
+                    for root, _, files in os.walk(self.svnrepo.local_dirname)
+                    for name in files
+                ]
+            return super().post_load(success)
+
+    loader = SvnLoaderPostLoadLocalDirIsEmpty(
+        swh_storage, repo_url, temp_directory=tmp_path
+    )
+
+    assert loader.load() == {"status": "eventful"}
+
+    assert loader.local_dirname_content == []
+
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
+    )

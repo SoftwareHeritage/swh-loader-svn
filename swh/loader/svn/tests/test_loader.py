@@ -1362,13 +1362,10 @@ def test_loader_first_revision_is_not_number_one(swh_storage, mocker, tmp_path):
     }
 
 
-def test_loader_svn_special_property_on_binary_file_with_null_byte(
-    swh_storage, tmp_path
-):
+def test_loader_svn_special_property_on_binary_file(swh_storage, tmp_path):
     """When a file has the svn:special property set but is not a svn link,
-    it will be truncated when performing an export operation if it contains
-    a null byte. Indeed, subversion will treat the file content as text but
-    it might be a binary file containing null bytes."""
+    it might be truncated under certain conditions when performing an export
+    operation."""
 
     # create a repository
     repo_path = os.path.join(tmp_path, "tmprepo")
@@ -1382,7 +1379,10 @@ def test_loader_svn_special_property_on_binary_file_with_null_byte(
     # first commit
     add_commit(
         repo_url,
-        "Add a non svn link binary file and set the svn:special property on it",
+        (
+            "Add a non svn link binary file and set the svn:special property on it."
+            "That file will be truncated when exporting it."
+        ),
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
@@ -1396,11 +1396,37 @@ def test_loader_svn_special_property_on_binary_file_with_null_byte(
     # second commit
     add_commit(
         repo_url,
-        "Remove the svn:special property on the previously added file",
+        (
+            "Add a non svn link binary file and set the svn:special and "
+            "svn:mime-type properties on it."
+            "That file will not be truncated when exporting it."
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="another_binary_file",
+                properties={
+                    "svn:special": "*",
+                    "svn:mime-type": "application/octet-stream",
+                },
+                data=data,
+            ),
+        ],
+    )
+
+    # third commit
+    add_commit(
+        repo_url,
+        "Remove the svn:special property on the previously added files",
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
                 path="binary_file",
+                properties={"svn:special": None},
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="another_binary_file",
                 properties={"svn:special": None},
             ),
         ],

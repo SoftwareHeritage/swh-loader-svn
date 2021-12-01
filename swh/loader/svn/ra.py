@@ -7,12 +7,14 @@
 
 """
 
+from __future__ import annotations
+
 import codecs
 import dataclasses
 import os
 import shutil
 import tempfile
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 import click
 from subvertpy import delta, properties
@@ -20,6 +22,9 @@ from subvertpy.ra import Auth, RemoteAccess, get_username_provider
 
 from swh.model import from_disk, hashutil
 from swh.model.model import Content, Directory, SkippedContent
+
+if TYPE_CHECKING:
+    from swh.loader.svn.svn import SvnRepo
 
 _eol_style = {"native": b"\n", "CRLF": b"\r\n", "LF": b"\n", "CR": b"\r"}
 
@@ -157,13 +162,15 @@ class FileEditor:
         "executable",
         "link",
         "state",
+        "svnrepo",
     ]
 
-    def __init__(self, directory, rootpath, path, state: FileState):
+    def __init__(self, directory, rootpath, path, state: FileState, svnrepo: SvnRepo):
         self.directory = directory
         self.path = path
         self.fullpath = os.path.join(rootpath, path)
         self.state = state
+        self.svnrepo = svnrepo
 
     def change_prop(self, key, value):
         if key == properties.PROP_EXECUTABLE:
@@ -250,19 +257,24 @@ class FileEditor:
                 self.__make_symlink(src)
             else:  # not a real link ...
                 # when a file with the svn:special property set is not a svn link,
-                # the svn export operation will extract a truncated version of that file
-                # if it contains a null byte (see create_special_file_from_stream
-                # implementation in libsvn_subr/subst.c), so ensure to produce the
-                # same file as the export operation.
+                # the svn export operation might extract a truncated version of it
+                # if it is a binary file, so ensure to produce the same file as the
+                # export operation.
                 with open(self.fullpath, "rb") as f:
                     content = f.read()
-                with open(self.fullpath, "wb") as f:
-                    exported_data = content.split(b"\x00")[0]
+                self.svnrepo.client.export(
+                    os.path.join(self.svnrepo.remote_url.encode(), self.path),
+                    to=self.fullpath,
+                    rev=self.svnrepo.swhreplay.editor.revnum,
+                    ignore_keywords=True,
+                    overwrite=True,
+                )
+                with open(self.fullpath, "rb") as f:
+                    exported_data = f.read()
                     if exported_data != content:
                         # keep track of original file content in order to restore
                         # it if the svn:special property gets unset in another revision
                         self.state.svn_special_path_non_link_data = content
-                    f.write(exported_data)
         elif os.path.islink(self.fullpath):
             # path was a symbolic link in previous revision but got the property
             # svn:special unset in current one, revert its content to svn link format
@@ -317,14 +329,17 @@ class BaseDirEditor:
 
     """
 
-    __slots__ = ["directory", "rootpath"]
+    __slots__ = ["directory", "rootpath", "svnrepo"]
 
-    def __init__(self, directory, rootpath, file_states: Dict[str, FileState]):
+    def __init__(
+        self, directory, rootpath, file_states: Dict[str, FileState], svnrepo: SvnRepo
+    ):
         self.directory = directory
         self.rootpath = rootpath
         # build directory on init
         os.makedirs(rootpath, exist_ok=True)
         self.file_states = file_states
+        self.svnrepo = svnrepo
 
     def remove_child(self, path):
         """Remove a path from the current objects.
@@ -379,6 +394,7 @@ class BaseDirEditor:
             rootpath=self.rootpath,
             path=path,
             state=self.file_states[fullpath],
+            svnrepo=self.svnrepo,
         )
 
     def add_file(self, path, copyfrom_path=None, copyfrom_rev=-1):
@@ -390,7 +406,11 @@ class BaseDirEditor:
         fullpath = os.path.join(self.rootpath, path)
         self.file_states[fullpath] = FileState()
         return FileEditor(
-            self.directory, self.rootpath, path, state=self.file_states[fullpath]
+            self.directory,
+            self.rootpath,
+            path,
+            state=self.file_states[fullpath],
+            svnrepo=self.svnrepo,
         )
 
     def change_prop(self, key, value):
@@ -457,13 +477,15 @@ class Editor:
 
     """
 
-    def __init__(self, rootpath, directory):
+    def __init__(self, rootpath, directory, svnrepo: SvnRepo):
         self.rootpath = rootpath
         self.directory = directory
         self.file_states: Dict[str, FileState] = {}
+        self.svnrepo = svnrepo
+        self.revnum = None
 
     def set_target_revision(self, revnum):
-        pass
+        self.revnum = revnum
 
     def abort(self):
         pass
@@ -473,7 +495,10 @@ class Editor:
 
     def open_root(self, base_revnum):
         return DirEditor(
-            self.directory, rootpath=self.rootpath, file_states=self.file_states
+            self.directory,
+            rootpath=self.rootpath,
+            file_states=self.file_states,
+            svnrepo=self.svnrepo,
         )
 
 
@@ -481,13 +506,13 @@ class Replay:
     """Replay class.
     """
 
-    def __init__(self, conn, rootpath, directory=None):
+    def __init__(self, conn, rootpath, svnrepo: SvnRepo, directory=None):
         self.conn = conn
         self.rootpath = rootpath
         if directory is None:
             directory = from_disk.Directory()
         self.directory = directory
-        self.editor = Editor(rootpath=rootpath, directory=directory)
+        self.editor = Editor(rootpath=rootpath, directory=directory, svnrepo=svnrepo)
 
     def replay(self, rev):
         """Replay svn actions between rev and rev+1.

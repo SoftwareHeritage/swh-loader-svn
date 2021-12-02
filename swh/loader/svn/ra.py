@@ -14,7 +14,18 @@ import dataclasses
 import os
 import shutil
 import tempfile
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    BinaryIO,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 import click
 from subvertpy import delta, properties
@@ -29,18 +40,18 @@ if TYPE_CHECKING:
 _eol_style = {"native": b"\n", "CRLF": b"\r\n", "LF": b"\n", "CR": b"\r"}
 
 
-def _normalize_line_endings(lines, eol_style="native"):
+def _normalize_line_endings(lines: bytes, eol_style: str = "native") -> bytes:
     r"""Normalize line endings to unix (\\n), windows (\\r\\n) or mac (\\r).
 
     Args:
-        lines (bytes): The lines to normalize
+        lines: The lines to normalize
 
-        line_ending (str): The line ending format as defined for
+        eol_style: The line ending format as defined for
             svn:eol-style property. Acceptable values are 'native',
             'CRLF', 'LF' and 'CR'
 
     Returns:
-        bytes: lines with endings normalized
+        Lines with endings normalized
     """
     if eol_style in _eol_style:
         lines = lines.replace(_eol_style["CRLF"], _eol_style["LF"]).replace(
@@ -52,7 +63,9 @@ def _normalize_line_endings(lines, eol_style="native"):
     return lines
 
 
-def apply_txdelta_handler(sbuf, target_stream):
+def apply_txdelta_handler(
+    sbuf: bytes, target_stream: BinaryIO
+) -> Callable[[Any, bytes, BinaryIO], None]:
     """Return a function that can be called repeatedly with txdelta windows.
     When done, closes the target_stream.
 
@@ -68,7 +81,9 @@ def apply_txdelta_handler(sbuf, target_stream):
 
     """
 
-    def apply_window(window, sbuf=sbuf, target_stream=target_stream):
+    def apply_window(
+        window: Any, sbuf: bytes = sbuf, target_stream: BinaryIO = target_stream
+    ):
         if window is None:
             target_stream.close()
             return  # Last call
@@ -78,11 +93,11 @@ def apply_txdelta_handler(sbuf, target_stream):
     return apply_window
 
 
-def read_svn_link(data):
+def read_svn_link(data: bytes) -> Tuple[bytes, bytes]:
     """Read the svn link's content.
 
     Args:
-        data (bytes): svn link's raw content
+        data: svn link's raw content
 
     Returns:
         The tuple of (filetype, destination path)
@@ -91,19 +106,19 @@ def read_svn_link(data):
     split_byte = b" "
     first_line = data.split(b"\n")[0]
     filetype, *src = first_line.split(split_byte)
-    src = split_byte.join(src)
-    return filetype, src
+    target = split_byte.join(src)
+    return filetype, target
 
 
-def is_file_an_svnlink_p(fullpath):
+def is_file_an_svnlink_p(fullpath: bytes) -> Tuple[bool, bytes]:
     """Determine if a filepath is an svnlink or something else.
 
     Args:
-        fullpath (str/bytes): Full path to the potential symlink to check
+        fullpath: Full path to the potential symlink to check
 
     Returns:
-        boolean value to determine if it's indeed a symlink (as per
-        svn) or not.
+        Tuple containing a boolean value to determine if it's indeed a symlink
+        (as per svn) and the link target.
 
     """
     with open(fullpath, "rb") as f:
@@ -111,17 +126,16 @@ def is_file_an_svnlink_p(fullpath):
         return filetype == b"link", src
 
 
-def _ra_codecs_error_handler(e):
+def _ra_codecs_error_handler(e: UnicodeError) -> Tuple[Union[str, bytes], int]:
     """Subvertpy may fail to decode to utf-8 the user svn properties.  As
        they are not used by the loader, return an empty string instead
        of the decoded content.
 
     Args:
-        e (UnicodeDecodeError): exception raised during the svn
-                                properties decoding.
+        e: exception raised during the svn properties decoding.
 
     """
-    return "", e.end
+    return "", cast(UnicodeDecodeError, e).end
 
 
 DEFAULT_FLAG = 0
@@ -165,14 +179,21 @@ class FileEditor:
         "svnrepo",
     ]
 
-    def __init__(self, directory, rootpath, path, state: FileState, svnrepo: SvnRepo):
+    def __init__(
+        self,
+        directory: from_disk.Directory,
+        rootpath: bytes,
+        path: bytes,
+        state: FileState,
+        svnrepo: SvnRepo,
+    ):
         self.directory = directory
         self.path = path
         self.fullpath = os.path.join(rootpath, path)
         self.state = state
         self.svnrepo = svnrepo
 
-    def change_prop(self, key, value):
+    def change_prop(self, key: str, value: str) -> None:
         if key == properties.PROP_EXECUTABLE:
             if value is None:  # bit flip off
                 self.state.executable = NOEXEC_FLAG
@@ -186,13 +207,13 @@ class FileEditor:
             # backup end of line style for file
             self.state.eol_style = value
 
-    def __make_symlink(self, src):
+    def __make_symlink(self, src: bytes) -> None:
         """Convert the svnlink to a symlink on disk.
 
         This function expects self.fullpath to be a svn link.
 
         Args:
-            src (bytes): Path to the link's source
+            src: Path to the link's source
 
         Return:
             tuple: The svnlink's data tuple:
@@ -204,7 +225,7 @@ class FileEditor:
         os.remove(self.fullpath)
         os.symlink(src=src, dst=self.fullpath)
 
-    def __make_svnlink(self):
+    def __make_svnlink(self) -> bytes:
         """Convert the symlink to a svnlink on disk.
 
         Return:
@@ -220,7 +241,7 @@ class FileEditor:
             f.write(sbuf)
         return sbuf
 
-    def apply_textdelta(self, base_checksum):
+    def apply_textdelta(self, base_checksum) -> Callable[[Any, bytes, BinaryIO], None]:
         if os.path.lexists(self.fullpath):
             if os.path.islink(self.fullpath):
                 # svn does not deal with symlink so we transform into
@@ -237,7 +258,7 @@ class FileEditor:
         t = open(self.fullpath, "wb")
         return apply_txdelta_handler(sbuf, target_stream=t)
 
-    def close(self):
+    def close(self) -> None:
         """When done with the file, this is called.
 
         So the file exists and is updated, we can:
@@ -332,7 +353,11 @@ class BaseDirEditor:
     __slots__ = ["directory", "rootpath", "svnrepo"]
 
     def __init__(
-        self, directory, rootpath, file_states: Dict[str, FileState], svnrepo: SvnRepo
+        self,
+        directory: from_disk.Directory,
+        rootpath: bytes,
+        file_states: Dict[bytes, FileState],
+        svnrepo: SvnRepo,
     ):
         self.directory = directory
         self.rootpath = rootpath
@@ -341,7 +366,7 @@ class BaseDirEditor:
         self.file_states = file_states
         self.svnrepo = svnrepo
 
-    def remove_child(self, path):
+    def remove_child(self, path: bytes) -> None:
         """Remove a path from the current objects.
 
         The path can be resolved as link, file or directory.
@@ -379,10 +404,10 @@ class BaseDirEditor:
     def open_directory(self, *args):
         raise NotImplementedError("This should be implemented.")
 
-    def add_directory(self, *args):
+    def add_directory(self, path: str, *args):
         raise NotImplementedError("This should be implemented.")
 
-    def open_file(self, *args):
+    def open_file(self, *args) -> FileEditor:
         """Updating existing file.
 
         """
@@ -397,30 +422,30 @@ class BaseDirEditor:
             svnrepo=self.svnrepo,
         )
 
-    def add_file(self, path, copyfrom_path=None, copyfrom_rev=-1):
+    def add_file(self, path: str, *args) -> FileEditor:
         """Creating a new file.
 
         """
-        path = os.fsencode(path)
-        self.directory[path] = from_disk.Content()
-        fullpath = os.path.join(self.rootpath, path)
+        path_bytes = os.fsencode(path)
+        self.directory[path_bytes] = from_disk.Content()
+        fullpath = os.path.join(self.rootpath, path_bytes)
         self.file_states[fullpath] = FileState()
         return FileEditor(
             self.directory,
             self.rootpath,
-            path,
+            path_bytes,
             state=self.file_states[fullpath],
             svnrepo=self.svnrepo,
         )
 
-    def change_prop(self, key, value):
+    def change_prop(self, key: str, value: str) -> None:
         """Change property callback on directory.
 
         """
         if key == properties.PROP_EXTERNALS:
             raise ValueError("Property '%s' detected. Not implemented yet." % key)
 
-    def delete_entry(self, path, revision):
+    def delete_entry(self, path: str, revision: int) -> None:
         """Remove a path.
 
         """
@@ -442,7 +467,7 @@ class DirEditor(BaseDirEditor):
 
     """
 
-    def update_checksum(self):
+    def update_checksum(self) -> None:
         """Update the root path self.path's checksums according to the
         children's objects.
 
@@ -452,19 +477,19 @@ class DirEditor(BaseDirEditor):
         """
         pass
 
-    def open_directory(self, *args):
+    def open_directory(self, *args) -> DirEditor:
         """Updating existing directory.
 
         """
         return self
 
-    def add_directory(self, path, copyfrom_path=None, copyfrom_rev=-1):
+    def add_directory(self, path: str, *args) -> DirEditor:
         """Adding a new directory.
 
         """
-        path = os.fsencode(path)
-        os.makedirs(os.path.join(self.rootpath, path), exist_ok=True)
-        self.directory[path] = from_disk.Directory()
+        path_bytes = os.fsencode(path)
+        os.makedirs(os.path.join(self.rootpath, path_bytes), exist_ok=True)
+        self.directory[path_bytes] = from_disk.Directory()
         return self
 
 
@@ -477,23 +502,25 @@ class Editor:
 
     """
 
-    def __init__(self, rootpath, directory, svnrepo: SvnRepo):
+    def __init__(
+        self, rootpath: bytes, directory: from_disk.Directory, svnrepo: SvnRepo
+    ):
         self.rootpath = rootpath
         self.directory = directory
-        self.file_states: Dict[str, FileState] = {}
+        self.file_states: Dict[bytes, FileState] = {}
         self.svnrepo = svnrepo
         self.revnum = None
 
-    def set_target_revision(self, revnum):
+    def set_target_revision(self, revnum) -> None:
         self.revnum = revnum
 
-    def abort(self):
+    def abort(self) -> None:
         pass
 
-    def close(self):
+    def close(self) -> None:
         pass
 
-    def open_root(self, base_revnum):
+    def open_root(self, base_revnum: int) -> DirEditor:
         return DirEditor(
             self.directory,
             rootpath=self.rootpath,
@@ -506,7 +533,13 @@ class Replay:
     """Replay class.
     """
 
-    def __init__(self, conn, rootpath, svnrepo: SvnRepo, directory=None):
+    def __init__(
+        self,
+        conn: RemoteAccess,
+        rootpath: bytes,
+        svnrepo: SvnRepo,
+        directory: Optional[from_disk.Directory] = None,
+    ):
         self.conn = conn
         self.rootpath = rootpath
         if directory is None:
@@ -514,7 +547,7 @@ class Replay:
         self.directory = directory
         self.editor = Editor(rootpath=rootpath, directory=directory, svnrepo=svnrepo)
 
-    def replay(self, rev):
+    def replay(self, rev: int) -> from_disk.Directory:
         """Replay svn actions between rev and rev+1.
 
         This method updates in place the self.editor.directory, as well as the

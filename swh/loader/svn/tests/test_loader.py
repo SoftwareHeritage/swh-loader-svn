@@ -1836,3 +1836,53 @@ def test_loader_svn_empty_local_dir_before_post_load(swh_storage, datadir, tmp_p
         type="svn",
         snapshot=GOURMET_SNAPSHOT.id,
     )
+
+
+def test_loader_svn_add_property_on_directory_link(swh_storage, tmp_path):
+    # create a repository
+    repo_path = os.path.join(tmp_path, "tmprepo")
+    repos.create(repo_path)
+    repo_url = f"file://{repo_path}"
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Add an executable file in a directory and a svn link to the directory.",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/hello-world",
+                properties={"svn:executable": "*"},
+                data=b"#!/bin/bash\necho Hello World !",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="hello",
+                properties={"svn:special": "*"},
+                data=b"link code",
+            ),
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Set svn:eol-style property on link",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="hello",
+                properties={"svn:eol-style": "native"},
+            ),
+        ],
+    )
+
+    # instantiate a svn loader checking after each processed revision that
+    # the repository filesystem it reconstructed does not differ from a subversion
+    # export of that revision
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )

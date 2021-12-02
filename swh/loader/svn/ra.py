@@ -121,6 +121,8 @@ def is_file_an_svnlink_p(fullpath: bytes) -> Tuple[bool, bytes]:
         (as per svn) and the link target.
 
     """
+    if os.path.islink(fullpath):
+        return False, b""
     with open(fullpath, "rb") as f:
         filetype, src = read_svn_link(f.read())
         return filetype == b"link", src
@@ -276,7 +278,7 @@ class FileEditor:
             is_link, src = is_file_an_svnlink_p(self.fullpath)
             if is_link:
                 self.__make_symlink(src)
-            else:  # not a real link ...
+            elif not os.path.isdir(self.fullpath):  # not a real link ...
                 # when a file with the svn:special property set is not a svn link,
                 # the svn export operation might extract a truncated version of it
                 # if it is a binary file, so ensure to produce the same file as the

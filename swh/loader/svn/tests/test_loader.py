@@ -580,7 +580,52 @@ def test_loader_svn_with_external_properties(swh_storage, datadir, tmp_path):
     # repository holds 21 revisions, but the last commit holds an 'svn:externals'
     # property which will make the loader-svn stops at the last revision prior to the
     # bad one
-    assert stats["revision"] == 21 - 1  # commit with the svn:external property
+    assert stats["revision"] == 20  # commit with the svn:external property
+
+
+def test_loader_svn_with_external_properties_mutiple_loads(
+    swh_storage, datadir, tmp_path
+):
+    """Repository with svn:external properties cannot be fully ingested yet
+    but it should not raise errors on second load.
+
+    """
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, "pkg-gourmet-with-external-id.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    # first load
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    assert loader.load() == {"status": "eventful"}
+    gourmet_externals_snapshot = Snapshot(
+        id=hash_to_bytes("19cb68d0a3f22372e2b7017ea5e2a2ea5ae3e09a"),
+        branches={
+            b"HEAD": SnapshotBranch(
+                target=hash_to_bytes("82a7a4a09f9549223429143ba36ad77375e33c5c"),
+                target_type=TargetType.REVISION,
+            )
+        },
+    )
+    check_snapshot(gourmet_externals_snapshot, loader.storage)
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="partial",
+        type="svn",
+        snapshot=gourmet_externals_snapshot.id,
+    )
+
+    # second load
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    assert loader.load() == {"status": "uneventful"}
+    check_snapshot(gourmet_externals_snapshot, loader.storage)
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="partial",
+        type="svn",
+        snapshot=gourmet_externals_snapshot.id,
+    )
 
 
 def test_loader_svn_with_symlink(swh_storage, datadir, tmp_path):

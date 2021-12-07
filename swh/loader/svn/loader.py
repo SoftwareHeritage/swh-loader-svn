@@ -404,6 +404,8 @@ Local repository not cleaned up for investigation: %s""",
         latest_snapshot_revision = self._latest_snapshot_revision(self.origin_url)
         if latest_snapshot_revision:
             self.latest_snapshot, self.latest_revision = latest_snapshot_revision
+            self._snapshot = self.latest_snapshot
+            self._last_revision = self.latest_revision
 
         local_dirname = self._create_tmp_dir(self.temp_directory)
 
@@ -429,8 +431,6 @@ Local repository not cleaned up for investigation: %s""",
             )
         except SvnLoaderUneventful as e:
             self.log.warning(e)
-            if self.latest_snapshot:
-                self._snapshot = self.latest_snapshot
             self.done = True
             self._load_status = "uneventful"
         except SvnLoaderHistoryAltered as e:

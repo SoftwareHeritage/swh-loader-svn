@@ -456,7 +456,7 @@ Local repository not cleaned up for investigation: %s""",
             False to stop.
 
         """
-        data = None
+
         if self.done:
             return False
 
@@ -464,19 +464,18 @@ Local repository not cleaned up for investigation: %s""",
             data = next(self.swh_revision_gen)
             self._load_status = "eventful"
         except StopIteration:
-            self.done = True
+            self.done = True  # Stopping iteration
             self._visit_status = "full"
-            return False  # Stopping iteration
         except Exception as e:  # svn:external, hash divergence, i/o error...
             self.log.exception(e)
-            self.done = True
+            self.done = True  # Stopping iteration
             self._visit_status = "partial"
-            return False  # Stopping iteration
-        self._contents, self._skipped_contents, self._directories, rev = data
-        if rev:
-            self._last_revision = rev
-            self._revisions.append(rev)
-        return True  # next svn revision
+        else:
+            self._contents, self._skipped_contents, self._directories, rev = data
+            if rev:
+                self._last_revision = rev
+                self._revisions.append(rev)
+        return not self.done
 
     def store_data(self):
         """We store the data accumulated in internal instance variable.  If

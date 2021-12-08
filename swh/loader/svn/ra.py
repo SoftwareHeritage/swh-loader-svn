@@ -332,27 +332,14 @@ class FileEditor:
             self.directory[self.path] = from_disk.Content.from_file(path=self.fullpath)
 
 
-class BaseDirEditor:
-    """Base class implementation of dir editor.
+class DirEditor:
+    """Directory Editor in charge of updating directory hashes computation.
 
-    see :class:`DirEditor` for an implementation that hashes every
-    directory encountered.
-
-    Instantiate a new class inheriting from this class and define the following
-    functions::
-
-        def update_checksum(self):
-            # Compute the checksums at current state
-
-        def open_directory(self, *args):
-            # Update an existing folder.
-
-        def add_directory(self, *args):
-            # Add a new one.
+    This implementation includes empty folder in the hash computation.
 
     """
 
-    __slots__ = ["directory", "rootpath", "svnrepo"]
+    __slots__ = ["directory", "rootpath", "file_states", "svnrepo"]
 
     def __init__(
         self,
@@ -400,14 +387,30 @@ class BaseDirEditor:
             if state_path.startswith(fullpath + b"/"):
                 del self.file_states[state_path]
 
-    def update_checksum(self):
-        raise NotImplementedError("This should be implemented.")
+    def update_checksum(self) -> None:
+        """Update the root path self.path's checksums according to the
+        children's objects.
 
-    def open_directory(self, *args):
-        raise NotImplementedError("This should be implemented.")
+        This function is expected to be called when the folder has
+        been completely 'walked'.
 
-    def add_directory(self, path: str, *args):
-        raise NotImplementedError("This should be implemented.")
+        """
+        pass
+
+    def open_directory(self, *args) -> DirEditor:
+        """Updating existing directory.
+
+        """
+        return self
+
+    def add_directory(self, path: str, *args) -> DirEditor:
+        """Adding a new directory.
+
+        """
+        path_bytes = os.fsencode(path)
+        os.makedirs(os.path.join(self.rootpath, path_bytes), exist_ok=True)
+        self.directory[path_bytes] = from_disk.Directory()
+        return self
 
     def open_file(self, *args) -> FileEditor:
         """Updating existing file.
@@ -460,39 +463,6 @@ class BaseDirEditor:
 
         """
         self.update_checksum()
-
-
-class DirEditor(BaseDirEditor):
-    """Directory Editor in charge of updating directory hashes computation.
-
-    This implementation includes empty folder in the hash computation.
-
-    """
-
-    def update_checksum(self) -> None:
-        """Update the root path self.path's checksums according to the
-        children's objects.
-
-        This function is expected to be called when the folder has
-        been completely 'walked'.
-
-        """
-        pass
-
-    def open_directory(self, *args) -> DirEditor:
-        """Updating existing directory.
-
-        """
-        return self
-
-    def add_directory(self, path: str, *args) -> DirEditor:
-        """Adding a new directory.
-
-        """
-        path_bytes = os.fsencode(path)
-        os.makedirs(os.path.join(self.rootpath, path_bytes), exist_ok=True)
-        self.directory[path_bytes] = from_disk.Directory()
-        return self
 
 
 class Editor:

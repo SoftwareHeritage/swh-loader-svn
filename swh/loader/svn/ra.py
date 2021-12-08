@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import codecs
 import dataclasses
+import logging
 import os
 import shutil
 import tempfile
@@ -38,6 +39,8 @@ if TYPE_CHECKING:
     from swh.loader.svn.svn import SvnRepo
 
 _eol_style = {"native": b"\n", "CRLF": b"\r\n", "LF": b"\n", "CR": b"\r"}
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_line_endings(lines: bytes, eol_style: str = "native") -> bytes:
@@ -462,6 +465,12 @@ class DirEditor:
 
         """
         if key == properties.PROP_EXTERNALS:
+            logger.debug(
+                "Setting '%s' property with value '%s' on path %s",
+                key,
+                value,
+                self.path,
+            )
             raise ValueError("Property '%s' detected. Not implemented yet." % key)
 
     def delete_entry(self, path: str, revision: int) -> None:

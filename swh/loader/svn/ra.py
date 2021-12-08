@@ -339,17 +339,19 @@ class DirEditor:
 
     """
 
-    __slots__ = ["directory", "rootpath", "file_states", "svnrepo"]
+    __slots__ = ["directory", "rootpath", "path", "file_states", "svnrepo"]
 
     def __init__(
         self,
         directory: from_disk.Directory,
         rootpath: bytes,
+        path: bytes,
         file_states: Dict[bytes, FileState],
         svnrepo: SvnRepo,
     ):
         self.directory = directory
         self.rootpath = rootpath
+        self.path = path
         # build directory on init
         os.makedirs(rootpath, exist_ok=True)
         self.file_states = file_states
@@ -397,11 +399,17 @@ class DirEditor:
         """
         pass
 
-    def open_directory(self, *args) -> DirEditor:
+    def open_directory(self, path: str, *args) -> DirEditor:
         """Updating existing directory.
 
         """
-        return self
+        return DirEditor(
+            self.directory,
+            rootpath=self.rootpath,
+            path=os.fsencode(path),
+            file_states=self.file_states,
+            svnrepo=self.svnrepo,
+        )
 
     def add_directory(self, path: str, *args) -> DirEditor:
         """Adding a new directory.
@@ -410,7 +418,13 @@ class DirEditor:
         path_bytes = os.fsencode(path)
         os.makedirs(os.path.join(self.rootpath, path_bytes), exist_ok=True)
         self.directory[path_bytes] = from_disk.Directory()
-        return self
+        return DirEditor(
+            self.directory,
+            rootpath=self.rootpath,
+            path=path_bytes,
+            file_states=self.file_states,
+            svnrepo=self.svnrepo,
+        )
 
     def open_file(self, *args) -> FileEditor:
         """Updating existing file.
@@ -496,6 +510,7 @@ class Editor:
         return DirEditor(
             self.directory,
             rootpath=self.rootpath,
+            path=b"",
             file_states=self.file_states,
             svnrepo=self.svnrepo,
         )

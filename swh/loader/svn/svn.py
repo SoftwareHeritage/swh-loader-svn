@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2021  The Software Heritage developers
+# Copyright (C) 2015-2022  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -28,6 +28,7 @@ from swh.model.model import (
 )
 
 from . import converters, ra
+from .utils import parse_external_definition
 
 # When log message contains empty data
 DEFAULT_AUTHOR_MESSAGE = ""
@@ -73,6 +74,8 @@ class SvnRepo:
             conn=self.conn, rootpath=self.local_url, svnrepo=self
         )
         self.max_content_length = max_content_length
+        self.has_relative_externals = False
+        self.replay_started = False
 
     def __str__(self):
         return str(
@@ -204,10 +207,49 @@ class SvnRepo:
         local_dirname = tempfile.mkdtemp(
             dir=self.local_dirname, prefix=f"check-revision-{revision}."
         )
+
         local_name = os.path.basename(self.remote_url)
         local_url = os.path.join(local_dirname, local_name)
+
+        url = self.remote_url
+        # if some paths have external URLs relative to the repository URL but targeting
+        # paths oustide it, we need to export from the origin URL as the remote URL can
+        # target a dump mounted on the local filesystem
+        if self.replay_started and self.has_relative_externals:
+            # externals detected while replaying revisions
+            url = self.origin_url
+        elif not self.replay_started and self.remote_url.startswith("file://"):
+            # revisions replay has not started, we need to check if svn:externals
+            # properties are set from a checkout of the revision and if some
+            # external URLs are relative to pick the right export URL
+            with tempfile.TemporaryDirectory(
+                dir=self.local_dirname, prefix=f"checkout-revision-{revision}."
+            ) as co_dirname:
+                self.client.checkout(
+                    self.remote_url, co_dirname, revision, ignore_externals=True
+                )
+                # get all svn:externals properties recursively
+                externals = self.client.propget(
+                    "svn:externals", co_dirname, None, revision, True
+                )
+                self.has_relative_externals = False
+                for path, external_defs in externals.items():
+                    if self.has_relative_externals:
+                        break
+                    for external_def in os.fsdecode(external_defs).split("\n"):
+                        # skip empty line or comment
+                        if not external_def or external_def.startswith("#"):
+                            continue
+                        _, _, _, relative_url = parse_external_definition(
+                            external_def.rstrip("\r"), path, self.origin_url
+                        )
+                        if relative_url:
+                            self.has_relative_externals = True
+                            url = self.origin_url
+                            break
+
         self.client.export(
-            self.remote_url, to=local_url, rev=revision, ignore_keywords=True
+            url.rstrip("/"), to=local_url, rev=revision, ignore_keywords=True,
         )
         return local_dirname, os.fsencode(local_url)
 
@@ -244,6 +286,7 @@ class SvnRepo:
         # even in incremental loading mode, we need to replay the whole set of
         # path modifications from first revision to restore possible file states induced
         # by setting svn properties on those files (end of line style for instance)
+        self.replay_started = True
         first_revision = 1 if start_revision else 0  # handle empty repository edge case
         for commit in self.logs(first_revision, end_revision):
             rev = commit["rev"]

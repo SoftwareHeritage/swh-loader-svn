@@ -1076,11 +1076,18 @@ def add_commit(repo_url: str, message: str, changes: List[CommitChange]) -> None
     editor.close()
 
 
-def test_loader_eol_style_file_property_handling_edge_case(swh_storage, tmp_path):
+@pytest.fixture
+def repo_url(tmp_path):
     # create a repository
     repo_path = os.path.join(tmp_path, "tmprepo")
     repos.create(repo_path)
     repo_url = f"file://{repo_path}"
+    return repo_url
+
+
+def test_loader_eol_style_file_property_handling_edge_case(
+    swh_storage, repo_url, tmp_path
+):
 
     # # first commit
     add_commit(
@@ -1158,11 +1165,7 @@ def get_head_revision_paths_info(loader: SvnLoader) -> Dict[bytes, Dict[str, Any
     return paths
 
 
-def test_loader_eol_style_on_svn_link_handling(swh_storage, tmp_path):
-    # create a repository
-    repo_path = os.path.join(tmp_path, "tmprepo")
-    repos.create(repo_path)
-    repo_url = f"file://{repo_path}"
+def test_loader_eol_style_on_svn_link_handling(swh_storage, repo_url, tmp_path):
 
     # first commit
     add_commit(
@@ -1226,11 +1229,7 @@ def test_loader_eol_style_on_svn_link_handling(swh_storage, tmp_path):
     )
 
 
-def test_loader_svn_special_property_unset(swh_storage, tmp_path):
-    # create a repository
-    repo_path = os.path.join(tmp_path, "tmprepo")
-    repos.create(repo_path)
-    repo_url = f"file://{repo_path}"
+def test_loader_svn_special_property_unset(swh_storage, repo_url, tmp_path):
 
     # first commit
     add_commit(
@@ -1315,11 +1314,7 @@ def test_loader_svn_special_property_unset(swh_storage, tmp_path):
     )
 
 
-def test_loader_invalid_svn_eol_style_property_value(swh_storage, tmp_path):
-    # create a repository
-    repo_path = os.path.join(tmp_path, "tmprepo")
-    repos.create(repo_path)
-    repo_url = f"file://{repo_path}"
+def test_loader_invalid_svn_eol_style_property_value(swh_storage, repo_url, tmp_path):
 
     filename = "file_with_crlf_eol.txt"
     file_content = b"Hello world!\r\n"
@@ -1359,7 +1354,9 @@ def test_loader_invalid_svn_eol_style_property_value(swh_storage, tmp_path):
     )
 
 
-def test_loader_first_revision_is_not_number_one(swh_storage, mocker, tmp_path):
+def test_loader_first_revision_is_not_number_one(
+    swh_storage, mocker, repo_url, tmp_path
+):
     class SvnRepoSkipFirstRevision(SvnRepo):
         def logs(self, revision_start, revision_end):
             """Overrides logs method to skip revision number one in yielded revisions"""
@@ -1368,10 +1365,6 @@ def test_loader_first_revision_is_not_number_one(swh_storage, mocker, tmp_path):
     from swh.loader.svn import loader
 
     mocker.patch.object(loader, "SvnRepo", SvnRepoSkipFirstRevision)
-    # create a repository
-    repo_path = os.path.join(tmp_path, "tmprepo")
-    repos.create(repo_path)
-    repo_url = f"file://{repo_path}"
 
     for filename in ("foo", "bar", "baz"):
         add_commit(
@@ -1407,15 +1400,10 @@ def test_loader_first_revision_is_not_number_one(swh_storage, mocker, tmp_path):
     }
 
 
-def test_loader_svn_special_property_on_binary_file(swh_storage, tmp_path):
+def test_loader_svn_special_property_on_binary_file(swh_storage, repo_url, tmp_path):
     """When a file has the svn:special property set but is not a svn link,
     it might be truncated under certain conditions when performing an export
     operation."""
-
-    # create a repository
-    repo_path = os.path.join(tmp_path, "tmprepo")
-    repos.create(repo_path)
-    repo_url = f"file://{repo_path}"
 
     data = (
         b"!<symlink>\xff\xfea\x00p\x00t\x00-\x00c\x00y\x00g\x00.\x00s\x00h\x00\x00\x00"
@@ -1510,11 +1498,9 @@ def test_loader_last_revision_divergence(swh_storage, datadir, tmp_path):
     )
 
 
-def test_loader_delete_directory_while_file_has_same_prefix(swh_storage, tmp_path):
-    # create a repository
-    repo_path = os.path.join(tmp_path, "tmprepo")
-    repos.create(repo_path)
-    repo_url = f"file://{repo_path}"
+def test_loader_delete_directory_while_file_has_same_prefix(
+    swh_storage, repo_url, tmp_path
+):
 
     # first commit
     add_commit(
@@ -1559,11 +1545,7 @@ def test_loader_delete_directory_while_file_has_same_prefix(swh_storage, tmp_pat
     )
 
 
-def test_svn_loader_incremental(swh_storage, tmp_path):
-    # create a repository
-    repo_path = os.path.join(tmp_path, "tmprepo")
-    repos.create(repo_path)
-    repo_url = f"file://{repo_path}"
+def test_svn_loader_incremental(swh_storage, repo_url, tmp_path):
 
     # first commit
     add_commit(
@@ -1632,12 +1614,8 @@ def test_svn_loader_incremental(swh_storage, tmp_path):
 
 
 def test_svn_loader_incremental_replay_start_with_empty_directory(
-    swh_storage, mocker, tmp_path
+    swh_storage, mocker, repo_url, tmp_path
 ):
-    # create a repository
-    repo_path = os.path.join(tmp_path, "tmprepo")
-    repos.create(repo_path)
-    repo_url = f"file://{repo_path}"
 
     # first commit
     add_commit(
@@ -1692,11 +1670,9 @@ def test_svn_loader_incremental_replay_start_with_empty_directory(
     assert loader.svnrepo.replay_dir_content_before_start == []
 
 
-def test_loader_svn_executable_property_on_svn_link_handling(swh_storage, tmp_path):
-    # create a repository
-    repo_path = os.path.join(tmp_path, "tmprepo")
-    repos.create(repo_path)
-    repo_url = f"file://{repo_path}"
+def test_loader_svn_executable_property_on_svn_link_handling(
+    swh_storage, repo_url, tmp_path
+):
 
     # first commit
     add_commit(
@@ -1751,11 +1727,7 @@ def test_loader_svn_executable_property_on_svn_link_handling(swh_storage, tmp_pa
     )
 
 
-def test_loader_svn_add_property_on_link(swh_storage, tmp_path):
-    # create a repository
-    repo_path = os.path.join(tmp_path, "tmprepo")
-    repos.create(repo_path)
-    repo_url = f"file://{repo_path}"
+def test_loader_svn_add_property_on_link(swh_storage, repo_url, tmp_path):
 
     # first commit
     add_commit(
@@ -1801,11 +1773,7 @@ def test_loader_svn_add_property_on_link(swh_storage, tmp_path):
     )
 
 
-def test_loader_svn_link_parsing(swh_storage, tmp_path):
-    # create a repository
-    repo_path = os.path.join(tmp_path, "tmprepo")
-    repos.create(repo_path)
-    repo_url = f"file://{repo_path}"
+def test_loader_svn_link_parsing(swh_storage, repo_url, tmp_path):
 
     # first commit
     add_commit(
@@ -1883,11 +1851,7 @@ def test_loader_svn_empty_local_dir_before_post_load(swh_storage, datadir, tmp_p
     )
 
 
-def test_loader_svn_add_property_on_directory_link(swh_storage, tmp_path):
-    # create a repository
-    repo_path = os.path.join(tmp_path, "tmprepo")
-    repos.create(repo_path)
-    repo_url = f"file://{repo_path}"
+def test_loader_svn_add_property_on_directory_link(swh_storage, repo_url, tmp_path):
 
     # first commit
     add_commit(

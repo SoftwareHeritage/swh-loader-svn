@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2021  The Software Heritage developers
+# Copyright (C) 2016-2022  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -8,6 +8,8 @@ import os
 import pty
 import shutil
 from subprocess import Popen
+
+import pytest
 
 from swh.loader.svn import utils
 
@@ -122,3 +124,260 @@ def test_init_svn_repo_from_archive_dump_and_cleanup(datadir, tmp_path):
     assert not os.path.exists(dump_path), "Dump path should no longer exists"
     assert os.path.exists(repo_path), "Repository should exists"
     assert os.path.exists(dump_ori_path), "Original dump path should still exists"
+
+
+@pytest.mark.parametrize(
+    "base_url, paths_to_join, expected_result",
+    [
+        (
+            "https://svn.example.org",
+            ["repos", "test"],
+            "https://svn.example.org/repos/test",
+        ),
+        (
+            "https://svn.example.org/",
+            ["repos", "test"],
+            "https://svn.example.org/repos/test",
+        ),
+        (
+            "https://svn.example.org/foo",
+            ["repos", "test"],
+            "https://svn.example.org/foo/repos/test",
+        ),
+        (
+            "https://svn.example.org/foo/",
+            ["/repos", "test/"],
+            "https://svn.example.org/foo/repos/test",
+        ),
+        ("https://svn.example.org/foo", ["../bar"], "https://svn.example.org/bar",),
+    ],
+)
+def test_svn_urljoin(base_url, paths_to_join, expected_result):
+    assert utils.svn_urljoin(base_url, *paths_to_join) == expected_result
+
+
+@pytest.mark.parametrize(
+    "external, dir_path, repo_url, expected_result",
+    [
+        # subversion < 1.5
+        (
+            "third-party/sounds             http://svn.example.com/repos/sounds",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            ("third-party/sounds", "http://svn.example.com/repos/sounds", None, False),
+        ),
+        (
+            "third-party/skins -r148        http://svn.example.com/skinproj",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            ("third-party/skins", "http://svn.example.com/skinproj", 148, False),
+        ),
+        (
+            "third-party/skins/toolkit -r21 http://svn.example.com/skin-maker",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                "third-party/skins/toolkit",
+                "http://svn.example.com/skin-maker",
+                21,
+                False,
+            ),
+        ),
+        # subversion >= 1.5
+        (
+            "      http://svn.example.com/repos/sounds third-party/sounds",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            ("third-party/sounds", "http://svn.example.com/repos/sounds", None, False),
+        ),
+        (
+            "-r148 http://svn.example.com/skinproj third-party/skins",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            ("third-party/skins", "http://svn.example.com/skinproj", 148, False),
+        ),
+        (
+            "-r 21 http://svn.example.com/skin-maker third-party/skins/toolkit",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                "third-party/skins/toolkit",
+                "http://svn.example.com/skin-maker",
+                21,
+                False,
+            ),
+        ),
+        (
+            "http://svn.example.com/repos/sounds third-party/sounds",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            ("third-party/sounds", "http://svn.example.com/repos/sounds", None, False),
+        ),
+        (
+            "http://svn.example.com/skinproj@148 third-party/skins",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            ("third-party/skins", "http://svn.example.com/skinproj", 148, False),
+        ),
+        (
+            "http://anon:anon@svn.example.com/skin-maker@21 third-party/skins/toolkit",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                "third-party/skins/toolkit",
+                "http://anon:anon@svn.example.com/skin-maker",
+                21,
+                False,
+            ),
+        ),
+        (
+            "-r21 http://anon:anon@svn.example.com/skin-maker third-party/skins/toolkit",  # noqa
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                "third-party/skins/toolkit",
+                "http://anon:anon@svn.example.com/skin-maker",
+                21,
+                False,
+            ),
+        ),
+        (
+            "-r21 http://anon:anon@svn.example.com/skin-maker@21 third-party/skins/toolkit",  # noqa
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                "third-party/skins/toolkit",
+                "http://anon:anon@svn.example.com/skin-maker",
+                21,
+                False,
+            ),
+        ),
+        # subversion >= 1.5, relative external definitions
+        (
+            "^/sounds third-party/sounds",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                "third-party/sounds",
+                "http://svn.example.org/repos/test/sounds",
+                None,
+                False,
+            ),
+        ),
+        (
+            "/skinproj@148 third-party/skins",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            ("third-party/skins", "http://svn.example.org/skinproj", 148, True),
+        ),
+        (
+            "//svn.example.com/skin-maker@21 third-party/skins/toolkit",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                "third-party/skins/toolkit",
+                "http://svn.example.com/skin-maker",
+                21,
+                True,
+            ),
+        ),
+        (
+            "../skins skins",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            ("skins", "http://svn.example.org/repos/test/trunk/skins", None, False),
+        ),
+        (
+            "../skins skins",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            ("skins", "http://svn.example.org/repos/test/trunk/skins", None, False),
+        ),
+        # subversion >= 1.6
+        (
+            'http://svn.thirdparty.com/repos/My%20Project "My Project"',
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            ("My Project", "http://svn.thirdparty.com/repos/My%20Project", None, False),
+        ),
+        (
+            'http://svn.thirdparty.com/repos/My%20%20%20Project "My   Project"',
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                "My   Project",
+                "http://svn.thirdparty.com/repos/My%20%20%20Project",
+                None,
+                False,
+            ),
+        ),
+        (
+            'http://svn.thirdparty.com/repos/%22Quotes%20Too%22 \\"Quotes\\ Too\\"',
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                '"Quotes Too"',
+                "http://svn.thirdparty.com/repos/%22Quotes%20Too%22",
+                None,
+                False,
+            ),
+        ),
+        (
+            'http://svn.thirdparty.com/repos/%22Quotes%20%20%20Too%22 \\"Quotes\\ \\ \\ Too\\"',  # noqa
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                '"Quotes   Too"',
+                "http://svn.thirdparty.com/repos/%22Quotes%20%20%20Too%22",
+                None,
+                False,
+            ),
+        ),
+        # edge cases
+        (
+            '-r1 http://svn.thirdparty.com/repos/test "trunk/PluginFramework"',
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            ("trunk/PluginFramework", "http://svn.thirdparty.com/repos/test", 1, False),
+        ),
+        (
+            "external -r 9 http://svn.thirdparty.com/repos/test",
+            "tags",
+            "http://svn.example.org/repos/test",
+            ("external", "http://svn.thirdparty.com/repos/test", 9, False),
+        ),
+        (
+            "./external http://svn.thirdparty.com/repos/test",
+            "tags",
+            "http://svn.example.org/repos/test",
+            ("external", "http://svn.thirdparty.com/repos/test", None, False),
+        ),
+        (
+            "external ttp://svn.thirdparty.com/repos/test",
+            "tags",
+            "http://svn.example.org/repos/test",
+            ("external", "ttp://svn.thirdparty.com/repos/test", None, False),
+        ),
+        (
+            "C:\\code\\repo\\external http://svn.thirdparty.com/repos/test",
+            "tags",
+            "http://svn.example.org/repos/test",
+            ("C:coderepoexternal", "http://svn.thirdparty.com/repos/test", None, False),
+        ),
+        (
+            "C:\\\\code\\\\repo\\\\external http://svn.thirdparty.com/repos/test",
+            "tags",
+            "http://svn.example.org/repos/test",
+            (
+                "C:\\code\\repo\\external",
+                "http://svn.thirdparty.com/repos/test",
+                None,
+                False,
+            ),
+        ),
+    ],
+)
+def test_parse_external_definition(external, dir_path, repo_url, expected_result):
+    assert (
+        utils.parse_external_definition(external, dir_path, repo_url) == expected_result
+    )

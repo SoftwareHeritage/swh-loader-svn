@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2021  The Software Heritage developers
+# Copyright (C) 2016-2022  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -6,10 +6,12 @@
 import errno
 import logging
 import os
+import re
 import shutil
 from subprocess import PIPE, Popen, call
 import tempfile
 from typing import Optional, Tuple
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -166,3 +168,127 @@ def init_svn_repo_from_archive_dump(
         gzip=True,
         cleanup_dump=cleanup_dump,
     )
+
+
+def svn_urljoin(base_url: str, *args) -> str:
+    """Join a base URL and a list of paths in a SVN way.
+
+    For instance:
+
+        - svn_urljoin("http://example.org", "foo", "bar")
+            will return "https://example.org/foo/bar
+
+        - svn_urljoin("http://example.org/foo", "../bar")
+            will return "https://example.org/bar
+
+    Args:
+        base_url: Base URL to join paths with
+        args: path components
+
+    Returns:
+        The joined URL
+
+    """
+    parsed_url = urlparse(base_url)
+    path = os.path.abspath(
+        os.path.join(parsed_url.path or "/", *[arg.strip("/") for arg in args])
+    )
+    return f"{parsed_url.scheme}://{parsed_url.netloc}{path}"
+
+
+def parse_external_definition(
+    external: str, dir_path: str, repo_url: str
+) -> Tuple[str, str, Optional[int], bool]:
+    """Parse a subversion external definition.
+
+    Args:
+        external: an external definition, extracted from the lines split of a
+            svn:externals property value
+        dir_path: The path of the directory in the subversion repository where
+            the svn:externals property was set
+        repo_url: URL of the subversion repository
+
+    Returns:
+        A tuple with the following members:
+
+            - path relative to dir_path where the external should be exported
+            - URL of the external to export
+            - optional revision of the external to export
+            - boolean indicating if the external URL is relative to the repository
+              URL and targets a path not in the repository
+
+    """
+    path = ""
+    external_url = ""
+    revision = None
+    relative_url = False
+    prev_part = None
+    # turn multiple spaces into a single one and split on space
+    for external_part in external.split():
+        if prev_part == "-r":
+            # parse revision in the form "-r XXX"
+            revision = int(external_part)
+        elif external_part.startswith("-r") and external_part != "-r":
+            # parse revision in the form "-rXXX"
+            revision = int(external_part[2:])
+        elif external_part.startswith("^/"):
+            # URL relative to the root of the repository in which the svn:externals
+            # property is versioned
+            external_url = svn_urljoin(repo_url, external_part[2:])
+        elif external_part.startswith("//"):
+            # URL relative to the scheme of the URL of the directory on which the
+            # svn:externals property is set
+            scheme = urlparse(repo_url).scheme
+            external_url = f"{scheme}:{external_part}"
+            relative_url = not external_url.startswith(repo_url)
+        elif external_part.startswith("/"):
+            # URL relative to the root URL of the server on which the svn:externals
+            # property is versioned
+            parsed_url = urlparse(repo_url)
+            root_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+            external_url = svn_urljoin(root_url, external_part)
+            relative_url = not external_url.startswith(repo_url)
+        elif external_part.startswith("../"):
+            # URL relative to the URL of the directory on which the svn:externals
+            # property is set
+            external_url = svn_urljoin(repo_url, dir_path, external_part)
+            relative_url = not external_url.startswith(repo_url)
+        elif re.match(r"^.*://.*", external_part):
+            # absolute external URL
+            external_url = external_part
+        # subversion >= 1.6 added a quoting and escape mechanism to the syntax so
+        # that the path of the external working copy may contain whitespace.
+        elif external_part.startswith('\\"'):
+            external_split = external.split('\\"')
+            path = [
+                e.replace("\\ ", " ")
+                for e in external_split
+                if e.startswith(external_part[2:])
+            ][0]
+            path = f'"{path}"'
+        elif external_part.endswith('\\"'):
+            continue
+        elif external_part.startswith('"'):
+            external_split = external.split('"')
+            path_prefix = external_part.strip('"')
+            path = next(iter([e for e in external_split if e.startswith(path_prefix)]))
+        elif external_part.endswith('"'):
+            continue
+        elif not external_part.startswith("\\") and external_part != "-r":
+            # path of the external relative to dir_path
+            path = external_part.replace("\\\\", "\\")
+            if path == external_part:
+                path = external_part.replace("\\", "")
+            path = path.lstrip("./")
+        prev_part = external_part
+    if "@" in external_url:
+        # try to extract revision number if external URL is in the form
+        # http://svn.example.org/repos/test/path@XXX
+        url, revision_s = external_url.rsplit("@", maxsplit=1)
+        try:
+            revision = int(revision_s)
+            external_url = url
+        except ValueError:
+            # handle URL like http://user@svn.example.org/
+            pass
+    return (path, external_url, revision, relative_url)

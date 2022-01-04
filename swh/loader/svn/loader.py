@@ -719,8 +719,10 @@ class SvnLoaderFromRemoteDump(SvnLoader):
 
         # Get the stderr line with latest dumped revision
         last_dumped_rev = None
-        if len(stderr_lines) > 1:
-            last_dumped_rev = stderr_lines[-2]
+        for stderr_line in reversed(stderr_lines):
+            if stderr_line.startswith("* Dumped revision"):
+                last_dumped_rev = stderr_line
+                break
 
         if last_dumped_rev:
             # Get the latest dumped revision number

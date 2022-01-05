@@ -232,13 +232,10 @@ Local repository not cleaned up for investigation: %s""",
         parents = swh_rev.parents
 
         assert self.svnrepo is not None
-        hash_data_per_revs = self.svnrepo.swh_hash_data_at_revision(revision_start)
-
-        rev = revision_start
-        commit, root_dir = list(hash_data_per_revs)[0]
+        commit, root_dir = self.svnrepo.swh_hash_data_at_revision(revision_start)
 
         dir_id = root_dir.hash
-        swh_revision = self.build_swh_revision(rev, commit, dir_id, parents)
+        swh_revision = self.build_swh_revision(revision_start, commit, dir_id, parents)
         swh_revision_id = swh_revision.id
         return swh_revision_id == revision_id
 

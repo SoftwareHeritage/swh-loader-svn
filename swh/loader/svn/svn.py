@@ -261,7 +261,7 @@ class SvnRepo:
 
     def swh_hash_data_at_revision(
         self, revision: int
-    ) -> Iterator[Tuple[Dict, DirectoryFromDisk]]:
+    ) -> Tuple[Dict, DirectoryFromDisk]:
         """Compute the information at a given svn revision. This is expected to be used
         for checks only.
 
@@ -282,7 +282,7 @@ class SvnRepo:
         # Clean export directory
         self.clean_fs(local_dirname)
 
-        yield commit, directory
+        return commit, directory
 
     def clean_fs(self, local_dirname: Optional[str] = None) -> None:
         """Clean up the local working copy.

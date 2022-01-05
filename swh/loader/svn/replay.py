@@ -307,7 +307,7 @@ class FileEditor:
                 # export operation.
                 with open(self.fullpath, "rb") as f:
                     content = f.read()
-                self.svnrepo.client.export(
+                self.svnrepo.export(
                     os.path.join(self.svnrepo.remote_url.encode(), self.path),
                     to=self.fullpath,
                     peg_rev=self.editor.revnum,
@@ -682,12 +682,7 @@ class DirEditor:
                         and not self.svnrepo.has_relative_externals
                     ):
                         url = url.replace(origin_url, self.svnrepo.remote_url)
-                    logger.debug(
-                        "svn export --ignore-keywords %s%s",
-                        url,
-                        f"@{revision}" if revision else "",
-                    )
-                    self.svnrepo.client.export(
+                    self.svnrepo.export(
                         url, to=temp_path, peg_rev=revision, ignore_keywords=True,
                     )
                     self.editor.externals_cache[external] = temp_path

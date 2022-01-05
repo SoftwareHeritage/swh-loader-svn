@@ -5,11 +5,19 @@
 
 import pytest
 
-from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
+from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump, SvnRepo
 from swh.loader.svn.utils import svn_urljoin
 from swh.loader.tests import assert_last_visit_matches, check_snapshot
 
 from .utils import CommitChange, CommitChangeType, add_commit, create_repo
+
+
+@pytest.fixture(autouse=True)
+def svn_retry_sleep_mocker(mocker):
+    mocker.patch.object(SvnRepo.export.retry, "sleep")
+    mocker.patch.object(SvnRepo.checkout.retry, "sleep")
+    mocker.patch.object(SvnRepo.propget.retry, "sleep")
+    mocker.patch.object(SvnRepo.remote_access.retry, "sleep")
 
 
 @pytest.fixture
@@ -110,7 +118,7 @@ def test_loader_with_valid_svn_externals(
     check_snapshot(loader.snapshot, loader.storage)
 
 
-def test_loader_with_invalid_svn_externals(swh_storage, repo_url, tmp_path):
+def test_loader_with_invalid_svn_externals(swh_storage, repo_url, tmp_path, mocker):
 
     # first commit
     add_commit(

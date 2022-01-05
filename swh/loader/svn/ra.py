@@ -392,16 +392,6 @@ class DirEditor:
             if state_path.startswith(fullpath + b"/"):
                 del self.file_states[state_path]
 
-    def update_checksum(self) -> None:
-        """Update the root path self.path's checksums according to the
-        children's objects.
-
-        This function is expected to be called when the folder has
-        been completely 'walked'.
-
-        """
-        pass
-
     def open_directory(self, path: str, *args) -> DirEditor:
         """Updating existing directory.
 
@@ -485,7 +475,7 @@ class DirEditor:
         """Function called when we finish walking a repository.
 
         """
-        self.update_checksum()
+        pass
 
 
 class Editor:

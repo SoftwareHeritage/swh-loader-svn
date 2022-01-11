@@ -149,6 +149,7 @@ def test_loader_svnrdump_no_such_revision(swh_storage, tmp_path, datadir):
     actual_visit = assert_last_visit_matches(
         swh_storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     loader2 = SvnLoaderFromRemoteDump(
         swh_storage, repo_url, temp_directory=loading_path
@@ -181,6 +182,7 @@ def test_loader_svn_new_visit(swh_storage, datadir, tmp_path):
         type="svn",
         snapshot=GOURMET_SNAPSHOT.id,
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     stats = get_stats(loader.storage)
     assert stats == {
@@ -215,6 +217,7 @@ def test_loader_svn_2_visits_no_change(swh_storage, datadir, tmp_path):
         type="svn",
         snapshot=GOURMET_SNAPSHOT.id,
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     assert loader.load() == {"status": "uneventful"}
     visit_status2 = assert_last_visit_matches(
@@ -287,6 +290,7 @@ def test_loader_tampered_repository(swh_storage, datadir, tmp_path):
         type="svn",
         snapshot=GOURMET_SNAPSHOT.id,
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     archive_path2 = os.path.join(datadir, "pkg-gourmet-tampered-rev6-log.tgz")
     repo_tampered_url = prepare_repository_from_archive(
@@ -305,6 +309,7 @@ def test_loader_tampered_repository(swh_storage, datadir, tmp_path):
         type="svn",
         snapshot=hash_to_bytes("5aa61959e788e281fd6e187053d0f46c68e8d8bb"),
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     stats = get_stats(loader.storage)
     assert stats["origin"] == 1
@@ -335,6 +340,7 @@ def test_loader_svn_visit_with_changes(swh_storage, datadir, tmp_path):
         type="svn",
         snapshot=GOURMET_SNAPSHOT.id,
     )
+    check_snapshot(GOURMET_SNAPSHOT, loader.storage)
 
     archive_path = os.path.join(datadir, "pkg-gourmet-with-updates.tgz")
     repo_updated_url = prepare_repository_from_archive(
@@ -422,6 +428,7 @@ def test_loader_svn_visit_start_from_revision(swh_storage, datadir, tmp_path):
         type="svn",
         snapshot=GOURMET_SNAPSHOT.id,
     )
+    check_snapshot(GOURMET_SNAPSHOT, loader.storage)
 
     start_revision = loader.storage.revision_get(
         [hash_to_bytes("95edacc8848369d6fb1608e887d6d2474fd5224f")]
@@ -899,6 +906,7 @@ def test_loader_svn_dir_added_then_removed(swh_storage, datadir, tmp_path):
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
@@ -1068,6 +1076,7 @@ def test_loader_eol_style_file_property_handling_edge_case(
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     assert get_stats(loader.storage) == {
         "content": 2,
@@ -1128,6 +1137,7 @@ def test_loader_eol_style_on_svn_link_handling(swh_storage, repo_url, tmp_path):
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     # check loaded objects are those expected
     assert get_stats(loader.storage) == {
@@ -1214,6 +1224,7 @@ def test_loader_svn_special_property_unset(swh_storage, repo_url, tmp_path):
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     # check loaded objects are those expected
     assert get_stats(loader.storage) == {
@@ -1273,6 +1284,7 @@ def test_loader_invalid_svn_eol_style_property_value(swh_storage, repo_url, tmp_
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     paths = get_head_revision_paths_info(loader)
     # end of lines should not have been processed
@@ -1315,6 +1327,7 @@ def test_loader_first_revision_is_not_number_one(
     assert_last_visit_matches(
         loader.storage, repo_url, status="partial", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     assert get_stats(loader.storage) == {
         "content": 2,
@@ -1402,6 +1415,7 @@ def test_loader_svn_special_property_on_binary_file(swh_storage, repo_url, tmp_p
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_loader_last_revision_divergence(swh_storage, datadir, tmp_path):
@@ -1424,6 +1438,7 @@ def test_loader_last_revision_divergence(swh_storage, datadir, tmp_path):
         type="svn",
         snapshot=GOURMET_SNAPSHOT.id,
     )
+    check_snapshot(GOURMET_SNAPSHOT, loader.storage)
 
 
 def test_loader_delete_directory_while_file_has_same_prefix(
@@ -1471,6 +1486,7 @@ def test_loader_delete_directory_while_file_has_same_prefix(
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_svn_loader_incremental(swh_storage, repo_url, tmp_path):
@@ -1499,6 +1515,7 @@ def test_svn_loader_incremental(swh_storage, repo_url, tmp_path):
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     # second commit
     add_commit(
@@ -1519,6 +1536,7 @@ def test_svn_loader_incremental(swh_storage, repo_url, tmp_path):
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     # third commit
     add_commit(
@@ -1539,6 +1557,7 @@ def test_svn_loader_incremental(swh_storage, repo_url, tmp_path):
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_svn_loader_incremental_replay_start_with_empty_directory(
@@ -1562,6 +1581,7 @@ def test_svn_loader_incremental_replay_start_with_empty_directory(
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     # second commit
     add_commit(
@@ -1653,6 +1673,7 @@ def test_loader_svn_executable_property_on_svn_link_handling(
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_loader_svn_add_property_on_link(swh_storage, repo_url, tmp_path):
@@ -1699,6 +1720,7 @@ def test_loader_svn_add_property_on_link(swh_storage, repo_url, tmp_path):
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_loader_svn_link_parsing(swh_storage, repo_url, tmp_path):
@@ -1745,6 +1767,7 @@ def test_loader_svn_link_parsing(swh_storage, repo_url, tmp_path):
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_loader_svn_empty_local_dir_before_post_load(swh_storage, datadir, tmp_path):
@@ -1777,6 +1800,7 @@ def test_loader_svn_empty_local_dir_before_post_load(swh_storage, datadir, tmp_p
         type="svn",
         snapshot=GOURMET_SNAPSHOT.id,
     )
+    check_snapshot(GOURMET_SNAPSHOT, loader.storage)
 
 
 def test_loader_svn_add_property_on_directory_link(swh_storage, repo_url, tmp_path):
@@ -1823,6 +1847,7 @@ def test_loader_svn_add_property_on_directory_link(swh_storage, repo_url, tmp_pa
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 @pytest.fixture
@@ -1892,6 +1917,7 @@ def test_loader_with_valid_svn_externals(
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     # third commit
     add_commit(
@@ -1912,6 +1938,7 @@ def test_loader_with_valid_svn_externals(
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_loader_with_invalid_svn_externals(swh_storage, repo_url, tmp_path):
@@ -1953,6 +1980,7 @@ def test_loader_with_invalid_svn_externals(swh_storage, repo_url, tmp_path):
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_loader_with_valid_externals_modification(
@@ -2027,6 +2055,7 @@ def test_loader_with_valid_externals_modification(
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_loader_with_valid_externals_and_versioned_path(
@@ -2093,6 +2122,7 @@ def test_loader_with_valid_externals_and_versioned_path(
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_loader_with_invalid_externals_and_versioned_path(
@@ -2134,6 +2164,7 @@ def test_loader_with_invalid_externals_and_versioned_path(
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_loader_set_externals_then_remove_and_add_as_local(
@@ -2190,6 +2221,7 @@ def test_loader_set_externals_then_remove_and_add_as_local(
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_loader_set_invalid_externals_then_remove(swh_storage, repo_url, tmp_path):
@@ -2227,6 +2259,7 @@ def test_loader_set_invalid_externals_then_remove(swh_storage, repo_url, tmp_pat
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_loader_set_externals_with_versioned_file_overlap(
@@ -2293,6 +2326,7 @@ def test_loader_set_externals_with_versioned_file_overlap(
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
 
 def test_dump_loader_relative_externals_detection(
@@ -2343,6 +2377,7 @@ def test_dump_loader_relative_externals_detection(
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
     assert loader.svnrepo.has_relative_externals
 
     add_commit(
@@ -2364,6 +2399,7 @@ def test_dump_loader_relative_externals_detection(
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
     assert not loader.svnrepo.has_relative_externals
 
 
@@ -2421,5 +2457,6 @@ def test_loader_externals_cache(swh_storage, repo_url, external_repo_url, tmp_pa
     assert_last_visit_matches(
         loader.storage, repo_url, status="full", type="svn",
     )
+    check_snapshot(loader.snapshot, loader.storage)
 
     assert (external_url, None) in loader.svnrepo.swhreplay.editor.externals_cache

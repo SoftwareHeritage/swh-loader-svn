@@ -36,6 +36,7 @@ from subvertpy import SubversionException, delta, properties
 from subvertpy.ra import Auth, RemoteAccess, get_username_provider
 
 from swh.model import from_disk, hashutil
+from swh.model.from_disk import DiskBackedContent
 from swh.model.model import Content, Directory, SkippedContent
 
 if TYPE_CHECKING:
@@ -204,6 +205,8 @@ class FileEditor:
         self.state = state
         self.svnrepo = svnrepo
         self.editor = svnrepo.swhreplay.editor
+
+        self.editor.modified_paths.add(path)
 
     def change_prop(self, key: str, value: str) -> None:
         if key == properties.PROP_EXECUTABLE:
@@ -392,6 +395,10 @@ class DirEditor:
         self.editor = svnrepo.swhreplay.editor
         self.externals: Dict[str, Tuple[str, Optional[int], bool]] = {}
 
+        # repository root dir has empty path
+        if path:
+            self.editor.modified_paths.add(path)
+
     def remove_child(self, path: bytes) -> None:
         """Remove a path from the current objects.
 
@@ -423,6 +430,8 @@ class DirEditor:
         for state_path in list(self.file_states):
             if state_path.startswith(fullpath + b"/"):
                 del self.file_states[state_path]
+
+        self.editor.modified_paths.discard(path)
 
     def open_directory(self, path: str, *args) -> DirEditor:
         """Updating existing directory.
@@ -617,6 +626,9 @@ class DirEditor:
                 self.remove_child(dest_fullpath)
                 # copy exported path to reconstructed filesystem
                 fullpath = os.path.join(self.rootpath, dest_fullpath)
+
+                self.editor.external_paths.add(dest_fullpath)
+                self.editor.modified_paths.add(dest_fullpath)
                 # update from_disk model and store external paths
                 self.editor.external_paths.add(dest_fullpath)
                 if os.path.isfile(temp_path):
@@ -629,13 +641,16 @@ class DirEditor:
                     self.directory[dest_fullpath] = from_disk.Directory.from_disk(
                         path=fullpath
                     )
+                    external_paths = set()
                     for root, dirs, files in os.walk(fullpath):
-                        self.editor.external_paths.update(
+                        external_paths.update(
                             [
                                 os.path.join(root.replace(self.rootpath + b"/", b""), p)
                                 for p in chain(dirs, files)
                             ]
                         )
+                    self.editor.external_paths.update(external_paths)
+                    self.editor.modified_paths.update(external_paths)
 
                 # ensure hash update for the directory with externals set
                 self.directory[self.path].update_hash(force=True)
@@ -713,6 +728,8 @@ class Editor:
         self.externals_cache: Dict[Tuple[str, Optional[int]], str] = {}
         self.svnrepo = svnrepo
         self.revnum = None
+        # to store the set of paths added or modified when replaying a revision
+        self.modified_paths: Set[bytes] = set()
 
     def set_target_revision(self, revnum) -> None:
         self.revnum = revnum
@@ -724,6 +741,8 @@ class Editor:
         pass
 
     def open_root(self, base_revnum: int) -> DirEditor:
+        # a new revision is being replayed so clear the modified_paths set
+        self.modified_paths.clear()
         return DirEditor(
             self.directory,
             rootpath=self.rootpath,
@@ -773,7 +792,7 @@ class Replay:
     def compute_objects(
         self, rev: int
     ) -> Tuple[List[Content], List[SkippedContent], List[Directory]]:
-        """Compute objects at revisions rev.
+        """Compute objects added or modified at revisions rev.
         Expects the state to be at previous revision's objects.
 
         Args:
@@ -785,7 +804,23 @@ class Replay:
 
         """
         self.replay(rev)
-        return from_disk.iter_directory(self.directory)
+
+        contents: List[Content] = []
+        skipped_contents: List[SkippedContent] = []
+        directories: List[Directory] = []
+
+        directories.append(self.editor.directory.to_model())
+        for path in self.editor.modified_paths:
+            obj = self.directory[path].to_model()
+            obj_type = obj.object_type
+            if obj_type in (Content.object_type, DiskBackedContent.object_type):
+                contents.append(obj.with_data())
+            elif obj_type == SkippedContent.object_type:
+                skipped_contents.append(obj)
+            elif obj_type == Directory.object_type:
+                directories.append(obj)
+
+        return contents, skipped_contents, directories
 
 
 @click.command()

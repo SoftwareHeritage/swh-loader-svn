@@ -566,30 +566,40 @@ class DirEditor:
                 # external already exported, nothing to do
                 continue
 
-            try:
-                # try to export external in a temporary path, destination path could
-                # be versioned and must be overridden only if the external URL is
-                # still valid
-                temp_dir = os.fsencode(tempfile.mkdtemp())
-                temp_path = os.path.join(temp_dir, dest_path)
-                os.makedirs(b"/".join(temp_path.split(b"/")[:-1]), exist_ok=True)
-                if external_url not in self.editor.dead_externals:
-                    logger.debug("Exporting external %s to path %s", external_url, path)
-                    self.svnrepo.client.export(
-                        external_url.rstrip("/"),
-                        to=temp_path,
-                        rev=revision,
-                        ignore_keywords=True,
-                    )
-                    self.editor.valid_externals[dest_fullpath] = (
-                        external_url,
-                        relative_url,
-                    )
+            if external not in self.editor.externals_cache:
 
-            except SubversionException as se:
-                # external no longer available (404)
-                logger.debug(se)
-                self.editor.dead_externals.add(external_url)
+                try:
+                    # try to export external in a temporary path, destination path could
+                    # be versioned and must be overridden only if the external URL is
+                    # still valid
+                    temp_dir = os.fsencode(
+                        tempfile.mkdtemp(dir=self.editor.externals_cache_dir)
+                    )
+                    temp_path = os.path.join(temp_dir, dest_path)
+                    os.makedirs(b"/".join(temp_path.split(b"/")[:-1]), exist_ok=True)
+                    if external_url not in self.editor.dead_externals:
+                        logger.debug(
+                            "Exporting external %s to path %s", external_url, path
+                        )
+                        self.svnrepo.client.export(
+                            external_url.rstrip("/"),
+                            to=temp_path,
+                            rev=revision,
+                            ignore_keywords=True,
+                        )
+                        self.editor.externals_cache[external] = temp_path
+                        self.editor.valid_externals[dest_fullpath] = (
+                            external_url,
+                            relative_url,
+                        )
+
+                except SubversionException as se:
+                    # external no longer available (404)
+                    logger.debug(se)
+                    self.editor.dead_externals.add(external_url)
+
+            else:
+                temp_path = self.editor.externals_cache[external]
 
             # subversion export will always create the subdirectories of the external
             # path regardless the validity of the remote URL
@@ -605,16 +615,17 @@ class DirEditor:
 
                 # remove previous path in from_disk model
                 self.remove_child(dest_fullpath)
-                # move exported path to reconstructed filesystem
+                # copy exported path to reconstructed filesystem
                 fullpath = os.path.join(self.rootpath, dest_fullpath)
-                shutil.move(temp_path, fullpath)
                 # update from_disk model and store external paths
                 self.editor.external_paths.add(dest_fullpath)
-                if os.path.isfile(fullpath):
+                if os.path.isfile(temp_path):
+                    shutil.copy(temp_path, fullpath)
                     self.directory[dest_fullpath] = from_disk.Content.from_file(
                         path=fullpath
                     )
                 else:
+                    shutil.copytree(temp_path, fullpath, symlinks=True)
                     self.directory[dest_fullpath] = from_disk.Directory.from_disk(
                         path=fullpath
                     )
@@ -685,7 +696,11 @@ class Editor:
     """
 
     def __init__(
-        self, rootpath: bytes, directory: from_disk.Directory, svnrepo: SvnRepo
+        self,
+        rootpath: bytes,
+        directory: from_disk.Directory,
+        svnrepo: SvnRepo,
+        temp_dir: str,
     ):
         self.rootpath = rootpath
         self.directory = directory
@@ -694,6 +709,8 @@ class Editor:
         self.external_paths: Set[bytes] = set()
         self.valid_externals: Dict[bytes, Tuple[str, bool]] = {}
         self.dead_externals: Set[str] = set()
+        self.externals_cache_dir = tempfile.mkdtemp(dir=temp_dir)
+        self.externals_cache: Dict[Tuple[str, Optional[int]], str] = {}
         self.svnrepo = svnrepo
         self.revnum = None
 
@@ -726,6 +743,7 @@ class Replay:
         conn: RemoteAccess,
         rootpath: bytes,
         svnrepo: SvnRepo,
+        temp_dir: str,
         directory: Optional[from_disk.Directory] = None,
     ):
         self.conn = conn
@@ -733,7 +751,9 @@ class Replay:
         if directory is None:
             directory = from_disk.Directory()
         self.directory = directory
-        self.editor = Editor(rootpath=rootpath, directory=directory, svnrepo=svnrepo)
+        self.editor = Editor(
+            rootpath=rootpath, directory=directory, svnrepo=svnrepo, temp_dir=temp_dir
+        )
 
     def replay(self, rev: int) -> from_disk.Directory:
         """Replay svn actions between rev and rev+1.

@@ -2365,3 +2365,61 @@ def test_dump_loader_relative_externals_detection(
         loader.storage, repo_url, status="full", type="svn",
     )
     assert not loader.svnrepo.has_relative_externals
+
+
+def test_loader_externals_cache(swh_storage, repo_url, external_repo_url, tmp_path):
+
+    # first commit on external
+    add_commit(
+        external_repo_url,
+        "Create some directories and files in an external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/hello/hello-world",
+                properties={"svn:executable": "*"},
+                data=b"#!/bin/bash\necho Hello World !",
+            ),
+        ],
+    )
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Create repository structure.",
+        [
+            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="project1/",),
+            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="project2/",),
+        ],
+    )
+
+    external_url = svn_urljoin(external_repo_url, "code/hello")
+
+    # second commit
+    add_commit(
+        repo_url,
+        (
+            "Set svn:externals property on trunk/externals path of repository to load."
+            "One external targets a remote directory and another one a remote file."
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="project1/externals/",
+                properties={"svn:externals": (f"{external_url} hello\n")},
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="project2/externals/",
+                properties={"svn:externals": (f"{external_url} hello\n")},
+            ),
+        ],
+    )
+
+    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+
+    assert (external_url, None) in loader.svnrepo.swhreplay.editor.externals_cache

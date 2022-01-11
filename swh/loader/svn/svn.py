@@ -71,7 +71,10 @@ class SvnRepo:
 
         self.uuid = self.conn.get_uuid().encode("utf-8")
         self.swhreplay = ra.Replay(
-            conn=self.conn, rootpath=self.local_url, svnrepo=self
+            conn=self.conn,
+            rootpath=self.local_url,
+            svnrepo=self,
+            temp_dir=local_dirname,
         )
         self.max_content_length = max_content_length
         self.has_relative_externals = False

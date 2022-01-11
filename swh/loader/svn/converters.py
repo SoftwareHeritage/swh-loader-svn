@@ -6,17 +6,17 @@
 import datetime
 from typing import Dict, Optional, Sequence, Tuple
 
-import dateutil
+import iso8601
 
 from swh.model.model import Person, Revision, RevisionType, TimestampWithTimezone
 
 
-def svn_date_to_swh_date(strdate: Optional[str]) -> TimestampWithTimezone:
+def svn_date_to_swh_date(strdate: Optional[bytes]) -> TimestampWithTimezone:
     """Convert a string date to an swh one.
 
     Args:
         strdate: A string representing a date with format like
-        'YYYY-mm-DDTHH:MM:SS.800722Z'
+        ``b'YYYY-mm-DDTHH:MM:SS.800722Z'``
 
     Returns:
         An swh date format
@@ -25,8 +25,7 @@ def svn_date_to_swh_date(strdate: Optional[str]) -> TimestampWithTimezone:
     if not strdate:  # either None or empty string
         dt = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
     else:
-        # TODO: Migrate to iso8601 if possible
-        dt = dateutil.parser.parse(strdate)
+        dt = iso8601.parse_date(strdate.decode("ascii"))
         assert dt.tzinfo is not None, strdate
     return TimestampWithTimezone.from_datetime(dt)
 

@@ -97,7 +97,7 @@ def test_svn_date_to_swh_date():
 
     """
     assert converters.svn_date_to_swh_date(
-        "2011-05-31T06:04:39.500900Z"
+        b"2011-05-31T06:04:39.500900Z"
     ) == TimestampWithTimezone(
         timestamp=Timestamp(seconds=1306821879, microseconds=500900),
         offset=0,
@@ -105,7 +105,7 @@ def test_svn_date_to_swh_date():
     )
 
     assert converters.svn_date_to_swh_date(
-        "2011-05-31T06:04:39.800722Z"
+        b"2011-05-31T06:04:39.800722Z"
     ) == TimestampWithTimezone(
         timestamp=Timestamp(seconds=1306821879, microseconds=800722),
         offset=0,

@@ -110,7 +110,7 @@ class SvnRepo:
             return msg
         return msg.encode("utf-8")
 
-    def convert_commit_date(self, date: str) -> TimestampWithTimezone:
+    def convert_commit_date(self, date: bytes) -> TimestampWithTimezone:
         """Convert the message commit date into a timestamp in swh format.
         The precision is kept.
 

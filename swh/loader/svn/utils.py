@@ -9,36 +9,9 @@ import os
 import shutil
 from subprocess import PIPE, Popen, call
 import tempfile
-from typing import Tuple
-
-from dateutil import parser
-
-from swh.model.model import Optional, Timestamp
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
-
-
-def strdate_to_timestamp(strdate: Optional[str]) -> Timestamp:
-    """Convert a string date to an int timestamp.
-
-    Args:
-        strdate: A string representing a date with format like
-        'YYYY-mm-DDTHH:MM:SS.800722Z'
-
-    Returns:
-        A couple of integers: seconds, microseconds
-
-    """
-    if strdate:
-        # TODO: Migrate to iso8601 if possible
-        dt = parser.parse(strdate)
-        ts = {
-            "seconds": int(dt.timestamp()),
-            "microseconds": dt.microsecond,
-        }
-    else:  # epoch
-        ts = {"seconds": 0, "microseconds": 0}
-    return Timestamp.from_dict(ts)
 
 
 class OutputStream:

@@ -47,9 +47,7 @@ def test_build_swh_revision_default():
     """
     dir_id = hash_to_bytes("d6e08e19159f77983242877c373c75222d5ae9dd")
     date = TimestampWithTimezone(
-        timestamp=Timestamp(seconds=1088108379, microseconds=0),
-        offset=0,
-        negative_utc=False,
+        timestamp=Timestamp(seconds=1088108379, microseconds=0), offset_bytes=b"+0000"
     )
     actual_rev = converters.build_swh_revision(
         repo_uuid=b"uuid",
@@ -100,16 +98,14 @@ def test_svn_date_to_swh_date():
         b"2011-05-31T06:04:39.500900Z"
     ) == TimestampWithTimezone(
         timestamp=Timestamp(seconds=1306821879, microseconds=500900),
-        offset=0,
-        negative_utc=False,
+        offset_bytes=b"+0000",
     )
 
     assert converters.svn_date_to_swh_date(
         b"2011-05-31T06:04:39.800722Z"
     ) == TimestampWithTimezone(
         timestamp=Timestamp(seconds=1306821879, microseconds=800722),
-        offset=0,
-        negative_utc=False,
+        offset_bytes=b"+0000",
     )
 
 
@@ -117,7 +113,7 @@ def test_svn_date_to_swh_date_epoch():
     """Empty date should be EPOCH (timestamp and offset at 0)."""
     # It should return 0, epoch
     default_tstz = TimestampWithTimezone(
-        timestamp=Timestamp(seconds=0, microseconds=0), offset=0, negative_utc=False,
+        timestamp=Timestamp(seconds=0, microseconds=0), offset_bytes=b"+0000"
     )
 
     assert converters.svn_date_to_swh_date("") == default_tstz

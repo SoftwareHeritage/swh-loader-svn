@@ -27,7 +27,7 @@ from swh.model.model import (
     TimestampWithTimezone,
 )
 
-from . import converters, ra
+from . import converters, replay
 from .utils import parse_external_definition
 
 # When log message contains empty data
@@ -70,7 +70,7 @@ class SvnRepo:
         self.local_url = os.path.join(self.local_dirname, local_name).encode("utf-8")
 
         self.uuid = self.conn.get_uuid().encode("utf-8")
-        self.swhreplay = ra.Replay(
+        self.swhreplay = replay.Replay(
             conn=self.conn,
             rootpath=self.local_url,
             svnrepo=self,

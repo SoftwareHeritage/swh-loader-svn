@@ -3,6 +3,5 @@
 # dependency lines, see https://pip.readthedocs.org/en/1.1/requirements.html
 click
 iso8601
-python-dateutil
 subvertpy >= 0.9.4
 typing-extensions

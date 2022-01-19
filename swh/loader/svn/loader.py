@@ -232,13 +232,10 @@ Local repository not cleaned up for investigation: %s""",
         parents = swh_rev.parents
 
         assert self.svnrepo is not None
-        hash_data_per_revs = self.svnrepo.swh_hash_data_at_revision(revision_start)
-
-        rev = revision_start
-        commit, root_dir = list(hash_data_per_revs)[0]
+        commit, root_dir = self.svnrepo.swh_hash_data_at_revision(revision_start)
 
         dir_id = root_dir.hash
-        swh_revision = self.build_swh_revision(rev, commit, dir_id, parents)
+        swh_revision = self.build_swh_revision(revision_start, commit, dir_id, parents)
         swh_revision_id = swh_revision.id
         return swh_revision_id == revision_id
 
@@ -392,6 +389,11 @@ Local repository not cleaned up for investigation: %s""",
 
             yield _contents, _skipped_contents, _directories, swh_revision
 
+        if not self.debug and self.svnrepo:
+            # clean directory where revisions were replayed to gain some disk space
+            # before the post_load operation
+            self.svnrepo.clean_fs(self.svnrepo.local_url)
+
     def prepare_origin_visit(self):
         self.origin = Origin(url=self.origin_url if self.origin_url else self.svn_url)
 
@@ -399,6 +401,8 @@ Local repository not cleaned up for investigation: %s""",
         latest_snapshot_revision = self._latest_snapshot_revision(self.origin_url)
         if latest_snapshot_revision:
             self.latest_snapshot, self.latest_revision = latest_snapshot_revision
+            self._snapshot = self.latest_snapshot
+            self._last_revision = self.latest_revision
 
         local_dirname = self._create_tmp_dir(self.temp_directory)
 
@@ -424,8 +428,6 @@ Local repository not cleaned up for investigation: %s""",
             )
         except SvnLoaderUneventful as e:
             self.log.warning(e)
-            if self.latest_snapshot:
-                self._snapshot = self.latest_snapshot
             self.done = True
             self._load_status = "uneventful"
         except SvnLoaderHistoryAltered as e:
@@ -451,7 +453,7 @@ Local repository not cleaned up for investigation: %s""",
             False to stop.
 
         """
-        data = None
+
         if self.done:
             return False
 
@@ -459,19 +461,18 @@ Local repository not cleaned up for investigation: %s""",
             data = next(self.swh_revision_gen)
             self._load_status = "eventful"
         except StopIteration:
-            self.done = True
+            self.done = True  # Stopping iteration
             self._visit_status = "full"
-            return False  # Stopping iteration
         except Exception as e:  # svn:external, hash divergence, i/o error...
             self.log.exception(e)
-            self.done = True
+            self.done = True  # Stopping iteration
             self._visit_status = "partial"
-            return False  # Stopping iteration
-        self._contents, self._skipped_contents, self._directories, rev = data
-        if rev:
-            self._last_revision = rev
-            self._revisions.append(rev)
-        return True  # next svn revision
+        else:
+            self._contents, self._skipped_contents, self._directories, rev = data
+            if rev:
+                self._last_revision = rev
+                self._revisions.append(rev)
+        return not self.done
 
     def store_data(self):
         """We store the data accumulated in internal instance variable.  If
@@ -718,8 +719,10 @@ class SvnLoaderFromRemoteDump(SvnLoader):
 
         # Get the stderr line with latest dumped revision
         last_dumped_rev = None
-        if len(stderr_lines) > 1:
-            last_dumped_rev = stderr_lines[-2]
+        for stderr_line in reversed(stderr_lines):
+            if stderr_line.startswith("* Dumped revision"):
+                last_dumped_rev = stderr_line
+                break
 
         if last_dumped_rev:
             # Get the latest dumped revision number

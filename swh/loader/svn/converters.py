@@ -3,27 +3,31 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import datetime
 from typing import Dict, Optional, Sequence, Tuple
+
+import iso8601
 
 from swh.model.model import Person, Revision, RevisionType, TimestampWithTimezone
 
-from .utils import strdate_to_timestamp
 
-
-def svn_date_to_swh_date(strdate: Optional[str]) -> TimestampWithTimezone:
+def svn_date_to_swh_date(strdate: Optional[bytes]) -> TimestampWithTimezone:
     """Convert a string date to an swh one.
 
     Args:
-        strdate: A string formatted for .utils.strdate_to_timestamp
-        to do its jobs
+        strdate: A string representing a date with format like
+        ``b'YYYY-mm-DDTHH:MM:SS.800722Z'``
 
     Returns:
         An swh date format
 
     """
-    return TimestampWithTimezone(
-        timestamp=strdate_to_timestamp(strdate), offset=0, negative_utc=False,
-    )
+    if not strdate:  # either None or empty string
+        dt = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+    else:
+        dt = iso8601.parse_date(strdate.decode("ascii"))
+        assert dt.tzinfo is not None, strdate
+    return TimestampWithTimezone.from_datetime(dt)
 
 
 def svn_author_to_swh_person(author: Optional[bytes]) -> Person:

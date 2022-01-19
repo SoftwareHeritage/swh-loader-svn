@@ -555,15 +555,21 @@ class DirEditor:
         prev_externals = self.dir_states[self.path].externals
 
         if self.externals:
-            # externals definition list might have changed in the current processed
+            # externals definition list might have changed in the current replayed
             # revision, we need to determine if some were removed and delete the
             # associated paths
+            externals = self.externals
             old_externals = set(prev_externals) - set(self.externals)
             for old_external in old_externals:
                 self.remove_external_path(os.fsencode(old_external))
+        else:
+            # some external paths might have been removed in the current replayed
+            # revision by a delete operation on an overlapping versioned path so we
+            # need to restore them
+            externals = prev_externals
 
         # For each external, try to export it in reconstructed filesystem
-        for path, (external_url, revision, relative_url) in self.externals.items():
+        for path, (external_url, revision, relative_url) in externals.items():
             external = (external_url, revision)
             dest_path = os.fsencode(path)
             dest_fullpath = os.path.join(self.path, dest_path)

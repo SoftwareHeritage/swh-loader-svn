@@ -2460,3 +2460,66 @@ def test_loader_externals_cache(swh_storage, repo_url, external_repo_url, tmp_pa
     check_snapshot(loader.snapshot, loader.storage)
 
     assert (external_url, None) in loader.svnrepo.swhreplay.editor.externals_cache
+
+
+def test_loader_remove_versioned_path_with_external_overlap(
+    swh_storage, repo_url, external_repo_url, tmp_path
+):
+    # first commit on external
+    add_commit(
+        external_repo_url,
+        "Create a file in an external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/hello.sh",
+                data=b"#!/bin/bash\necho Hello World !",
+            ),
+        ],
+    )
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Add a file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/project/script.sh",
+                data=b"#!/bin/bash\necho foo",
+            ),
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Set external on trunk overlapping versioned path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(external_repo_url, 'code')} project/code"
+                    )
+                },
+            ),
+        ],
+    )
+
+    # third commit
+    add_commit(
+        repo_url,
+        "Remove trunk/project/ versioned path",
+        [CommitChange(change_type=CommitChangeType.Delete, path="trunk/project/",),],
+    )
+
+    loader = SvnLoader(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)

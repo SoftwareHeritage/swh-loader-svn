@@ -253,7 +253,7 @@ def parse_external_definition(
             # property is set
             external_url = svn_urljoin(repo_url, dir_path, external_part)
             relative_url = not external_url.startswith(repo_url)
-        elif re.match(r"^.*://.*", external_part):
+        elif re.match(r"^.*:*//.*", external_part):
             # absolute external URL
             external_url = external_part
         # subversion >= 1.6 added a quoting and escape mechanism to the syntax so
@@ -291,4 +291,4 @@ def parse_external_definition(
         except ValueError:
             # handle URL like http://user@svn.example.org/
             pass
-    return (path, external_url, revision, relative_url)
+    return (path.rstrip("/"), external_url, revision, relative_url)

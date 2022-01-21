@@ -682,9 +682,14 @@ class DirEditor:
                 self.editor.external_paths.remove(path)
         subpath_split = external_path.split(b"/")[:-1]
         for i in reversed(range(1, len(subpath_split) + 1)):
-            # delete external sub-directory only if it is empty
+            # delete external sub-directory only if it is not versioned
             subpath = os.path.join(self.path, b"/".join(subpath_split[0:i]))
-            if not os.listdir(os.path.join(self.rootpath, subpath)):
+            try:
+                self.svnrepo.client.info(
+                    svn_urljoin(self.svnrepo.remote_url, os.fsdecode(subpath)),
+                    peg_revision=self.editor.revnum,
+                )
+            except SubversionException:
                 self.remove_child(subpath)
             else:
                 break

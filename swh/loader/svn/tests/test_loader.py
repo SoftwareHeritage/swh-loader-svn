@@ -2610,3 +2610,66 @@ def test_loader_export_external_path_using_peg_rev(
         loader.storage, repo_url, status="full", type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_remove_external_overlapping_versioned_path(
+    swh_storage, repo_url, external_repo_url, tmp_path
+):
+    # first commit on external
+    add_commit(
+        external_repo_url,
+        "Create a file in an external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/foo.sh",
+                data=b"#!/bin/bash\necho foo",
+            ),
+        ],
+    )
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Add trunk dir",
+        [CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/")],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Set external on root dir overlapping versioned trunk path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="",  # repo root dir
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(external_repo_url, 'code/foo.sh')} trunk/code/foo.sh"  # noqa
+                    )
+                },
+            ),
+        ],
+    )
+
+    # third commit
+    add_commit(
+        repo_url,
+        "Remove external on root dir",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="",
+                properties={"svn:externals": None},
+            ),
+        ],
+    )
+
+    loader = SvnLoader(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)

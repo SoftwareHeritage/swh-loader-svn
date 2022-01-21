@@ -559,9 +559,15 @@ class DirEditor:
             # revision, we need to determine if some were removed and delete the
             # associated paths
             externals = self.externals
-            old_externals = set(prev_externals) - set(self.externals)
-            for old_external in old_externals:
-                self.remove_external_path(os.fsencode(old_external))
+            prev_externals_set = {
+                (path, url, rev) for path, (url, rev, _) in prev_externals.items()
+            }
+            externals_set = {
+                (path, url, rev) for path, (url, rev, _) in externals.items()
+            }
+            old_externals = prev_externals_set - externals_set
+            for path, _, _ in old_externals:
+                self.remove_external_path(os.fsencode(path))
         else:
             # some external paths might have been removed in the current replayed
             # revision by a delete operation on an overlapping versioned path so we

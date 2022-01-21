@@ -2673,3 +2673,64 @@ def test_loader_remove_external_overlapping_versioned_path(
         loader.storage, repo_url, status="full", type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_modify_external_same_path(
+    swh_storage, repo_url, external_repo_url, tmp_path
+):
+    # first commit on external
+    add_commit(
+        external_repo_url,
+        "Create a file in an external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/foo.sh",
+                data=b"#!/bin/bash\necho foo",
+            ),
+        ],
+    )
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Add trunk dir",
+        [CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/")],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Set external code on trunk dir",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={
+                    "svn:externals": (f"{svn_urljoin(external_repo_url, 'code')} code")
+                },
+            ),
+        ],
+    )
+
+    # third commit
+    add_commit(
+        repo_url,
+        "Change code external on trunk targeting an invalid URL",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={"svn:externals": "file:///tmp/invalid/svn/repo/path code"},
+            ),
+        ],
+    )
+
+    loader = SvnLoader(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)

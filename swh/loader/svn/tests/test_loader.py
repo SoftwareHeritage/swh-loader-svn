@@ -2523,3 +2523,90 @@ def test_loader_remove_versioned_path_with_external_overlap(
         loader.storage, repo_url, status="full", type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_export_external_path_using_peg_rev(
+    swh_storage, repo_url, external_repo_url, tmp_path
+):
+    # first commit on external
+    add_commit(
+        external_repo_url,
+        "Create a file in an external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/foo.sh",
+                data=b"#!/bin/bash\necho foo",
+            ),
+        ],
+    )
+
+    # second commit on external
+    add_commit(
+        external_repo_url,
+        "Remove previously added file",
+        [CommitChange(change_type=CommitChangeType.Delete, path="code/foo.sh",),],
+    )
+
+    # third commit on external
+    add_commit(
+        external_repo_url,
+        "Add file again but with different content",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/foo.sh",
+                data=b"#!/bin/bash\necho bar",
+            ),
+        ],
+    )
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Add trunk dir",
+        [CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/",),],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Set external on trunk targeting first revision of external repo",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(external_repo_url, 'code/foo.sh')}@1 foo.sh"
+                    )
+                },
+            ),
+        ],
+    )
+
+    # third commit
+    add_commit(
+        repo_url,
+        "Modify external on trunk to target third revision of external repo",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(external_repo_url, 'code/foo.sh')}@3 foo.sh"
+                    )
+                },
+            ),
+        ],
+    )
+
+    loader = SvnLoader(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)

@@ -305,7 +305,7 @@ class FileEditor:
                 self.svnrepo.client.export(
                     os.path.join(self.svnrepo.remote_url.encode(), self.path),
                     to=self.fullpath,
-                    rev=self.editor.revnum,
+                    peg_rev=self.editor.revnum,
                     ignore_keywords=True,
                     overwrite=True,
                 )
@@ -599,7 +599,7 @@ class DirEditor:
                         self.svnrepo.client.export(
                             external_url.rstrip("/"),
                             to=temp_path,
-                            rev=revision,
+                            peg_rev=revision,
                             ignore_keywords=True,
                         )
                         self.editor.externals_cache[external] = temp_path
@@ -696,7 +696,7 @@ class DirEditor:
             self.svnrepo.client.export(
                 svn_urljoin(self.svnrepo.remote_url, os.fsdecode(fullpath)),
                 to=dest_path,
-                rev=self.editor.revnum,
+                peg_rev=self.editor.revnum,
                 ignore_keywords=True,
             )
             if os.path.isfile(dest_path):

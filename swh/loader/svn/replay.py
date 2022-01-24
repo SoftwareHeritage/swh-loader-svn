@@ -42,7 +42,11 @@ from swh.model.model import Content, Directory, SkippedContent
 if TYPE_CHECKING:
     from swh.loader.svn.svn import SvnRepo
 
-from swh.loader.svn.utils import parse_external_definition, svn_urljoin
+from swh.loader.svn.utils import (
+    is_recursive_external,
+    parse_external_definition,
+    svn_urljoin,
+)
 
 _eol_style = {"native": b"\n", "CRLF": b"\r\n", "LF": b"\n", "CR": b"\r"}
 
@@ -305,7 +309,7 @@ class FileEditor:
                 self.svnrepo.client.export(
                     os.path.join(self.svnrepo.remote_url.encode(), self.path),
                     to=self.fullpath,
-                    rev=self.editor.revnum,
+                    peg_rev=self.editor.revnum,
                     ignore_keywords=True,
                     overwrite=True,
                 )
@@ -559,9 +563,15 @@ class DirEditor:
             # revision, we need to determine if some were removed and delete the
             # associated paths
             externals = self.externals
-            old_externals = set(prev_externals) - set(self.externals)
-            for old_external in old_externals:
-                self.remove_external_path(os.fsencode(old_external))
+            prev_externals_set = {
+                (path, url, rev) for path, (url, rev, _) in prev_externals.items()
+            }
+            externals_set = {
+                (path, url, rev) for path, (url, rev, _) in externals.items()
+            }
+            old_externals = prev_externals_set - externals_set
+            for path, _, _ in old_externals:
+                self.remove_external_path(os.fsencode(path))
         else:
             # some external paths might have been removed in the current replayed
             # revision by a delete operation on an overlapping versioned path so we
@@ -579,6 +589,12 @@ class DirEditor:
                 and dest_fullpath in self.directory
             ):
                 # external already exported, nothing to do
+                continue
+
+            if is_recursive_external(
+                self.svnrepo.origin_url, os.fsdecode(self.path), path, external_url
+            ):
+                # recursive external, skip it
                 continue
 
             if external not in self.editor.externals_cache:
@@ -599,7 +615,7 @@ class DirEditor:
                         self.svnrepo.client.export(
                             external_url.rstrip("/"),
                             to=temp_path,
-                            rev=revision,
+                            peg_rev=revision,
                             ignore_keywords=True,
                         )
                         self.editor.externals_cache[external] = temp_path
@@ -669,6 +685,21 @@ class DirEditor:
             [relative_url for (_, relative_url) in self.editor.valid_externals.values()]
         )
 
+        self.svnrepo.has_recursive_externals = any(
+            is_recursive_external(
+                self.svnrepo.origin_url, os.fsdecode(path), external_path, external_url
+            )
+            for path, dir_state in self.dir_states.items()
+            for external_path, (external_url, _, _) in dir_state.externals.items()
+        )
+        if self.svnrepo.has_recursive_externals:
+            # If the repository has recursive externals, we stop processing externals
+            # and remove those already exported,
+            # We will then ignore externals when exporting the revision to check for
+            # divergence with the reconstructed filesystem
+            for external_path in list(self.editor.external_paths):
+                self.remove_external_path(external_path)
+
     def remove_external_path(self, external_path: bytes) -> None:
         """Remove a previously exported SVN external path from
         the reconstruted filesystem.
@@ -682,9 +713,14 @@ class DirEditor:
                 self.editor.external_paths.remove(path)
         subpath_split = external_path.split(b"/")[:-1]
         for i in reversed(range(1, len(subpath_split) + 1)):
-            # delete external sub-directory only if it is empty
+            # delete external sub-directory only if it is not versioned
             subpath = os.path.join(self.path, b"/".join(subpath_split[0:i]))
-            if not os.listdir(os.path.join(self.rootpath, subpath)):
+            try:
+                self.svnrepo.client.info(
+                    svn_urljoin(self.svnrepo.remote_url, os.fsdecode(subpath)),
+                    peg_revision=self.editor.revnum,
+                )
+            except SubversionException:
                 self.remove_child(subpath)
             else:
                 break
@@ -696,7 +732,7 @@ class DirEditor:
             self.svnrepo.client.export(
                 svn_urljoin(self.svnrepo.remote_url, os.fsdecode(fullpath)),
                 to=dest_path,
-                rev=self.editor.revnum,
+                peg_rev=self.editor.revnum,
                 ignore_keywords=True,
             )
             if os.path.isfile(dest_path):

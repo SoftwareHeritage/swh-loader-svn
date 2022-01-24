@@ -28,7 +28,7 @@ from swh.model.model import (
 )
 
 from . import converters, replay
-from .utils import parse_external_definition
+from .utils import is_recursive_external, parse_external_definition
 
 # When log message contains empty data
 DEFAULT_AUTHOR_MESSAGE = ""
@@ -78,6 +78,7 @@ class SvnRepo:
         )
         self.max_content_length = max_content_length
         self.has_relative_externals = False
+        self.has_recursive_externals = False
         self.replay_started = False
 
     def __str__(self):
@@ -221,10 +222,11 @@ class SvnRepo:
         if self.replay_started and self.has_relative_externals:
             # externals detected while replaying revisions
             url = self.origin_url
-        elif not self.replay_started and self.remote_url.startswith("file://"):
+        elif not self.replay_started:
             # revisions replay has not started, we need to check if svn:externals
             # properties are set from a checkout of the revision and if some
-            # external URLs are relative to pick the right export URL
+            # external URLs are relative to pick the right export URL,
+            # recursive externals are also checked
             with tempfile.TemporaryDirectory(
                 dir=self.local_dirname, prefix=f"checkout-revision-{revision}."
             ) as co_dirname:
@@ -236,23 +238,42 @@ class SvnRepo:
                     "svn:externals", co_dirname, None, revision, True
                 )
                 self.has_relative_externals = False
+                self.has_recursive_externals = False
                 for path, external_defs in externals.items():
-                    if self.has_relative_externals:
+                    if self.has_relative_externals or self.has_recursive_externals:
                         break
+                    path = path.replace(self.remote_url.rstrip("/") + "/", "")
                     for external_def in os.fsdecode(external_defs).split("\n"):
                         # skip empty line or comment
                         if not external_def or external_def.startswith("#"):
                             continue
-                        _, _, _, relative_url = parse_external_definition(
+                        (
+                            external_path,
+                            external_url,
+                            _,
+                            relative_url,
+                        ) = parse_external_definition(
                             external_def.rstrip("\r"), path, self.origin_url
                         )
+
+                        if is_recursive_external(
+                            self.origin_url, path, external_path, external_url,
+                        ):
+                            self.has_recursive_externals = True
+                            url = self.remote_url
+                            break
+
                         if relative_url:
                             self.has_relative_externals = True
                             url = self.origin_url
                             break
 
         self.client.export(
-            url.rstrip("/"), to=local_url, rev=revision, ignore_keywords=True,
+            url.rstrip("/"),
+            to=local_url,
+            rev=revision,
+            ignore_keywords=True,
+            ignore_externals=self.has_recursive_externals,
         )
         return local_dirname, os.fsencode(local_url)
 

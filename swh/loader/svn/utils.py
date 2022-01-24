@@ -11,7 +11,7 @@ import shutil
 from subprocess import PIPE, Popen, call
 import tempfile
 from typing import Optional, Tuple
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
 
@@ -253,7 +253,7 @@ def parse_external_definition(
             # property is set
             external_url = svn_urljoin(repo_url, dir_path, external_part)
             relative_url = not external_url.startswith(repo_url)
-        elif re.match(r"^.*://.*", external_part):
+        elif re.match(r"^.*:*//.*", external_part):
             # absolute external URL
             external_url = external_part
         # subversion >= 1.6 added a quoting and escape mechanism to the syntax so
@@ -291,4 +291,30 @@ def parse_external_definition(
         except ValueError:
             # handle URL like http://user@svn.example.org/
             pass
-    return (path, external_url, revision, relative_url)
+    return (path.rstrip("/"), external_url, revision, relative_url)
+
+
+def is_recursive_external(
+    origin_url: str, dir_path: str, external_path: str, external_url: str
+) -> bool:
+    """
+    Check if an external definition can lead to a recursive subversion export
+    operation (https://issues.apache.org/jira/browse/SVN-1703).
+
+    Args:
+        origin_url: repository URL
+        dir_path: path of the directory where external is defined
+        external_path: path of the external relative to the directory
+        external_url: external URL
+
+    Returns:
+        Whether the external definition is recursive
+    """
+    parsed_origin_url = urlparse(origin_url)
+    parsed_external_url = urlparse(external_url)
+    external_url = urlunparse(
+        parsed_external_url._replace(scheme=parsed_origin_url.scheme)
+    )
+    return svn_urljoin(origin_url, quote(dir_path), quote(external_path)).startswith(
+        external_url
+    )

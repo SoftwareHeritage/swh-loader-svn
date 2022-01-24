@@ -353,10 +353,22 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             ("external", "http://svn.thirdparty.com/repos/test", None, False),
         ),
         (
+            "external/ http://svn.thirdparty.com/repos/test",
+            "tags",
+            "http://svn.example.org/repos/test",
+            ("external", "http://svn.thirdparty.com/repos/test", None, False),
+        ),
+        (
             "external ttp://svn.thirdparty.com/repos/test",
             "tags",
             "http://svn.example.org/repos/test",
             ("external", "ttp://svn.thirdparty.com/repos/test", None, False),
+        ),
+        (
+            "external http//svn.thirdparty.com/repos/test",
+            "tags",
+            "http://svn.example.org/repos/test",
+            ("external", "http//svn.thirdparty.com/repos/test", None, False),
         ),
         (
             "C:\\code\\repo\\external http://svn.thirdparty.com/repos/test",

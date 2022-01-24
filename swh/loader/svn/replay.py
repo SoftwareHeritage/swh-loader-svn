@@ -42,7 +42,11 @@ from swh.model.model import Content, Directory, SkippedContent
 if TYPE_CHECKING:
     from swh.loader.svn.svn import SvnRepo
 
-from swh.loader.svn.utils import parse_external_definition, svn_urljoin
+from swh.loader.svn.utils import (
+    is_recursive_external,
+    parse_external_definition,
+    svn_urljoin,
+)
 
 _eol_style = {"native": b"\n", "CRLF": b"\r\n", "LF": b"\n", "CR": b"\r"}
 
@@ -587,6 +591,12 @@ class DirEditor:
                 # external already exported, nothing to do
                 continue
 
+            if is_recursive_external(
+                self.svnrepo.origin_url, os.fsdecode(self.path), path, external_url
+            ):
+                # recursive external, skip it
+                continue
+
             if external not in self.editor.externals_cache:
 
                 try:
@@ -674,6 +684,21 @@ class DirEditor:
         self.svnrepo.has_relative_externals = any(
             [relative_url for (_, relative_url) in self.editor.valid_externals.values()]
         )
+
+        self.svnrepo.has_recursive_externals = any(
+            is_recursive_external(
+                self.svnrepo.origin_url, os.fsdecode(path), external_path, external_url
+            )
+            for path, dir_state in self.dir_states.items()
+            for external_path, (external_url, _, _) in dir_state.externals.items()
+        )
+        if self.svnrepo.has_recursive_externals:
+            # If the repository has recursive externals, we stop processing externals
+            # and remove those already exported,
+            # We will then ignore externals when exporting the revision to check for
+            # divergence with the reconstructed filesystem
+            for external_path in list(self.editor.external_paths):
+                self.remove_external_path(external_path)
 
     def remove_external_path(self, external_path: bytes) -> None:
         """Remove a previously exported SVN external path from

@@ -2734,3 +2734,99 @@ def test_loader_modify_external_same_path(
         loader.storage, repo_url, status="full", type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_with_recursive_external(
+    swh_storage, repo_url, external_repo_url, tmp_path
+):
+    # first commit on external
+    add_commit(
+        external_repo_url,
+        "Create a file in an external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/foo.sh",
+                data=b"#!/bin/bash\necho foo",
+            ),
+        ],
+    )
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Add trunk dir and a file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/bar.sh",
+                data=b"#!/bin/bash\necho bar",
+            )
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Set externals code on trunk/externals dir, one being recursive",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/externals/",
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(external_repo_url, 'code')} code\n"
+                        f"{repo_url} recursive"
+                    )
+                },
+            ),
+        ],
+    )
+
+    # first load
+    loader = SvnLoader(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+    assert loader.svnrepo.has_recursive_externals
+
+    # second load on stale repo
+    loader = SvnLoader(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+    )
+    assert loader.load() == {"status": "uneventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+    assert loader.svnrepo.has_recursive_externals
+
+    # third commit
+    add_commit(
+        repo_url,
+        "Remove recursive external on trunk/externals dir",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/externals/",
+                properties={
+                    "svn:externals": (f"{svn_urljoin(external_repo_url, 'code')} code")
+                },
+            ),
+        ],
+    )
+
+    # third load
+    loader = SvnLoader(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+    assert not loader.svnrepo.has_recursive_externals

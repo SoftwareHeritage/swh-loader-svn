@@ -719,6 +719,7 @@ class DirEditor:
                 self.svnrepo.client.info(
                     svn_urljoin(self.svnrepo.remote_url, os.fsdecode(subpath)),
                     peg_revision=self.editor.revnum,
+                    revision=self.editor.revnum,
                 )
             except SubversionException:
                 self.remove_child(subpath)

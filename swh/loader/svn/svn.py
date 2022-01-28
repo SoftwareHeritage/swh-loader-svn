@@ -15,7 +15,7 @@ import shutil
 import tempfile
 from typing import Dict, Iterator, List, Optional, Tuple, Union
 
-from subvertpy import client, properties
+from subvertpy import SubversionException, client, properties
 from subvertpy.ra import Auth, RemoteAccess, get_username_provider
 
 from swh.model.from_disk import Directory as DirectoryFromDisk
@@ -268,13 +268,24 @@ class SvnRepo:
                             url = self.origin_url
                             break
 
-        self.client.export(
-            url.rstrip("/"),
-            to=local_url,
-            rev=revision,
-            ignore_keywords=True,
-            ignore_externals=self.has_recursive_externals,
-        )
+        try:
+            self.client.export(
+                url.rstrip("/"),
+                to=local_url,
+                rev=revision,
+                ignore_keywords=True,
+                ignore_externals=self.has_recursive_externals,
+            )
+        except SubversionException as se:
+            if se.args[0].startswith(
+                (
+                    "Error parsing svn:externals property",
+                    "Unrecognized format for the relative external URL",
+                )
+            ):
+                pass
+            else:
+                raise
         return local_dirname, os.fsencode(local_url)
 
     def swh_hash_data_per_revision(

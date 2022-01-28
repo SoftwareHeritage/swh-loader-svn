@@ -2618,12 +2618,17 @@ def test_loader_remove_external_overlapping_versioned_path(
     # first commit on external
     add_commit(
         external_repo_url,
-        "Create a file in an external repository",
+        "Create files in an external repository",
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
                 path="code/foo.sh",
                 data=b"#!/bin/bash\necho foo",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/link",
+                data=b"#!/bin/bash\necho link",
             ),
         ],
     )
@@ -2631,8 +2636,16 @@ def test_loader_remove_external_overlapping_versioned_path(
     # first commit
     add_commit(
         repo_url,
-        "Add trunk dir",
-        [CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/")],
+        "Add trunk dir and a link file",
+        [
+            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/"),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/link",
+                data=b"link ../test",
+                properties={"svn:special": "*"},
+            ),
+        ],
     )
 
     # second commit
@@ -2645,7 +2658,8 @@ def test_loader_remove_external_overlapping_versioned_path(
                 path="",  # repo root dir
                 properties={
                     "svn:externals": (
-                        f"{svn_urljoin(external_repo_url, 'code/foo.sh')} trunk/code/foo.sh"  # noqa
+                        f"{svn_urljoin(external_repo_url, 'code/foo.sh')} trunk/code/foo.sh\n"  # noqa
+                        f"{svn_urljoin(external_repo_url, 'code/link')} trunk/link"
                     )
                 },
             ),

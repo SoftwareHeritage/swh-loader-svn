@@ -735,7 +735,7 @@ class DirEditor:
                 peg_rev=self.editor.revnum,
                 ignore_keywords=True,
             )
-            if os.path.isfile(dest_path):
+            if os.path.isfile(dest_path) or os.path.islink(dest_path):
                 self.directory[fullpath] = from_disk.Content.from_file(path=dest_path)
             else:
                 self.directory[fullpath] = from_disk.Directory.from_disk(path=dest_path)

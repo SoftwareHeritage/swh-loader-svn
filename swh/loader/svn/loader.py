@@ -761,7 +761,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
                             s.resize(n)
                 self.truncated_dump = True
                 return dump_path
-            elif last_dumped_rev != -1:
+            elif last_dumped_rev != -1 and last_dumped_rev < last_loaded_svn_rev:
                 raise Exception(
                     (
                         "Last dumped subversion revision (%s) is "

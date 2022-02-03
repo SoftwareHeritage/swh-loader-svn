@@ -235,7 +235,7 @@ class SvnRepo:
                 )
                 # get all svn:externals properties recursively
                 externals = self.client.propget(
-                    "svn:externals", co_dirname, None, revision, True
+                    "svn:externals", co_dirname, None, None, True
                 )
                 self.has_relative_externals = False
                 self.has_recursive_externals = False

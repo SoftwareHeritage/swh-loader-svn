@@ -2846,6 +2846,62 @@ def test_loader_with_recursive_external(
     assert not loader.svnrepo.has_recursive_externals
 
 
+def test_loader_externals_with_same_target(
+    swh_storage, repo_url, external_repo_url, tmp_path
+):
+    # first commit on external
+    add_commit(
+        external_repo_url,
+        "Create files in an external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="foo/foo.sh",
+                data=b"#!/bin/bash\necho foo",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="bar/bar.sh",
+                data=b"#!/bin/bash\necho bar",
+            ),
+        ],
+    )
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Add trunk/src dir",
+        [CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/src/")],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Add externals on trunk targeting same directory",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(external_repo_url, 'foo')} src\n"
+                        f"{svn_urljoin(external_repo_url, 'bar')} src"
+                    )
+                },
+            ),
+        ],
+    )
+
+    loader = SvnLoader(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+
+
 def test_loader_external_in_versioned_path(
     swh_storage, repo_url, external_repo_url, tmp_path
 ):

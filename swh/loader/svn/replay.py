@@ -359,7 +359,8 @@ class DirState:
     """Persists some directory states (eg. externals) across revisions while
     replaying them."""
 
-    externals: Dict[str, Tuple[str, Optional[int]]] = field(default_factory=dict)
+    externals: Dict[str, List[Tuple[str, Optional[int]]]] = field(default_factory=dict)
+    """Map a path in the directory to a list of (external_url, revision) targeting it"""
 
 
 class DirEditor:
@@ -398,7 +399,7 @@ class DirEditor:
         self.dir_states = dir_states
         self.svnrepo = svnrepo
         self.editor = svnrepo.swhreplay.editor
-        self.externals: Dict[str, Tuple[str, Optional[int], bool]] = {}
+        self.externals: Dict[str, List[Tuple[str, Optional[int], bool]]] = {}
 
         # repository root dir has empty path
         if path:
@@ -513,7 +514,7 @@ class DirEditor:
                 value,
                 self.path,
             )
-            self.externals = {}
+            self.externals = defaultdict(list)
             if value is not None:
                 # externals are set on that directory path, parse and store them
                 # for later processing in the close method
@@ -530,7 +531,7 @@ class DirEditor:
                     ) = parse_external_definition(
                         external, os.fsdecode(self.path), self.svnrepo.origin_url
                     )
-                    self.externals[path] = (external_url, revision, relative_url)
+                    self.externals[path].append((external_url, revision, relative_url))
 
             if not self.externals:
                 # externals might have been unset on that directory path,
@@ -565,10 +566,14 @@ class DirEditor:
             # associated paths
             externals = self.externals
             prev_externals_set = {
-                (path, url, rev) for path, (url, rev, _) in prev_externals.items()
+                (path, url, rev)
+                for path in prev_externals.keys()
+                for (url, rev, _) in prev_externals[path]
             }
             externals_set = {
-                (path, url, rev) for path, (url, rev, _) in externals.items()
+                (path, url, rev)
+                for path in externals.keys()
+                for (url, rev, _) in externals[path]
             }
             old_externals = prev_externals_set - externals_set
             for path, _, _ in old_externals:
@@ -580,15 +585,23 @@ class DirEditor:
             externals = prev_externals
 
         # For each external, try to export it in reconstructed filesystem
-        for path, (external_url, revision, relative_url) in externals.items():
-            self.process_external(path, external_url, revision, relative_url)
+        for path, externals_def in externals.items():
+            for i, external in enumerate(externals_def):
+                external_url, revision, relative_url = external
+                self.process_external(
+                    path,
+                    external_url,
+                    revision,
+                    relative_url,
+                    remove_target_path=i == 0,
+                )
 
         # backup externals in directory state
         if self.externals:
             self.dir_states[self.path].externals = self.externals
 
         self.svnrepo.has_relative_externals = any(
-            [relative_url for (_, relative_url) in self.editor.valid_externals.values()]
+            relative_url for (_, relative_url) in self.editor.valid_externals.values()
         )
 
         self.svnrepo.has_recursive_externals = any(
@@ -596,7 +609,8 @@ class DirEditor:
                 self.svnrepo.origin_url, os.fsdecode(path), external_path, external_url
             )
             for path, dir_state in self.dir_states.items()
-            for external_path, (external_url, _, _) in dir_state.externals.items()
+            for external_path in dir_state.externals.keys()
+            for (external_url, _, _) in dir_state.externals[external_path]
         )
         if self.svnrepo.has_recursive_externals:
             # If the repository has recursive externals, we stop processing externals
@@ -607,7 +621,12 @@ class DirEditor:
                 self.remove_external_path(external_path)
 
     def process_external(
-        self, path: str, external_url: str, revision: Optional[int], relative_url: bool
+        self,
+        path: str,
+        external_url: str,
+        revision: Optional[int],
+        relative_url: bool,
+        remove_target_path: bool = True,
     ) -> None:
         external = (external_url, revision)
         dest_path = os.fsencode(path)
@@ -668,8 +687,9 @@ class DirEditor:
         if os.path.exists(temp_path):
             # external successfully exported
 
-            # remove previous path in from_disk model
-            self.remove_external_path(dest_path, remove_subpaths=False)
+            if remove_target_path:
+                # remove previous path in from_disk model
+                self.remove_external_path(dest_path, remove_subpaths=False)
 
             # mark external as valid
             self.editor.valid_externals[dest_fullpath] = (

@@ -470,17 +470,17 @@ class DirEditor:
             svnrepo=self.svnrepo,
         )
 
-    def open_file(self, *args) -> FileEditor:
+    def open_file(self, path: str, *args) -> FileEditor:
         """Updating existing file.
 
         """
-        path = os.fsencode(args[0])
-        self.directory[path] = from_disk.Content()
-        fullpath = os.path.join(self.rootpath, path)
+        path_bytes = os.fsencode(path)
+        self.directory[path_bytes] = from_disk.Content()
+        fullpath = os.path.join(self.rootpath, path_bytes)
         return FileEditor(
             self.directory,
             rootpath=self.rootpath,
-            path=path,
+            path=path_bytes,
             state=self.file_states[fullpath],
             svnrepo=self.svnrepo,
         )

@@ -230,6 +230,9 @@ class SvnRepo:
             with tempfile.TemporaryDirectory(
                 dir=self.local_dirname, prefix=f"checkout-revision-{revision}."
             ) as co_dirname:
+                logger.debug(
+                    "svn checkout --ignore-externals %s@%s", self.remote_url, revision,
+                )
                 self.client.checkout(
                     self.remote_url, co_dirname, revision, ignore_externals=True
                 )
@@ -269,8 +272,12 @@ class SvnRepo:
                             break
 
         try:
+            url = url.rstrip("/")
+            logger.debug(
+                "svn export --ignore-keywords %s@%s", url, revision,
+            )
             self.client.export(
-                url.rstrip("/"),
+                url,
                 to=local_url,
                 rev=revision,
                 ignore_keywords=True,

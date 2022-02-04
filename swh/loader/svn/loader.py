@@ -271,12 +271,6 @@ Local repository not cleaned up for investigation: %s""",
                 revision_start: self.latest_revision.parents,
             }
 
-            self.log.debug(
-                "svn export --ignore-keywords %s@%s",
-                self.svnrepo.remote_url,
-                revision_start,
-            )
-
             if not self.check_history_not_altered(revision_start, self.latest_revision):
                 self.log.debug(
                     (

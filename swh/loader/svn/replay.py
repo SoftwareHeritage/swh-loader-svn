@@ -12,6 +12,7 @@ from __future__ import annotations
 import codecs
 from collections import defaultdict
 from dataclasses import dataclass, field
+from distutils.dir_util import copy_tree
 from itertools import chain
 import logging
 import os
@@ -646,10 +647,6 @@ class DirEditor:
                         ignore_keywords=True,
                     )
                     self.editor.externals_cache[external] = temp_path
-                    self.editor.valid_externals[dest_fullpath] = (
-                        external_url,
-                        relative_url,
-                    )
 
             except SubversionException as se:
                 # external no longer available (404)
@@ -672,23 +669,49 @@ class DirEditor:
             # external successfully exported
 
             # remove previous path in from_disk model
-            self.remove_child(dest_fullpath)
+            self.remove_external_path(dest_path, remove_subpaths=False)
+
+            # mark external as valid
+            self.editor.valid_externals[dest_fullpath] = (
+                external_url,
+                relative_url,
+            )
+
             # copy exported path to reconstructed filesystem
             fullpath = os.path.join(self.rootpath, dest_fullpath)
 
-            self.editor.external_paths.add(dest_fullpath)
-            self.editor.modified_paths.add(dest_fullpath)
             # update from_disk model and store external paths
             self.editor.external_paths.add(dest_fullpath)
+            self.editor.modified_paths.add(dest_fullpath)
+
             if os.path.isfile(temp_path):
+                if os.path.islink(fullpath):
+                    # remove destination file if it is a link
+                    os.remove(fullpath)
                 shutil.copy(os.fsdecode(temp_path), os.fsdecode(fullpath))
                 self.directory[dest_fullpath] = from_disk.Content.from_file(
                     path=fullpath
                 )
             else:
-                shutil.copytree(
-                    os.fsdecode(temp_path), os.fsdecode(fullpath), symlinks=True
+                self.add_directory(os.fsdecode(dest_fullpath))
+
+                # copy_tree needs sub-directories to exist in destination
+                for root, dirs, files in os.walk(temp_path):
+                    for dir in dirs:
+                        subdir = os.path.join(root, dir).replace(temp_path + b"/", b"")
+                        self.add_directory(
+                            os.fsdecode(os.path.join(dest_fullpath, subdir))
+                        )
+
+                copy_tree(
+                    os.fsdecode(temp_path),
+                    os.fsdecode(fullpath),
+                    preserve_symlinks=True,
                 )
+
+                # TODO: replace code above by the line below once we use Python >= 3.8 in production # noqa
+                # shutil.copytree(temp_path, fullpath, symlinks=True, dirs_exist_ok=True) # noqa
+
                 self.directory[dest_fullpath] = from_disk.Directory.from_disk(
                     path=fullpath
                 )
@@ -706,7 +729,7 @@ class DirEditor:
             # ensure hash update for the directory with externals set
             self.directory[self.path].update_hash(force=True)
 
-    def remove_external_path(self, external_path: bytes) -> None:
+    def remove_external_path(self, external_path: bytes, remove_subpaths=True) -> None:
         """Remove a previously exported SVN external path from
         the reconstruted filesystem.
         """
@@ -717,20 +740,22 @@ class DirEditor:
         for path in list(self.editor.external_paths):
             if path.startswith(fullpath + b"/"):
                 self.editor.external_paths.remove(path)
-        subpath_split = external_path.split(b"/")[:-1]
-        for i in reversed(range(1, len(subpath_split) + 1)):
-            # delete external sub-directory only if it is not versioned
-            subpath = os.path.join(self.path, b"/".join(subpath_split[0:i]))
-            try:
-                self.svnrepo.client.info(
-                    svn_urljoin(self.svnrepo.remote_url, os.fsdecode(subpath)),
-                    peg_revision=self.editor.revnum,
-                    revision=self.editor.revnum,
-                )
-            except SubversionException:
-                self.remove_child(subpath)
-            else:
-                break
+
+        if remove_subpaths:
+            subpath_split = external_path.split(b"/")[:-1]
+            for i in reversed(range(1, len(subpath_split) + 1)):
+                # delete external sub-directory only if it is not versioned
+                subpath = os.path.join(self.path, b"/".join(subpath_split[0:i]))
+                try:
+                    self.svnrepo.client.info(
+                        svn_urljoin(self.svnrepo.remote_url, os.fsdecode(subpath)),
+                        peg_revision=self.editor.revnum,
+                        revision=self.editor.revnum,
+                    )
+                except SubversionException:
+                    self.remove_child(subpath)
+                else:
+                    break
 
         try:
             # externals can overlap with versioned files so we must restore

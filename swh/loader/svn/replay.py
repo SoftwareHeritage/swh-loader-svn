@@ -664,12 +664,26 @@ class DirEditor:
                 temp_path = os.path.join(temp_dir, dest_path)
                 os.makedirs(b"/".join(temp_path.split(b"/")[:-1]), exist_ok=True)
                 if external_url not in self.editor.dead_externals:
-                    logger.debug("Exporting external %s to path %s", external_url, path)
+                    logger.debug(
+                        "Exporting external %s%s to path %s",
+                        external_url,
+                        f"@{revision}" if revision else "",
+                        path,
+                    )
+                    url = external_url.rstrip("/")
+                    origin_url = self.svnrepo.origin_url.rstrip("/")
+                    if (
+                        url.startswith(origin_url + "/")
+                        and not self.svnrepo.has_relative_externals
+                    ):
+                        url = url.replace(origin_url, self.svnrepo.remote_url)
+                    logger.debug(
+                        "svn export --ignore-keywords %s%s",
+                        url,
+                        f"@{revision}" if revision else "",
+                    )
                     self.svnrepo.client.export(
-                        external_url.rstrip("/"),
-                        to=temp_path,
-                        peg_rev=revision,
-                        ignore_keywords=True,
+                        url, to=temp_path, peg_rev=revision, ignore_keywords=True,
                     )
                     self.editor.externals_cache[external] = temp_path
 

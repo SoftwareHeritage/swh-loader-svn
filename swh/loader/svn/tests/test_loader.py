@@ -1008,8 +1008,8 @@ def add_commit(repo_url: str, message: str, changes: List[CommitChange]) -> None
     editor.close()
 
 
-def create_repo(tmp_path):
-    repo_path = os.path.join(tmp_path, "tmprepo")
+def create_repo(tmp_path, repo_name="tmprepo"):
+    repo_path = os.path.join(tmp_path, repo_name)
     repos.create(repo_path)
     repo_url = f"file://{repo_path}"
     return repo_url
@@ -1887,6 +1887,12 @@ def test_loader_with_valid_svn_externals(
             CommitChange(change_type=CommitChangeType.AddOrUpdate, path="branches/",),
             CommitChange(change_type=CommitChangeType.AddOrUpdate, path="tags/",),
             CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/",),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/bar.sh",
+                properties={"svn:executable": "*"},
+                data=b"#!/bin/bash\necho bar",
+            ),
         ],
     )
 
@@ -1904,7 +1910,8 @@ def test_loader_with_valid_svn_externals(
                 properties={
                     "svn:externals": (
                         f"{svn_urljoin(external_repo_url, 'code/hello')} hello\n"
-                        f"{svn_urljoin(external_repo_url, 'foo.sh')} foo.sh"
+                        f"{svn_urljoin(external_repo_url, 'foo.sh')} foo.sh\n"
+                        f"{svn_urljoin(repo_url, 'trunk/bar.sh')} bar.sh"
                     )
                 },
             ),
@@ -2953,3 +2960,68 @@ def test_loader_external_in_versioned_path(
         loader.storage, repo_url, status="full", type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_dump_loader_externals_in_loaded_repository(swh_storage, tmp_path, mocker):
+    repo_url = create_repo(tmp_path, repo_name="foo")
+    externa_url = create_repo(tmp_path, repo_name="foobar")
+
+    # first commit on external
+    add_commit(
+        externa_url,
+        "Create a file in an external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/src/foo.sh",
+                data=b"#!/bin/bash\necho foo",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        (
+            "Add a file and set externals on trunk/externals:"
+            "one external located in this repository, the other in a remote one"
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/src/bar.sh",
+                data=b"#!/bin/bash\necho bar",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/externals/",
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(repo_url, 'trunk/src/bar.sh')} bar.sh\n"
+                        f"{svn_urljoin(externa_url, 'trunk/src/foo.sh')} foo.sh"
+                    )
+                },
+            ),
+        ],
+    )
+
+    from swh.loader.svn.svn import client
+
+    mock_client = mocker.MagicMock()
+    mocker.patch.object(client, "Client", mock_client)
+
+    loader = SvnLoaderFromRemoteDump(swh_storage, repo_url, temp_directory=tmp_path)
+    loader.load()
+
+    export_call_args = mock_client().export.call_args_list
+
+    # first external export should use the base URL of the local repository
+    # mounted from the remote dump as it is located in loaded repository
+    assert export_call_args[0][0][0] != svn_urljoin(
+        loader.svnrepo.origin_url, "trunk/src/bar.sh"
+    )
+    assert export_call_args[0][0][0] == svn_urljoin(
+        loader.svnrepo.remote_url, "trunk/src/bar.sh"
+    )
+
+    # second external export should use the remote URL of the external repository
+    assert export_call_args[1][0][0] == svn_urljoin(externa_url, "trunk/src/foo.sh")

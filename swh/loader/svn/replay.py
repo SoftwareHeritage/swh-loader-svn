@@ -600,25 +600,31 @@ class DirEditor:
         if self.externals:
             self.dir_states[self.path].externals = self.externals
 
-        self.svnrepo.has_relative_externals = any(
-            relative_url for (_, relative_url) in self.editor.valid_externals.values()
-        )
-
-        self.svnrepo.has_recursive_externals = any(
-            is_recursive_external(
-                self.svnrepo.origin_url, os.fsdecode(path), external_path, external_url
+        # do operations below only when closing the root directory
+        if self.path == b"":
+            self.svnrepo.has_relative_externals = any(
+                relative_url
+                for (_, relative_url) in self.editor.valid_externals.values()
             )
-            for path, dir_state in self.dir_states.items()
-            for external_path in dir_state.externals.keys()
-            for (external_url, _, _) in dir_state.externals[external_path]
-        )
-        if self.svnrepo.has_recursive_externals:
-            # If the repository has recursive externals, we stop processing externals
-            # and remove those already exported,
-            # We will then ignore externals when exporting the revision to check for
-            # divergence with the reconstructed filesystem
-            for external_path in list(self.editor.external_paths):
-                self.remove_external_path(external_path)
+
+            self.svnrepo.has_recursive_externals = any(
+                is_recursive_external(
+                    self.svnrepo.origin_url,
+                    os.fsdecode(path),
+                    external_path,
+                    external_url,
+                )
+                for path, dir_state in self.dir_states.items()
+                for external_path in dir_state.externals.keys()
+                for (external_url, _, _) in dir_state.externals[external_path]
+            )
+            if self.svnrepo.has_recursive_externals:
+                # If the repository has recursive externals, we stop processing
+                # externals and remove those already exported,
+                # We will then ignore externals when exporting the revision to
+                # check for divergence with the reconstructed filesystem.
+                for external_path in list(self.editor.external_paths):
+                    self.remove_external_path(external_path)
 
     def process_external(
         self,

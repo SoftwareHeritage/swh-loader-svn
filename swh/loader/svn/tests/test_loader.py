@@ -3025,3 +3025,77 @@ def test_dump_loader_externals_in_loaded_repository(swh_storage, tmp_path, mocke
 
     # second external export should use the remote URL of the external repository
     assert export_call_args[1][0][0] == svn_urljoin(externa_url, "trunk/src/foo.sh")
+
+
+def test_loader_externals_add_remove_readd_on_subpath(
+    swh_storage, repo_url, external_repo_url, tmp_path
+):
+    # first commit on external
+    add_commit(
+        external_repo_url,
+        "Create files in an external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="src/foo.sh",
+                data=b"#!/bin/bash\necho foo",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="src/bar.sh",
+                data=b"#!/bin/bash\necho bar",
+            ),
+        ],
+    )
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Set external on two paths targeting the same absolute path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/src/",
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(external_repo_url, 'src/foo.sh')} foo.sh"
+                    )
+                },
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(external_repo_url, 'src/foo.sh')} src/foo.sh"
+                    )
+                },
+            ),
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Remove external on a single path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(external_repo_url, 'src/bar.sh')} src/bar.sh"
+                    )
+                },
+            ),
+        ],
+    )
+
+    loader = SvnLoader(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)

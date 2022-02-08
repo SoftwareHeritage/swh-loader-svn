@@ -624,7 +624,7 @@ class DirEditor:
                 # We will then ignore externals when exporting the revision to
                 # check for divergence with the reconstructed filesystem.
                 for external_path in list(self.editor.external_paths):
-                    self.remove_external_path(external_path)
+                    self.remove_external_path(external_path, force=True)
 
     def process_external(
         self,
@@ -652,6 +652,13 @@ class DirEditor:
             # recursive external, skip it
             return
 
+        logger.debug(
+            "Exporting external %s%s to path %s",
+            external_url,
+            f"@{revision}" if revision else "",
+            dest_fullpath,
+        )
+
         if external not in self.editor.externals_cache:
 
             try:
@@ -664,12 +671,6 @@ class DirEditor:
                 temp_path = os.path.join(temp_dir, dest_path)
                 os.makedirs(b"/".join(temp_path.split(b"/")[:-1]), exist_ok=True)
                 if external_url not in self.editor.dead_externals:
-                    logger.debug(
-                        "Exporting external %s%s to path %s",
-                        external_url,
-                        f"@{revision}" if revision else "",
-                        path,
-                    )
                     url = external_url.rstrip("/")
                     origin_url = self.svnrepo.origin_url.rstrip("/")
                     if (
@@ -721,7 +722,7 @@ class DirEditor:
             fullpath = os.path.join(self.rootpath, dest_fullpath)
 
             # update from_disk model and store external paths
-            self.editor.external_paths.add(dest_fullpath)
+            self.editor.external_paths[dest_fullpath] += 1
             self.editor.modified_paths.add(dest_fullpath)
 
             if os.path.isfile(temp_path):
@@ -763,23 +764,41 @@ class DirEditor:
                             for p in chain(dirs, files)
                         ]
                     )
-                self.editor.external_paths.update(external_paths)
+                for external_path in external_paths:
+                    self.editor.external_paths[external_path] += 1
+
                 self.editor.modified_paths.update(external_paths)
 
             # ensure hash update for the directory with externals set
             self.directory[self.path].update_hash(force=True)
 
-    def remove_external_path(self, external_path: bytes, remove_subpaths=True) -> None:
+    def remove_external_path(
+        self, external_path: bytes, remove_subpaths: bool = True, force: bool = False
+    ) -> None:
         """Remove a previously exported SVN external path from
-        the reconstruted filesystem.
+        the reconstructed filesystem.
         """
         fullpath = os.path.join(self.path, external_path)
-        self.remove_child(fullpath)
-        self.editor.external_paths.discard(fullpath)
-        self.editor.valid_externals.pop(fullpath, None)
-        for path in list(self.editor.external_paths):
-            if path.startswith(fullpath + b"/"):
-                self.editor.external_paths.remove(path)
+
+        # decrement number of references for external path when we really remove it
+        # (when remove_subpaths is False, we just cleanup the external path before
+        # copying exported paths in it)
+        if fullpath in self.editor.external_paths and remove_subpaths:
+            self.editor.external_paths[fullpath] -= 1
+
+        if (
+            force
+            or fullpath in self.editor.external_paths
+            and self.editor.external_paths[fullpath] == 0
+        ):
+            self.remove_child(fullpath)
+            self.editor.external_paths.pop(fullpath, None)
+            self.editor.valid_externals.pop(fullpath, None)
+            for path in list(self.editor.external_paths):
+                if path.startswith(fullpath + b"/"):
+                    self.editor.external_paths[path] -= 1
+                    if self.editor.external_paths[path] == 0:
+                        self.editor.external_paths.pop(path)
 
         if remove_subpaths:
             subpath_split = external_path.split(b"/")[:-1]
@@ -835,7 +854,7 @@ class Editor:
         self.directory = directory
         self.file_states: Dict[bytes, FileState] = defaultdict(FileState)
         self.dir_states: Dict[bytes, DirState] = defaultdict(DirState)
-        self.external_paths: Set[bytes] = set()
+        self.external_paths: Dict[bytes, int] = defaultdict(int)
         self.valid_externals: Dict[bytes, Tuple[str, bool]] = {}
         self.dead_externals: Set[str] = set()
         self.externals_cache_dir = tempfile.mkdtemp(dir=temp_dir)

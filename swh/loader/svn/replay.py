@@ -354,13 +354,17 @@ class FileEditor:
             self.directory[self.path] = from_disk.Content.from_file(path=self.fullpath)
 
 
+ExternalDefinition = Tuple[str, Optional[int], bool]
+
+
 @dataclass
 class DirState:
     """Persists some directory states (eg. externals) across revisions while
     replaying them."""
 
-    externals: Dict[str, List[Tuple[str, Optional[int]]]] = field(default_factory=dict)
-    """Map a path in the directory to a list of (external_url, revision) targeting it"""
+    externals: Dict[str, List[ExternalDefinition]] = field(default_factory=dict)
+    """Map a path in the directory to a list of (external_url, revision, relative_url)
+    targeting it"""
 
 
 class DirEditor:
@@ -399,7 +403,7 @@ class DirEditor:
         self.dir_states = dir_states
         self.svnrepo = svnrepo
         self.editor = svnrepo.swhreplay.editor
-        self.externals: Dict[str, List[Tuple[str, Optional[int], bool]]] = {}
+        self.externals: Dict[str, List[ExternalDefinition]] = {}
 
         # repository root dir has empty path
         if path:
@@ -634,13 +638,13 @@ class DirEditor:
         relative_url: bool,
         remove_target_path: bool = True,
     ) -> None:
-        external = (external_url, revision)
+        external = (external_url, revision, relative_url)
         dest_path = os.fsencode(path)
         dest_fullpath = os.path.join(self.path, dest_path)
         prev_externals = self.dir_states[self.path].externals
         if (
             path in prev_externals
-            and prev_externals[path] == external
+            and external in prev_externals[path]
             and dest_fullpath in self.directory
         ):
             # external already exported, nothing to do
@@ -858,7 +862,7 @@ class Editor:
         self.valid_externals: Dict[bytes, Tuple[str, bool]] = {}
         self.dead_externals: Set[str] = set()
         self.externals_cache_dir = tempfile.mkdtemp(dir=temp_dir)
-        self.externals_cache: Dict[Tuple[str, Optional[int]], bytes] = {}
+        self.externals_cache: Dict[ExternalDefinition, bytes] = {}
         self.svnrepo = svnrepo
         self.revnum = None
         # to store the set of paths added or modified when replaying a revision

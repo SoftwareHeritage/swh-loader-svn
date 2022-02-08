@@ -2466,7 +2466,11 @@ def test_loader_externals_cache(swh_storage, repo_url, external_repo_url, tmp_pa
     )
     check_snapshot(loader.snapshot, loader.storage)
 
-    assert (external_url, None) in loader.svnrepo.swhreplay.editor.externals_cache
+    assert (
+        external_url,
+        None,
+        False,
+    ) in loader.svnrepo.swhreplay.editor.externals_cache
 
 
 def test_loader_remove_versioned_path_with_external_overlap(

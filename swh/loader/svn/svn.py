@@ -300,7 +300,6 @@ class SvnRepo:
     ) -> Iterator[
         Tuple[
             int,
-            Optional[int],
             Dict,
             Tuple[List[Content], List[SkippedContent], List[Directory]],
             DirectoryFromDisk,
@@ -318,7 +317,6 @@ class SvnRepo:
             Tuple (rev, nextrev, commit, objects_per_path):
 
             - rev: current revision
-            - nextrev: next revision or None if we reached end_revision.
             - commit: commit data (author, date, message) for such revision
             - objects_per_path: Tuple of list of objects between start_revision and
               end_revision
@@ -334,15 +332,10 @@ class SvnRepo:
             rev = commit["rev"]
             objects = self.swhreplay.compute_objects(rev)
 
-            if rev == end_revision:
-                nextrev = None
-            else:
-                nextrev = rev + 1
-
             if rev >= start_revision:
                 # start yielding new data to archive once we reached the revision to
                 # resume the loading from
-                yield rev, nextrev, commit, objects, self.swhreplay.directory
+                yield rev, commit, objects, self.swhreplay.directory
 
     def swh_hash_data_at_revision(
         self, revision: int

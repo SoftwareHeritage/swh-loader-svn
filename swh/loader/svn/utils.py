@@ -279,7 +279,8 @@ def parse_external_definition(
             path = external_part.replace("\\\\", "\\")
             if path == external_part:
                 path = external_part.replace("\\", "")
-            path = path.lstrip("./")
+            if path.startswith("./"):
+                path = path.replace("./", "", 1)
         prev_part = external_part
     if "@" in external_url:
         # try to extract revision number if external URL is in the form

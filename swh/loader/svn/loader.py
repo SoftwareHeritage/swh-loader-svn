@@ -121,6 +121,7 @@ class SvnLoader(BaseLoader):
         # state from previous visit
         self.latest_snapshot = None
         self.latest_revision: Optional[Revision] = None
+        self.from_dump = False
 
     def pre_cleanup(self):
         """Cleanup potential dangling files from prior runs (e.g. OOM killed
@@ -160,9 +161,9 @@ Local repository not cleaned up for investigation: %s""",
         """
         assert self.svnrepo is not None
         local_dirname, local_url = self.svnrepo.export_temporary(revision)
-        h = from_disk.Directory.from_disk(path=local_url).hash
+        root_dir = from_disk.Directory.from_disk(path=local_url)
         self.svnrepo.clean_fs(local_dirname)
-        return h
+        return root_dir.hash
 
     def _latest_snapshot_revision(
         self, origin_url: str,
@@ -392,7 +393,11 @@ Local repository not cleaned up for investigation: %s""",
 
         try:
             self.svnrepo = SvnRepo(
-                self.svn_url, self.origin_url, local_dirname, self.max_content_size
+                self.svn_url,
+                self.origin_url,
+                local_dirname,
+                self.max_content_size,
+                self.from_dump,
             )
         except SubversionException as e:
             error_msgs = [
@@ -577,6 +582,7 @@ class SvnLoaderFromDumpArchive(SvnLoader):
         self.archive_path = archive_path
         self.temp_dir = None
         self.repo_path = None
+        self.from_dump = True
 
     def prepare(self):
         self.log.info("Archive to mount and load %s", self.archive_path)
@@ -630,6 +636,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             check_revision=check_revision,
             max_content_size=max_content_size,
         )
+        self.from_dump = True
         self.temp_dir = self._create_tmp_dir(self.temp_directory)
         self.repo_path = None
         self.truncated_dump = False

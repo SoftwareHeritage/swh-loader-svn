@@ -1175,6 +1175,11 @@ def test_dump_loader_externals_in_loaded_repository(swh_storage, tmp_path, mocke
     mock_client = mocker.MagicMock()
     mocker.patch.object(client, "Client", mock_client)
 
+    class Info:
+        repos_root_url = repo_url
+
+    mock_client().info.return_value = {"repo": Info()}
+
     loader = SvnLoaderFromRemoteDump(swh_storage, repo_url, temp_directory=tmp_path)
     loader.load()
 

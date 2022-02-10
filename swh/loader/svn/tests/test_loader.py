@@ -709,9 +709,10 @@ def test_loader_svn_cleanup_loader_from_dump_archive(swh_storage, datadir, tmp_p
     assert not os.path.exists(loader.temp_dir)
 
 
-def test_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
+def test_svn_loader_from_remote_dump(swh_storage, datadir, tmpdir_factory):
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    tmp_path = tmpdir_factory.mktemp("repo1")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
     loaderFromDump = SvnLoaderFromRemoteDump(
@@ -726,7 +727,10 @@ def test_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
         snapshot=GOURMET_SNAPSHOT.id,
     )
 
-    origin_url = repo_url + "2"  # rename to another origin
+    # rename to another origin
+    tmp_path = tmpdir_factory.mktemp("repo2")
+    origin_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
     loader = SvnLoader(
         swh_storage, repo_url, origin_url=origin_url, temp_directory=tmp_path
     )
@@ -911,7 +915,6 @@ def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
-    origin_url = f"svn://{archive_name}"
     dump_filename = f"{archive_name}.dump"
 
     with open(os.path.join(tmp_path, dump_filename), "wb") as dump_file:
@@ -922,7 +925,7 @@ def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
         # load svn repo from that compressed dump file
         loader = SvnLoaderFromDumpArchive(
             swh_storage,
-            url=origin_url,
+            url=repo_url,
             archive_path=os.path.join(tmp_path, f"{dump_filename}.gz"),
             temp_directory=tmp_path,
         )
@@ -931,7 +934,7 @@ def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
 
         assert_last_visit_matches(
             loader.storage,
-            origin_url,
+            repo_url,
             status="full",
             type="svn",
             snapshot=GOURMET_SNAPSHOT.id,
@@ -1778,3 +1781,99 @@ def test_loader_svn_add_property_on_directory_link(swh_storage, repo_url, tmp_pa
         loader.storage, repo_url, status="full", type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+@pytest.mark.parametrize(
+    "svn_loader_cls", [SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump]
+)
+def test_loader_with_subprojects(swh_storage, repo_url, tmp_path, svn_loader_cls):
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Add first project in repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="project1/foo.sh",
+                data=b"#!/bin/bash\necho foo",
+            ),
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Add second project in repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="project2/bar.sh",
+                data=b"#!/bin/bash\necho bar",
+            ),
+        ],
+    )
+
+    # third commit
+    add_commit(
+        repo_url,
+        "Add third project in repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="project3/baz.sh",
+                data=b"#!/bin/bash\necho baz",
+            ),
+        ],
+    )
+
+    def dump_project(origin_url):
+        svnrdump_cmd = ["svnrdump", "dump", origin_url]
+        dump_path = f"{tmp_path}/repo.dump"
+        with open(dump_path, "wb") as dump_file:
+            subprocess.run(svnrdump_cmd, stdout=dump_file)
+        subprocess.run(["gzip", dump_path])
+        return dump_path + ".gz"
+
+    for i in range(1, 4):
+        # load each project in the repository separately
+        origin_url = f"{repo_url}/project{i}"
+
+        loader_params = {
+            "storage": swh_storage,
+            "url": origin_url,
+            "origin_url": origin_url,
+            "temp_directory": tmp_path,
+            "incremental": True,
+            "check_revision": 1,
+        }
+
+        if svn_loader_cls == SvnLoaderFromDumpArchive:
+            loader_params["archive_path"] = dump_project(origin_url)
+
+        loader = svn_loader_cls(**loader_params)
+
+        assert loader.load() == {"status": "eventful"}
+        assert_last_visit_matches(
+            loader.storage, origin_url, status="full", type="svn",
+        )
+        check_snapshot(loader.snapshot, loader.storage)
+
+        if svn_loader_cls == SvnLoaderFromDumpArchive:
+            loader_params["archive_path"] = dump_project(origin_url)
+
+        loader = svn_loader_cls(**loader_params)
+
+        assert loader.load() == {"status": "uneventful"}
+
+        # each project origin must have
+        assert get_stats(loader.storage) == {
+            "content": i,  # one content
+            "directory": 2 * i,  # two directories
+            "origin": i,
+            "origin_visit": 2 * i,  # two visits
+            "release": 0,
+            "revision": i,  # one revision
+            "skipped_content": 0,
+            "snapshot": i,  # one snapshot
+        }

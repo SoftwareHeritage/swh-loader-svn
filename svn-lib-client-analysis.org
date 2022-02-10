@@ -1,7 +1,7 @@
 #+title: svn lib client analysis
 
 |-----------------------------------------+----------------------------------------------------------------------+------------------------------------------------------------------------------+-------------+------------------------------------------|
-| Client                                  | Cons                                                                 | Pros                                                                         | License     | work as advertize                        |
+| Client                                  | Cons                                                                 | Pros                                                                         | License     | work as advertise                        |
 |-----------------------------------------+----------------------------------------------------------------------+------------------------------------------------------------------------------+-------------+------------------------------------------|
 | http://subversion.apache.org/           | broken api link to doc: http://subversion.apache.org/docsapi/latest/ | python-subversion debian package                                             | [[http://www.apache.org/licenses/LICENSE-2.0][Apache v2.0]] | X                                        |
 |                                         | python 2 only                                                        | official bindings                                                            |             |                                          |

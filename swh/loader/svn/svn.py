@@ -217,7 +217,7 @@ class SvnRepo:
 
         url = self.remote_url
         # if some paths have external URLs relative to the repository URL but targeting
-        # paths oustide it, we need to export from the origin URL as the remote URL can
+        # paths outside it, we need to export from the origin URL as the remote URL can
         # target a dump mounted on the local filesystem
         if self.replay_started and self.has_relative_externals:
             # externals detected while replaying revisions

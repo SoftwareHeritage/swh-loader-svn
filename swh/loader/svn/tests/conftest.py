@@ -1,4 +1,4 @@
-# Copyright (C) 2019-2021  The Software Heritage developers
+# Copyright (C) 2019-2022  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -6,6 +6,8 @@
 from typing import Any, Dict
 
 import pytest
+
+from .utils import create_repo
 
 
 @pytest.fixture
@@ -37,3 +39,9 @@ def swh_loader_config(swh_storage_backend_config) -> Dict[str, Any]:
         "check_revision": 100,
         "temp_directory": "/tmp",
     }
+
+
+@pytest.fixture
+def repo_url(tmpdir_factory):
+    # create a repository
+    return create_repo(tmpdir_factory.mktemp("repos"))

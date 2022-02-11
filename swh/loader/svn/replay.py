@@ -12,6 +12,7 @@ from __future__ import annotations
 import codecs
 from collections import defaultdict
 from dataclasses import dataclass, field
+from distutils.dir_util import copy_tree
 from itertools import chain
 import logging
 import os
@@ -353,12 +354,17 @@ class FileEditor:
             self.directory[self.path] = from_disk.Content.from_file(path=self.fullpath)
 
 
+ExternalDefinition = Tuple[str, Optional[int], bool]
+
+
 @dataclass
 class DirState:
     """Persists some directory states (eg. externals) across revisions while
     replaying them."""
 
-    externals: Dict[str, Tuple[str, Optional[int]]] = field(default_factory=dict)
+    externals: Dict[str, List[ExternalDefinition]] = field(default_factory=dict)
+    """Map a path in the directory to a list of (external_url, revision, relative_url)
+    targeting it"""
 
 
 class DirEditor:
@@ -397,7 +403,7 @@ class DirEditor:
         self.dir_states = dir_states
         self.svnrepo = svnrepo
         self.editor = svnrepo.swhreplay.editor
-        self.externals: Dict[str, Tuple[str, Optional[int], bool]] = {}
+        self.externals: Dict[str, List[ExternalDefinition]] = {}
 
         # repository root dir has empty path
         if path:
@@ -470,17 +476,17 @@ class DirEditor:
             svnrepo=self.svnrepo,
         )
 
-    def open_file(self, *args) -> FileEditor:
+    def open_file(self, path: str, *args) -> FileEditor:
         """Updating existing file.
 
         """
-        path = os.fsencode(args[0])
-        self.directory[path] = from_disk.Content()
-        fullpath = os.path.join(self.rootpath, path)
+        path_bytes = os.fsencode(path)
+        self.directory[path_bytes] = from_disk.Content()
+        fullpath = os.path.join(self.rootpath, path_bytes)
         return FileEditor(
             self.directory,
             rootpath=self.rootpath,
-            path=path,
+            path=path_bytes,
             state=self.file_states[fullpath],
             svnrepo=self.svnrepo,
         )
@@ -512,7 +518,7 @@ class DirEditor:
                 value,
                 self.path,
             )
-            self.externals = {}
+            self.externals = defaultdict(list)
             if value is not None:
                 # externals are set on that directory path, parse and store them
                 # for later processing in the close method
@@ -529,7 +535,7 @@ class DirEditor:
                     ) = parse_external_definition(
                         external, os.fsdecode(self.path), self.svnrepo.origin_url
                     )
-                    self.externals[path] = (external_url, revision, relative_url)
+                    self.externals[path].append((external_url, revision, relative_url))
 
             if not self.externals:
                 # externals might have been unset on that directory path,
@@ -564,10 +570,14 @@ class DirEditor:
             # associated paths
             externals = self.externals
             prev_externals_set = {
-                (path, url, rev) for path, (url, rev, _) in prev_externals.items()
+                (path, url, rev)
+                for path in prev_externals.keys()
+                for (url, rev, _) in prev_externals[path]
             }
             externals_set = {
-                (path, url, rev) for path, (url, rev, _) in externals.items()
+                (path, url, rev)
+                for path in externals.keys()
+                for (url, rev, _) in externals[path]
             }
             old_externals = prev_externals_set - externals_set
             for path, _, _ in old_externals:
@@ -579,151 +589,236 @@ class DirEditor:
             externals = prev_externals
 
         # For each external, try to export it in reconstructed filesystem
-        for path, (external_url, revision, relative_url) in externals.items():
-            external = (external_url, revision)
-            dest_path = os.fsencode(path)
-            dest_fullpath = os.path.join(self.path, dest_path)
-            if (
-                path in prev_externals
-                and prev_externals[path] == external
-                and dest_fullpath in self.directory
-            ):
-                # external already exported, nothing to do
-                continue
-
-            if is_recursive_external(
-                self.svnrepo.origin_url, os.fsdecode(self.path), path, external_url
-            ):
-                # recursive external, skip it
-                continue
-
-            if external not in self.editor.externals_cache:
-
-                try:
-                    # try to export external in a temporary path, destination path could
-                    # be versioned and must be overridden only if the external URL is
-                    # still valid
-                    temp_dir = os.fsencode(
-                        tempfile.mkdtemp(dir=self.editor.externals_cache_dir)
-                    )
-                    temp_path = os.path.join(temp_dir, dest_path)
-                    os.makedirs(b"/".join(temp_path.split(b"/")[:-1]), exist_ok=True)
-                    if external_url not in self.editor.dead_externals:
-                        logger.debug(
-                            "Exporting external %s to path %s", external_url, path
-                        )
-                        self.svnrepo.client.export(
-                            external_url.rstrip("/"),
-                            to=temp_path,
-                            peg_rev=revision,
-                            ignore_keywords=True,
-                        )
-                        self.editor.externals_cache[external] = temp_path
-                        self.editor.valid_externals[dest_fullpath] = (
-                            external_url,
-                            relative_url,
-                        )
-
-                except SubversionException as se:
-                    # external no longer available (404)
-                    logger.debug(se)
-                    self.editor.dead_externals.add(external_url)
-
-            else:
-                temp_path = self.editor.externals_cache[external]
-
-            # subversion export will always create the subdirectories of the external
-            # path regardless the validity of the remote URL
-            dest_path_split = dest_path.split(b"/")
-            current_path = self.path
-            self.add_directory(current_path)
-            for subpath in dest_path_split[:-1]:
-                current_path = os.path.join(current_path, subpath)
-                self.add_directory(current_path)
-
-            if os.path.exists(temp_path):
-                # external successfully exported
-
-                # remove previous path in from_disk model
-                self.remove_child(dest_fullpath)
-                # copy exported path to reconstructed filesystem
-                fullpath = os.path.join(self.rootpath, dest_fullpath)
-
-                self.editor.external_paths.add(dest_fullpath)
-                self.editor.modified_paths.add(dest_fullpath)
-                # update from_disk model and store external paths
-                self.editor.external_paths.add(dest_fullpath)
-                if os.path.isfile(temp_path):
-                    shutil.copy(temp_path, fullpath)
-                    self.directory[dest_fullpath] = from_disk.Content.from_file(
-                        path=fullpath
-                    )
-                else:
-                    shutil.copytree(temp_path, fullpath, symlinks=True)
-                    self.directory[dest_fullpath] = from_disk.Directory.from_disk(
-                        path=fullpath
-                    )
-                    external_paths = set()
-                    for root, dirs, files in os.walk(fullpath):
-                        external_paths.update(
-                            [
-                                os.path.join(root.replace(self.rootpath + b"/", b""), p)
-                                for p in chain(dirs, files)
-                            ]
-                        )
-                    self.editor.external_paths.update(external_paths)
-                    self.editor.modified_paths.update(external_paths)
-
-                # ensure hash update for the directory with externals set
-                self.directory[self.path].update_hash(force=True)
+        for path, externals_def in externals.items():
+            for i, external in enumerate(externals_def):
+                external_url, revision, relative_url = external
+                self.process_external(
+                    path,
+                    external_url,
+                    revision,
+                    relative_url,
+                    remove_target_path=i == 0,
+                )
 
         # backup externals in directory state
         if self.externals:
             self.dir_states[self.path].externals = self.externals
 
-        self.svnrepo.has_relative_externals = any(
-            [relative_url for (_, relative_url) in self.editor.valid_externals.values()]
-        )
-
-        self.svnrepo.has_recursive_externals = any(
-            is_recursive_external(
-                self.svnrepo.origin_url, os.fsdecode(path), external_path, external_url
+        # do operations below only when closing the root directory
+        if self.path == b"":
+            self.svnrepo.has_relative_externals = any(
+                relative_url
+                for (_, relative_url) in self.editor.valid_externals.values()
             )
-            for path, dir_state in self.dir_states.items()
-            for external_path, (external_url, _, _) in dir_state.externals.items()
-        )
-        if self.svnrepo.has_recursive_externals:
-            # If the repository has recursive externals, we stop processing externals
-            # and remove those already exported,
-            # We will then ignore externals when exporting the revision to check for
-            # divergence with the reconstructed filesystem
-            for external_path in list(self.editor.external_paths):
-                self.remove_external_path(external_path)
 
-    def remove_external_path(self, external_path: bytes) -> None:
+            self.svnrepo.has_recursive_externals = any(
+                is_recursive_external(
+                    self.svnrepo.origin_url,
+                    os.fsdecode(path),
+                    external_path,
+                    external_url,
+                )
+                for path, dir_state in self.dir_states.items()
+                for external_path in dir_state.externals.keys()
+                for (external_url, _, _) in dir_state.externals[external_path]
+            )
+            if self.svnrepo.has_recursive_externals:
+                # If the repository has recursive externals, we stop processing
+                # externals and remove those already exported,
+                # We will then ignore externals when exporting the revision to
+                # check for divergence with the reconstructed filesystem.
+                for external_path in list(self.editor.external_paths):
+                    self.remove_external_path(external_path, force=True)
+
+    def process_external(
+        self,
+        path: str,
+        external_url: str,
+        revision: Optional[int],
+        relative_url: bool,
+        remove_target_path: bool = True,
+    ) -> None:
+        external = (external_url, revision, relative_url)
+        dest_path = os.fsencode(path)
+        dest_fullpath = os.path.join(self.path, dest_path)
+        prev_externals = self.dir_states[self.path].externals
+        if (
+            path in prev_externals
+            and external in prev_externals[path]
+            and dest_fullpath in self.directory
+        ):
+            # external already exported, nothing to do
+            return
+
+        if is_recursive_external(
+            self.svnrepo.origin_url, os.fsdecode(self.path), path, external_url
+        ):
+            # recursive external, skip it
+            return
+
+        logger.debug(
+            "Exporting external %s%s to path %s",
+            external_url,
+            f"@{revision}" if revision else "",
+            dest_fullpath,
+        )
+
+        if external not in self.editor.externals_cache:
+
+            try:
+                # try to export external in a temporary path, destination path could
+                # be versioned and must be overridden only if the external URL is
+                # still valid
+                temp_dir = os.fsencode(
+                    tempfile.mkdtemp(dir=self.editor.externals_cache_dir)
+                )
+                temp_path = os.path.join(temp_dir, dest_path)
+                os.makedirs(b"/".join(temp_path.split(b"/")[:-1]), exist_ok=True)
+                if external_url not in self.editor.dead_externals:
+                    url = external_url.rstrip("/")
+                    origin_url = self.svnrepo.origin_url.rstrip("/")
+                    if (
+                        url.startswith(origin_url + "/")
+                        and not self.svnrepo.has_relative_externals
+                    ):
+                        url = url.replace(origin_url, self.svnrepo.remote_url)
+                    logger.debug(
+                        "svn export --ignore-keywords %s%s",
+                        url,
+                        f"@{revision}" if revision else "",
+                    )
+                    self.svnrepo.client.export(
+                        url, to=temp_path, peg_rev=revision, ignore_keywords=True,
+                    )
+                    self.editor.externals_cache[external] = temp_path
+
+            except SubversionException as se:
+                # external no longer available (404)
+                logger.debug(se)
+                self.editor.dead_externals.add(external_url)
+
+        else:
+            temp_path = self.editor.externals_cache[external]
+
+        # subversion export will always create the subdirectories of the external
+        # path regardless the validity of the remote URL
+        dest_path_split = dest_path.split(b"/")
+        current_path = self.path
+        self.add_directory(os.fsdecode(current_path))
+        for subpath in dest_path_split[:-1]:
+            current_path = os.path.join(current_path, subpath)
+            self.add_directory(os.fsdecode(current_path))
+
+        if os.path.exists(temp_path):
+            # external successfully exported
+
+            if remove_target_path:
+                # remove previous path in from_disk model
+                self.remove_external_path(dest_path, remove_subpaths=False)
+
+            # mark external as valid
+            self.editor.valid_externals[dest_fullpath] = (
+                external_url,
+                relative_url,
+            )
+
+            # copy exported path to reconstructed filesystem
+            fullpath = os.path.join(self.rootpath, dest_fullpath)
+
+            # update from_disk model and store external paths
+            self.editor.external_paths[dest_fullpath] += 1
+            self.editor.modified_paths.add(dest_fullpath)
+
+            if os.path.isfile(temp_path):
+                if os.path.islink(fullpath):
+                    # remove destination file if it is a link
+                    os.remove(fullpath)
+                shutil.copy(os.fsdecode(temp_path), os.fsdecode(fullpath))
+                self.directory[dest_fullpath] = from_disk.Content.from_file(
+                    path=fullpath
+                )
+            else:
+                self.add_directory(os.fsdecode(dest_fullpath))
+
+                # copy_tree needs sub-directories to exist in destination
+                for root, dirs, files in os.walk(temp_path):
+                    for dir in dirs:
+                        subdir = os.path.join(root, dir).replace(temp_path + b"/", b"")
+                        self.add_directory(
+                            os.fsdecode(os.path.join(dest_fullpath, subdir))
+                        )
+
+                copy_tree(
+                    os.fsdecode(temp_path),
+                    os.fsdecode(fullpath),
+                    preserve_symlinks=True,
+                )
+
+                # TODO: replace code above by the line below once we use Python >= 3.8 in production # noqa
+                # shutil.copytree(temp_path, fullpath, symlinks=True, dirs_exist_ok=True) # noqa
+
+                self.directory[dest_fullpath] = from_disk.Directory.from_disk(
+                    path=fullpath
+                )
+                external_paths = set()
+                for root, dirs, files in os.walk(fullpath):
+                    external_paths.update(
+                        [
+                            os.path.join(root.replace(self.rootpath + b"/", b""), p)
+                            for p in chain(dirs, files)
+                        ]
+                    )
+                for external_path in external_paths:
+                    self.editor.external_paths[external_path] += 1
+
+                self.editor.modified_paths.update(external_paths)
+
+            # ensure hash update for the directory with externals set
+            self.directory[self.path].update_hash(force=True)
+
+    def remove_external_path(
+        self, external_path: bytes, remove_subpaths: bool = True, force: bool = False
+    ) -> None:
         """Remove a previously exported SVN external path from
-        the reconstruted filesystem.
+        the reconstructed filesystem.
         """
         fullpath = os.path.join(self.path, external_path)
-        self.remove_child(fullpath)
-        self.editor.external_paths.discard(fullpath)
-        self.editor.valid_externals.pop(fullpath, None)
-        for path in list(self.editor.external_paths):
-            if path.startswith(fullpath + b"/"):
-                self.editor.external_paths.remove(path)
-        subpath_split = external_path.split(b"/")[:-1]
-        for i in reversed(range(1, len(subpath_split) + 1)):
-            # delete external sub-directory only if it is not versioned
-            subpath = os.path.join(self.path, b"/".join(subpath_split[0:i]))
-            try:
-                self.svnrepo.client.info(
-                    svn_urljoin(self.svnrepo.remote_url, os.fsdecode(subpath)),
-                    peg_revision=self.editor.revnum,
-                )
-            except SubversionException:
-                self.remove_child(subpath)
-            else:
-                break
+
+        # decrement number of references for external path when we really remove it
+        # (when remove_subpaths is False, we just cleanup the external path before
+        # copying exported paths in it)
+        if fullpath in self.editor.external_paths and remove_subpaths:
+            self.editor.external_paths[fullpath] -= 1
+
+        if (
+            force
+            or fullpath in self.editor.external_paths
+            and self.editor.external_paths[fullpath] == 0
+        ):
+            self.remove_child(fullpath)
+            self.editor.external_paths.pop(fullpath, None)
+            self.editor.valid_externals.pop(fullpath, None)
+            for path in list(self.editor.external_paths):
+                if path.startswith(fullpath + b"/"):
+                    self.editor.external_paths[path] -= 1
+                    if self.editor.external_paths[path] == 0:
+                        self.editor.external_paths.pop(path)
+
+        if remove_subpaths:
+            subpath_split = external_path.split(b"/")[:-1]
+            for i in reversed(range(1, len(subpath_split) + 1)):
+                # delete external sub-directory only if it is not versioned
+                subpath = os.path.join(self.path, b"/".join(subpath_split[0:i]))
+                try:
+                    self.svnrepo.client.info(
+                        svn_urljoin(self.svnrepo.remote_url, os.fsdecode(subpath)),
+                        peg_revision=self.editor.revnum,
+                        revision=self.editor.revnum,
+                    )
+                except SubversionException:
+                    self.remove_child(subpath)
+                else:
+                    break
 
         try:
             # externals can overlap with versioned files so we must restore
@@ -763,11 +858,11 @@ class Editor:
         self.directory = directory
         self.file_states: Dict[bytes, FileState] = defaultdict(FileState)
         self.dir_states: Dict[bytes, DirState] = defaultdict(DirState)
-        self.external_paths: Set[bytes] = set()
+        self.external_paths: Dict[bytes, int] = defaultdict(int)
         self.valid_externals: Dict[bytes, Tuple[str, bool]] = {}
         self.dead_externals: Set[str] = set()
         self.externals_cache_dir = tempfile.mkdtemp(dir=temp_dir)
-        self.externals_cache: Dict[Tuple[str, Optional[int]], str] = {}
+        self.externals_cache: Dict[ExternalDefinition, bytes] = {}
         self.svnrepo = svnrepo
         self.revnum = None
         # to store the set of paths added or modified when replaying a revision

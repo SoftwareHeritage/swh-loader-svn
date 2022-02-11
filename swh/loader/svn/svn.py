@@ -53,9 +53,11 @@ class SvnRepo:
         origin_url: str,
         local_dirname: str,
         max_content_length: int,
+        from_dump: bool = False,
     ):
         self.remote_url = remote_url.rstrip("/")
         self.origin_url = origin_url
+        self.from_dump = from_dump
 
         auth = Auth([get_username_provider()])
         # one connection for log iteration
@@ -80,6 +82,12 @@ class SvnRepo:
         self.has_relative_externals = False
         self.has_recursive_externals = False
         self.replay_started = False
+
+        # compute root directory path from the remote repository URL, required to
+        # properly load the sub-tree of a repository mounted from a dump file
+        info = self.client.info(origin_url.rstrip("/"))
+        repos_root_url = next(iter(info.values())).repos_root_url
+        self.root_directory = origin_url.replace(repos_root_url, "", 1)
 
     def __str__(self):
         return str(
@@ -157,11 +165,21 @@ class SvnRepo:
             revprops.get(properties.PROP_REVISION_LOG, DEFAULT_AUTHOR_MESSAGE)
         )
 
+        has_changes = (
+            not self.from_dump
+            or changed_paths is not None
+            and any(
+                changed_path.startswith(self.root_directory)
+                for changed_path in changed_paths.keys()
+            )
+        )
+
         return {
             "rev": rev,
             "author_date": author_date,
             "author_name": author,
             "message": message,
+            "has_changes": has_changes,
         }
 
     def logs(self, revision_start: int, revision_end: int) -> Iterator[Dict]:
@@ -191,7 +209,7 @@ class SvnRepo:
             paths=None,
             start=revision_start,
             end=revision_end,
-            discover_changed_paths=False,
+            discover_changed_paths=self.from_dump,
         ):
             yield self.__to_entry(log_entry)
 
@@ -217,7 +235,7 @@ class SvnRepo:
 
         url = self.remote_url
         # if some paths have external URLs relative to the repository URL but targeting
-        # paths oustide it, we need to export from the origin URL as the remote URL can
+        # paths outside it, we need to export from the origin URL as the remote URL can
         # target a dump mounted on the local filesystem
         if self.replay_started and self.has_relative_externals:
             # externals detected while replaying revisions
@@ -230,12 +248,15 @@ class SvnRepo:
             with tempfile.TemporaryDirectory(
                 dir=self.local_dirname, prefix=f"checkout-revision-{revision}."
             ) as co_dirname:
+                logger.debug(
+                    "svn checkout --ignore-externals %s@%s", self.remote_url, revision,
+                )
                 self.client.checkout(
                     self.remote_url, co_dirname, revision, ignore_externals=True
                 )
                 # get all svn:externals properties recursively
                 externals = self.client.propget(
-                    "svn:externals", co_dirname, None, revision, True
+                    "svn:externals", co_dirname, None, None, True
                 )
                 self.has_relative_externals = False
                 self.has_recursive_externals = False
@@ -269,8 +290,12 @@ class SvnRepo:
                             break
 
         try:
+            url = url.rstrip("/")
+            logger.debug(
+                "svn export --ignore-keywords %s@%s", url, revision,
+            )
             self.client.export(
-                url.rstrip("/"),
+                url,
                 to=local_url,
                 rev=revision,
                 ignore_keywords=True,
@@ -286,6 +311,14 @@ class SvnRepo:
                 pass
             else:
                 raise
+
+        if self.from_dump:
+            # when exporting a subpath of a subversion repository mounted from
+            # a dump file gnerated by svnrdump, exported paths are relative to
+            # the repository root path while they are relative to the subpath
+            # otherwise, so we need to adjust the URL of the exported filesystem
+            local_url = os.path.join(local_url, self.root_directory.strip("/"))
+
         return local_dirname, os.fsencode(local_url)
 
     def swh_hash_data_per_revision(
@@ -293,7 +326,6 @@ class SvnRepo:
     ) -> Iterator[
         Tuple[
             int,
-            Optional[int],
             Dict,
             Tuple[List[Content], List[SkippedContent], List[Directory]],
             DirectoryFromDisk,
@@ -311,7 +343,6 @@ class SvnRepo:
             Tuple (rev, nextrev, commit, objects_per_path):
 
             - rev: current revision
-            - nextrev: next revision or None if we reached end_revision.
             - commit: commit data (author, date, message) for such revision
             - objects_per_path: Tuple of list of objects between start_revision and
               end_revision
@@ -327,15 +358,13 @@ class SvnRepo:
             rev = commit["rev"]
             objects = self.swhreplay.compute_objects(rev)
 
-            if rev == end_revision:
-                nextrev = None
-            else:
-                nextrev = rev + 1
-
             if rev >= start_revision:
                 # start yielding new data to archive once we reached the revision to
                 # resume the loading from
-                yield rev, nextrev, commit, objects, self.swhreplay.directory
+                if commit["has_changes"] or start_revision == 0:
+                    # yield data only if commit has changes or if repository is empty
+                    root_dir = self.swhreplay.directory[self.root_directory.encode()]
+                    yield rev, commit, objects, root_dir
 
     def swh_hash_data_at_revision(
         self, revision: int

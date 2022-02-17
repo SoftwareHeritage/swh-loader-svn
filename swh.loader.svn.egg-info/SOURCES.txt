@@ -50,10 +50,12 @@ swh/loader/svn/utils.py
 swh/loader/svn/tests/__init__.py
 swh/loader/svn/tests/conftest.py
 swh/loader/svn/tests/test_converters.py
+swh/loader/svn/tests/test_externals.py
 swh/loader/svn/tests/test_loader.org
 swh/loader/svn/tests/test_loader.py
 swh/loader/svn/tests/test_task.py
 swh/loader/svn/tests/test_utils.py
+swh/loader/svn/tests/utils.py
 swh/loader/svn/tests/data/httthttt.tgz
 swh/loader/svn/tests/data/mediawiki-repo-r407-eol-native-crlf.tgz
 swh/loader/svn/tests/data/penguinsdbtools2018.dump.gz

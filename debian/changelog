@@ -1,8 +1,16 @@
-swh-loader-svn (1.1.1-1~swh1~bpo10+1) buster-swh; urgency=medium
+swh-loader-svn (1.2.0-1~swh2) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * Bump new release
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 28 Jan 2022 10:46:52 +0000
+ -- Antoine R. Dumont (@ardumont) <ardumont@softwareheritage.org>  Thu, 17 Feb 2022 12:46:20 +0100
+
+swh-loader-svn (1.2.0-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 1.2.0     - (tagged by Antoine Lambert
+    <anlambert@softwareheritage.org> on 2022-02-11 17:19:45 +0100)
+  * Upstream changes:     - version 1.2.0
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 11 Feb 2022 16:23:08 +0000
 
 swh-loader-svn (1.1.1-1~swh1) unstable-swh; urgency=medium
 

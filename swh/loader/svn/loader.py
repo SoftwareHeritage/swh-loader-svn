@@ -120,7 +120,8 @@ class SvnLoader(BaseLoader):
         self.snapshot: Optional[Snapshot] = None
         # state from previous visit
         self.latest_snapshot = None
-        self.latest_revision = None
+        self.latest_revision: Optional[Revision] = None
+        self.from_dump = False
 
     def pre_cleanup(self):
         """Cleanup potential dangling files from prior runs (e.g. OOM killed
@@ -160,9 +161,9 @@ Local repository not cleaned up for investigation: %s""",
         """
         assert self.svnrepo is not None
         local_dirname, local_url = self.svnrepo.export_temporary(revision)
-        h = from_disk.Directory.from_disk(path=local_url).hash
+        root_dir = from_disk.Directory.from_disk(path=local_url)
         self.svnrepo.clean_fs(local_dirname)
-        return h
+        return root_dir.hash
 
     def _latest_snapshot_revision(
         self, origin_url: str,
@@ -239,11 +240,11 @@ Local repository not cleaned up for investigation: %s""",
         swh_revision_id = swh_revision.id
         return swh_revision_id == revision_id
 
-    def start_from(self) -> Tuple[int, int, Dict[int, Tuple[bytes, ...]]]:
+    def start_from(self) -> Tuple[int, int]:
         """Determine from where to start the loading.
 
         Returns:
-            tuple (revision_start, revision_end, revision_parents)
+            tuple (revision_start, revision_end)
 
         Raises:
 
@@ -261,21 +262,10 @@ Local repository not cleaned up for investigation: %s""",
             revision_start = self.svnrepo.initial_revision()
             revision_end = revision_head
 
-        revision_parents: Dict[int, Tuple[bytes, ...]] = {revision_start: ()}
-
         # start from a previous revision if any
         if self.incremental and self.latest_revision is not None:
             extra_headers = dict(self.latest_revision.extra_headers)
             revision_start = int(extra_headers[b"svn_revision"])
-            revision_parents = {
-                revision_start: self.latest_revision.parents,
-            }
-
-            self.log.debug(
-                "svn export --ignore-keywords %s@%s",
-                self.svnrepo.remote_url,
-                revision_start,
-            )
 
             if not self.check_history_not_altered(revision_start, self.latest_revision):
                 self.log.debug(
@@ -290,9 +280,6 @@ Local repository not cleaned up for investigation: %s""",
 
             # now we know history is ok, we start at next revision
             revision_start = revision_start + 1
-            # and the parent become the latest know revision for
-            # that repository
-            revision_parents[revision_start] = (self.latest_revision.id,)
 
         if revision_start > revision_end:
             msg = "%s@%s already injected." % (self.svnrepo.remote_url, revision_end)
@@ -305,7 +292,7 @@ Local repository not cleaned up for investigation: %s""",
             self.svnrepo,
         )
 
-        return revision_start, revision_end, revision_parents
+        return revision_start, revision_end
 
     def _check_revision_divergence(self, rev: int, dir_id: bytes) -> None:
         """Check for hash revision computation divergence.
@@ -334,7 +321,7 @@ Local repository not cleaned up for investigation: %s""",
             raise ValueError(err)
 
     def process_svn_revisions(
-        self, svnrepo, revision_start, revision_end, revision_parents
+        self, svnrepo, revision_start, revision_end
     ) -> Iterator[
         Tuple[List[Content], List[SkippedContent], List[Directory], Revision]
     ]:
@@ -357,18 +344,16 @@ Local repository not cleaned up for investigation: %s""",
 
         """
         gen_revs = svnrepo.swh_hash_data_per_revision(revision_start, revision_end)
-        swh_revision = None
+        parents = (self.latest_revision.id,) if self.latest_revision is not None else ()
         count = 0
-        for rev, nextrev, commit, new_objects, root_directory in gen_revs:
+        for rev, commit, new_objects, root_directory in gen_revs:
             count += 1
             # Send the associated contents/directories
             _contents, _skipped_contents, _directories = new_objects
 
             # compute the fs tree's checksums
             dir_id = root_directory.hash
-            swh_revision = self.build_swh_revision(
-                rev, commit, dir_id, revision_parents.get(rev, ())
-            )
+            swh_revision = self.build_swh_revision(rev, commit, dir_id, parents)
 
             self.log.debug(
                 "rev: %s, swhrev: %s, dir: %s",
@@ -384,8 +369,7 @@ Local repository not cleaned up for investigation: %s""",
             ):
                 self._check_revision_divergence(rev, dir_id)
 
-            if nextrev:
-                revision_parents[nextrev] = [swh_revision.id]
+            parents = (swh_revision.id,)
 
             yield _contents, _skipped_contents, _directories, swh_revision
 
@@ -398,17 +382,22 @@ Local repository not cleaned up for investigation: %s""",
         self.origin = Origin(url=self.origin_url if self.origin_url else self.svn_url)
 
     def prepare(self):
-        latest_snapshot_revision = self._latest_snapshot_revision(self.origin_url)
-        if latest_snapshot_revision:
-            self.latest_snapshot, self.latest_revision = latest_snapshot_revision
-            self._snapshot = self.latest_snapshot
-            self._last_revision = self.latest_revision
+        if self.incremental:
+            latest_snapshot_revision = self._latest_snapshot_revision(self.origin_url)
+            if latest_snapshot_revision:
+                self.latest_snapshot, self.latest_revision = latest_snapshot_revision
+                self._snapshot = self.latest_snapshot
+                self._last_revision = self.latest_revision
 
         local_dirname = self._create_tmp_dir(self.temp_directory)
 
         try:
             self.svnrepo = SvnRepo(
-                self.svn_url, self.origin_url, local_dirname, self.max_content_size
+                self.svn_url,
+                self.origin_url,
+                local_dirname,
+                self.max_content_size,
+                self.from_dump,
             )
         except SubversionException as e:
             error_msgs = [
@@ -422,9 +411,9 @@ Local repository not cleaned up for investigation: %s""",
             raise
 
         try:
-            revision_start, revision_end, revision_parents = self.start_from()
+            revision_start, revision_end = self.start_from()
             self.swh_revision_gen = self.process_svn_revisions(
-                self.svnrepo, revision_start, revision_end, revision_parents
+                self.svnrepo, revision_start, revision_end
             )
         except SvnLoaderUneventful as e:
             self.log.warning(e)
@@ -593,6 +582,7 @@ class SvnLoaderFromDumpArchive(SvnLoader):
         self.archive_path = archive_path
         self.temp_dir = None
         self.repo_path = None
+        self.from_dump = True
 
     def prepare(self):
         self.log.info("Archive to mount and load %s", self.archive_path)
@@ -646,6 +636,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             check_revision=check_revision,
             max_content_size=max_content_size,
         )
+        self.from_dump = True
         self.temp_dir = self._create_tmp_dir(self.temp_directory)
         self.repo_path = None
         self.truncated_dump = False

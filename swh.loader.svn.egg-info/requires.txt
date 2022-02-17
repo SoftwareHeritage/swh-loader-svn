@@ -8,7 +8,7 @@ swh.scheduler>=0.0.39
 swh.loader.core>=0.18
 
 [testing]
-pytest
+pytest<7.0.0
 pytest-mock
 pytest-postgresql
 swh.core[http]>=0.0.61

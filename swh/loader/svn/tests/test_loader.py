@@ -3,17 +3,13 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from enum import Enum
-from io import BytesIO
 import os
 import shutil
 import subprocess
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import pytest
-from subvertpy import SubversionException, delta, repos
-from subvertpy.ra import Auth, RemoteAccess, get_username_provider
-from typing_extensions import TypedDict
+from subvertpy import SubversionException
 
 from swh.loader.svn.loader import (
     SvnLoader,
@@ -21,7 +17,7 @@ from swh.loader.svn.loader import (
     SvnLoaderFromRemoteDump,
 )
 from swh.loader.svn.svn import SvnRepo
-from swh.loader.svn.utils import init_svn_repo_from_dump, svn_urljoin
+from swh.loader.svn.utils import init_svn_repo_from_dump
 from swh.loader.tests import (
     assert_last_visit_matches,
     check_snapshot,
@@ -31,6 +27,8 @@ from swh.loader.tests import (
 from swh.model.from_disk import DentryPerms
 from swh.model.hashutil import hash_to_bytes
 from swh.model.model import Snapshot, SnapshotBranch, TargetType
+
+from .utils import CommitChange, CommitChangeType, add_commit
 
 GOURMET_SNAPSHOT = Snapshot(
     id=hash_to_bytes("889cacc2731e3312abfb2b1a0c18ade82a949e07"),
@@ -711,9 +709,10 @@ def test_loader_svn_cleanup_loader_from_dump_archive(swh_storage, datadir, tmp_p
     assert not os.path.exists(loader.temp_dir)
 
 
-def test_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
+def test_svn_loader_from_remote_dump(swh_storage, datadir, tmpdir_factory):
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    tmp_path = tmpdir_factory.mktemp("repo1")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
     loaderFromDump = SvnLoaderFromRemoteDump(
@@ -728,7 +727,10 @@ def test_svn_loader_from_remote_dump(swh_storage, datadir, tmp_path):
         snapshot=GOURMET_SNAPSHOT.id,
     )
 
-    origin_url = repo_url + "2"  # rename to another origin
+    # rename to another origin
+    tmp_path = tmpdir_factory.mktemp("repo2")
+    origin_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
     loader = SvnLoader(
         swh_storage, repo_url, origin_url=origin_url, temp_directory=tmp_path
     )
@@ -913,7 +915,6 @@ def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
-    origin_url = f"svn://{archive_name}"
     dump_filename = f"{archive_name}.dump"
 
     with open(os.path.join(tmp_path, dump_filename), "wb") as dump_file:
@@ -924,7 +925,7 @@ def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
         # load svn repo from that compressed dump file
         loader = SvnLoaderFromDumpArchive(
             swh_storage,
-            url=origin_url,
+            url=repo_url,
             archive_path=os.path.join(tmp_path, f"{dump_filename}.gz"),
             temp_directory=tmp_path,
         )
@@ -933,7 +934,7 @@ def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
 
         assert_last_visit_matches(
             loader.storage,
-            origin_url,
+            repo_url,
             status="full",
             type="svn",
             snapshot=GOURMET_SNAPSHOT.id,
@@ -951,74 +952,6 @@ def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
             "skipped_content": 0,
             "snapshot": 1,
         }
-
-
-class CommitChangeType(Enum):
-    AddOrUpdate = 1
-    Delete = 2
-
-
-class CommitChange(TypedDict, total=False):
-    change_type: CommitChangeType
-    path: str
-    properties: Dict[str, str]
-    data: bytes
-
-
-def add_commit(repo_url: str, message: str, changes: List[CommitChange]) -> None:
-    conn = RemoteAccess(repo_url, auth=Auth([get_username_provider()]))
-    editor = conn.get_commit_editor({"svn:log": message})
-    root = editor.open_root()
-    for change in changes:
-        if change["change_type"] == CommitChangeType.Delete:
-            root.delete_entry(change["path"].rstrip("/"))
-        else:
-            dir_change = change["path"].endswith("/")
-            split_path = change["path"].rstrip("/").split("/")
-            for i in range(len(split_path)):
-                path = "/".join(split_path[0 : i + 1])
-                if i < len(split_path) - 1:
-                    try:
-                        root.add_directory(path).close()
-                    except SubversionException:
-                        pass
-                else:
-                    if dir_change:
-                        try:
-                            dir = root.add_directory(path)
-                        except SubversionException:
-                            dir = root.open_directory(path)
-                        if "properties" in change:
-                            for prop, value in change["properties"].items():
-                                dir.change_prop(prop, value)
-                        dir.close()
-                    else:
-                        try:
-                            file = root.add_file(path)
-                        except SubversionException:
-                            file = root.open_file(path)
-                        if "properties" in change:
-                            for prop, value in change["properties"].items():
-                                file.change_prop(prop, value)
-                        if "data" in change:
-                            txdelta = file.apply_textdelta()
-                            delta.send_stream(BytesIO(change["data"]), txdelta)
-                        file.close()
-    root.close()
-    editor.close()
-
-
-def create_repo(tmp_path):
-    repo_path = os.path.join(tmp_path, "tmprepo")
-    repos.create(repo_path)
-    repo_url = f"file://{repo_path}"
-    return repo_url
-
-
-@pytest.fixture
-def repo_url(tmpdir_factory):
-    # create a repository
-    return create_repo(tmpdir_factory.mktemp("repos"))
 
 
 def test_loader_eol_style_file_property_handling_edge_case(
@@ -1850,492 +1783,15 @@ def test_loader_svn_add_property_on_directory_link(swh_storage, repo_url, tmp_pa
     check_snapshot(loader.snapshot, loader.storage)
 
 
-@pytest.fixture
-def external_repo_url(tmpdir_factory):
-    # create a repository
-    return create_repo(tmpdir_factory.mktemp("external"))
-
-
-def test_loader_with_valid_svn_externals(
-    swh_storage, repo_url, external_repo_url, tmp_path
-):
-    # first commit on external
-    add_commit(
-        external_repo_url,
-        "Create some directories and files in an external repository",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="code/hello/hello-world",
-                properties={"svn:executable": "*"},
-                data=b"#!/bin/bash\necho Hello World !",
-            ),
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="foo.sh",
-                properties={"svn:executable": "*"},
-                data=b"#!/bin/bash\necho foo",
-            ),
-        ],
-    )
+@pytest.mark.parametrize(
+    "svn_loader_cls", [SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump]
+)
+def test_loader_with_subprojects(swh_storage, repo_url, tmp_path, svn_loader_cls):
 
     # first commit
     add_commit(
         repo_url,
-        "Create repository structure.",
-        [
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="branches/",),
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="tags/",),
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/",),
-        ],
-    )
-
-    # second commit
-    add_commit(
-        repo_url,
-        (
-            "Set svn:externals property on trunk/externals path of repository to load."
-            "One external targets a remote directory and another one a remote file."
-        ),
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/externals/",
-                properties={
-                    "svn:externals": (
-                        f"{svn_urljoin(external_repo_url, 'code/hello')} hello\n"
-                        f"{svn_urljoin(external_repo_url, 'foo.sh')} foo.sh"
-                    )
-                },
-            ),
-        ],
-    )
-
-    # first load
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-
-    # third commit
-    add_commit(
-        repo_url,
-        "Unset svn:externals property on trunk/externals path",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/externals/",
-                properties={"svn:externals": None},
-            ),
-        ],
-    )
-
-    # second load
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-
-
-def test_loader_with_invalid_svn_externals(swh_storage, repo_url, tmp_path):
-
-    # first commit
-    add_commit(
-        repo_url,
-        "Create repository structure.",
-        [
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="branches/",),
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="tags/",),
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/",),
-        ],
-    )
-
-    # second commit
-    add_commit(
-        repo_url,
-        (
-            "Set svn:externals property on trunk/externals path of repository to load."
-            "The externals URLs are not valid."
-        ),
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/externals/",
-                properties={
-                    "svn:externals": (
-                        "file:///tmp/invalid/svn/repo/hello hello\n"
-                        "file:///tmp/invalid/svn/repo/foo.sh foo.sh"
-                    )
-                },
-            ),
-        ],
-    )
-
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-
-
-def test_loader_with_valid_externals_modification(
-    swh_storage, repo_url, external_repo_url, tmp_path
-):
-    # first commit on external
-    add_commit(
-        external_repo_url,
-        "Create some directories and files in an external repository",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="code/hello/hello-world",
-                properties={"svn:executable": "*"},
-                data=b"#!/bin/bash\necho Hello World !",
-            ),
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="code/bar/bar.sh",
-                properties={"svn:executable": "*"},
-                data=b"#!/bin/bash\necho bar",
-            ),
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="foo.sh",
-                properties={"svn:executable": "*"},
-                data=b"#!/bin/bash\necho foo",
-            ),
-        ],
-    )
-
-    # first commit
-    add_commit(
-        repo_url,
-        ("Set svn:externals property on trunk/externals path of repository to load."),
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/externals/",
-                properties={
-                    "svn:externals": (
-                        f"{svn_urljoin(external_repo_url, 'code/hello')} src/code/hello\n"  # noqa
-                        f"{svn_urljoin(external_repo_url, 'foo.sh')} src/foo.sh\n"
-                    )
-                },
-            ),
-        ],
-    )
-
-    # second commit
-    add_commit(
-        repo_url,
-        (
-            "Modify svn:externals property on trunk/externals path of repository to load."  # noqa
-        ),
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/externals/",
-                properties={
-                    "svn:externals": (
-                        f"{svn_urljoin(external_repo_url, 'code/bar')} src/code/bar\n"  # noqa
-                        f"{svn_urljoin(external_repo_url, 'foo.sh')} src/foo.sh\n"
-                    )
-                },
-            ),
-        ],
-    )
-
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-
-
-def test_loader_with_valid_externals_and_versioned_path(
-    swh_storage, repo_url, external_repo_url, tmp_path
-):
-    # first commit on external
-    add_commit(
-        external_repo_url,
-        "Create a file in an external repository",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="code/script.sh",
-                data=b"#!/bin/bash\necho Hello World !",
-            ),
-        ],
-    )
-
-    # first commit
-    add_commit(
-        repo_url,
-        "Add file with same name but different content in main repository",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/script.sh",
-                data=b"#!/bin/bash\necho foo",
-            ),
-        ],
-    )
-
-    # second commit
-    add_commit(
-        repo_url,
-        "Add externals targeting the versioned file",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/",
-                properties={
-                    "svn:externals": (
-                        f"{svn_urljoin(external_repo_url, 'code/script.sh')} script.sh"  # noqa
-                    )
-                },
-            ),
-        ],
-    )
-
-    # third commit
-    add_commit(
-        repo_url,
-        "Modify the versioned file",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/script.sh",
-                data=b"#!/bin/bash\necho bar",
-            ),
-        ],
-    )
-
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-
-
-def test_loader_with_invalid_externals_and_versioned_path(
-    swh_storage, repo_url, tmp_path
-):
-
-    # first commit
-    add_commit(
-        repo_url,
-        "Add file in main repository",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/script.sh",
-                data=b"#!/bin/bash\necho foo",
-            ),
-        ],
-    )
-
-    # second commit
-    add_commit(
-        repo_url,
-        "Add invalid externals targeting the versioned file",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/",
-                properties={
-                    "svn:externals": (
-                        "file:///tmp/invalid/svn/repo/code/script.sh script.sh"
-                    )
-                },
-            ),
-        ],
-    )
-
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-
-
-def test_loader_set_externals_then_remove_and_add_as_local(
-    swh_storage, repo_url, external_repo_url, tmp_path
-):
-    # first commit on external
-    add_commit(
-        external_repo_url,
-        "Create a file in an external repository",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="code/script.sh",
-                data=b"#!/bin/bash\necho Hello World !",
-            ),
-        ],
-    )
-
-    # first commit
-    add_commit(
-        repo_url,
-        "Add trunk directory and set externals",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/",
-                properties={
-                    "svn:externals": (f"{svn_urljoin(external_repo_url, 'code')} code")
-                },
-            ),
-        ],
-    )
-
-    # second commit
-    add_commit(
-        repo_url,
-        "Unset externals on trunk and add remote path as local path",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/",
-                properties={"svn:externals": None},
-            ),
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/code/script.sh",
-                data=b"#!/bin/bash\necho Hello World !",
-            ),
-        ],
-    )
-
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-
-
-def test_loader_set_invalid_externals_then_remove(swh_storage, repo_url, tmp_path):
-
-    # first commit
-    add_commit(
-        repo_url,
-        "Add trunk directory and set invalid external",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/",
-                properties={
-                    "svn:externals": "file:///tmp/invalid/svn/repo/code external/code"
-                },
-            ),
-        ],
-    )
-
-    # second commit
-    add_commit(
-        repo_url,
-        "Unset externals on trunk",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/",
-                properties={"svn:externals": None},
-            ),
-        ],
-    )
-
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-
-
-def test_loader_set_externals_with_versioned_file_overlap(
-    swh_storage, repo_url, external_repo_url, tmp_path
-):
-    # first commit on external
-    add_commit(
-        external_repo_url,
-        "Create a file in an external repository",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="code/script.sh",
-                data=b"#!/bin/bash\necho Hello World !",
-            ),
-        ],
-    )
-
-    # first commit
-    add_commit(
-        repo_url,
-        "Add file with same name as in the external repository",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/script.sh",
-                data=b"#!/bin/bash\necho foo",
-            ),
-        ],
-    )
-
-    # second commit
-    add_commit(
-        repo_url,
-        "Set external on trunk overlapping versioned file",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/",
-                properties={
-                    "svn:externals": (
-                        f"{svn_urljoin(external_repo_url, 'code/script.sh')} script.sh"
-                    )
-                },
-            ),
-        ],
-    )
-
-    # third commit
-    add_commit(
-        repo_url,
-        "Unset externals on trunk",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/",
-                properties={"svn:externals": None},
-            ),
-        ],
-    )
-
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-
-
-def test_dump_loader_relative_externals_detection(
-    swh_storage, repo_url, external_repo_url, tmp_path
-):
-
-    add_commit(
-        external_repo_url,
-        "Create a file in external repository.",
+        "Add first project in repository",
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
@@ -2345,9 +1801,10 @@ def test_dump_loader_relative_externals_detection(
         ],
     )
 
+    # second commit
     add_commit(
-        external_repo_url,
-        "Create another file in repository to load.",
+        repo_url,
+        "Add second project in repository",
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
@@ -2357,490 +1814,66 @@ def test_dump_loader_relative_externals_detection(
         ],
     )
 
-    external_url = f"{external_repo_url.replace('file://', '//')}/project2/bar.sh"
-    add_commit(
-        repo_url,
-        "Set external relative to URL scheme in repository to load",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="project1/",
-                properties={"svn:externals": (f"{external_url} bar.sh")},
-            ),
-        ],
-    )
-
-    loader = SvnLoaderFromRemoteDump(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
-    )
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-    assert loader.svnrepo.has_relative_externals
-
-    add_commit(
-        repo_url,
-        "Unset external in repository to load",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="project1/",
-                properties={"svn:externals": None},
-            ),
-        ],
-    )
-
-    loader = SvnLoaderFromRemoteDump(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
-    )
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-    assert not loader.svnrepo.has_relative_externals
-
-
-def test_loader_externals_cache(swh_storage, repo_url, external_repo_url, tmp_path):
-
-    # first commit on external
-    add_commit(
-        external_repo_url,
-        "Create some directories and files in an external repository",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="code/hello/hello-world",
-                properties={"svn:executable": "*"},
-                data=b"#!/bin/bash\necho Hello World !",
-            ),
-        ],
-    )
-
-    # first commit
-    add_commit(
-        repo_url,
-        "Create repository structure.",
-        [
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="project1/",),
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="project2/",),
-        ],
-    )
-
-    external_url = svn_urljoin(external_repo_url, "code/hello")
-
-    # second commit
-    add_commit(
-        repo_url,
-        (
-            "Set svn:externals property on trunk/externals path of repository to load."
-            "One external targets a remote directory and another one a remote file."
-        ),
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="project1/externals/",
-                properties={"svn:externals": (f"{external_url} hello\n")},
-            ),
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="project2/externals/",
-                properties={"svn:externals": (f"{external_url} hello\n")},
-            ),
-        ],
-    )
-
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-
-    assert (external_url, None) in loader.svnrepo.swhreplay.editor.externals_cache
-
-
-def test_loader_remove_versioned_path_with_external_overlap(
-    swh_storage, repo_url, external_repo_url, tmp_path
-):
-    # first commit on external
-    add_commit(
-        external_repo_url,
-        "Create a file in an external repository",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="code/hello.sh",
-                data=b"#!/bin/bash\necho Hello World !",
-            ),
-        ],
-    )
-
-    # first commit
-    add_commit(
-        repo_url,
-        "Add a file",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/project/script.sh",
-                data=b"#!/bin/bash\necho foo",
-            ),
-        ],
-    )
-
-    # second commit
-    add_commit(
-        repo_url,
-        "Set external on trunk overlapping versioned path",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/",
-                properties={
-                    "svn:externals": (
-                        f"{svn_urljoin(external_repo_url, 'code')} project/code"
-                    )
-                },
-            ),
-        ],
-    )
-
     # third commit
     add_commit(
         repo_url,
-        "Remove trunk/project/ versioned path",
-        [CommitChange(change_type=CommitChangeType.Delete, path="trunk/project/",),],
-    )
-
-    loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
-    )
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-
-
-def test_loader_export_external_path_using_peg_rev(
-    swh_storage, repo_url, external_repo_url, tmp_path
-):
-    # first commit on external
-    add_commit(
-        external_repo_url,
-        "Create a file in an external repository",
+        "Add third project in repository",
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
-                path="code/foo.sh",
-                data=b"#!/bin/bash\necho foo",
+                path="project3/baz.sh",
+                data=b"#!/bin/bash\necho baz",
             ),
         ],
     )
 
-    # second commit on external
-    add_commit(
-        external_repo_url,
-        "Remove previously added file",
-        [CommitChange(change_type=CommitChangeType.Delete, path="code/foo.sh",),],
-    )
+    def dump_project(origin_url):
+        svnrdump_cmd = ["svnrdump", "dump", origin_url]
+        dump_path = f"{tmp_path}/repo.dump"
+        with open(dump_path, "wb") as dump_file:
+            subprocess.run(svnrdump_cmd, stdout=dump_file)
+        subprocess.run(["gzip", dump_path])
+        return dump_path + ".gz"
 
-    # third commit on external
-    add_commit(
-        external_repo_url,
-        "Add file again but with different content",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="code/foo.sh",
-                data=b"#!/bin/bash\necho bar",
-            ),
-        ],
-    )
+    for i in range(1, 4):
+        # load each project in the repository separately
+        origin_url = f"{repo_url}/project{i}"
 
-    # first commit
-    add_commit(
-        repo_url,
-        "Add trunk dir",
-        [CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/",),],
-    )
+        loader_params = {
+            "storage": swh_storage,
+            "url": origin_url,
+            "origin_url": origin_url,
+            "temp_directory": tmp_path,
+            "incremental": True,
+            "check_revision": 1,
+        }
 
-    # second commit
-    add_commit(
-        repo_url,
-        "Set external on trunk targeting first revision of external repo",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/",
-                properties={
-                    "svn:externals": (
-                        f"{svn_urljoin(external_repo_url, 'code/foo.sh')}@1 foo.sh"
-                    )
-                },
-            ),
-        ],
-    )
+        if svn_loader_cls == SvnLoaderFromDumpArchive:
+            loader_params["archive_path"] = dump_project(origin_url)
 
-    # third commit
-    add_commit(
-        repo_url,
-        "Modify external on trunk to target third revision of external repo",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/",
-                properties={
-                    "svn:externals": (
-                        f"{svn_urljoin(external_repo_url, 'code/foo.sh')}@3 foo.sh"
-                    )
-                },
-            ),
-        ],
-    )
+        loader = svn_loader_cls(**loader_params)
 
-    loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
-    )
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
+        assert loader.load() == {"status": "eventful"}
+        assert_last_visit_matches(
+            loader.storage, origin_url, status="full", type="svn",
+        )
+        check_snapshot(loader.snapshot, loader.storage)
 
+        if svn_loader_cls == SvnLoaderFromDumpArchive:
+            loader_params["archive_path"] = dump_project(origin_url)
 
-def test_loader_remove_external_overlapping_versioned_path(
-    swh_storage, repo_url, external_repo_url, tmp_path
-):
-    # first commit on external
-    add_commit(
-        external_repo_url,
-        "Create files in an external repository",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="code/foo.sh",
-                data=b"#!/bin/bash\necho foo",
-            ),
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="code/link",
-                data=b"#!/bin/bash\necho link",
-            ),
-        ],
-    )
+        loader = svn_loader_cls(**loader_params)
 
-    # first commit
-    add_commit(
-        repo_url,
-        "Add trunk dir and a link file",
-        [
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/"),
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/link",
-                data=b"link ../test",
-                properties={"svn:special": "*"},
-            ),
-        ],
-    )
+        assert loader.load() == {"status": "uneventful"}
 
-    # second commit
-    add_commit(
-        repo_url,
-        "Set external on root dir overlapping versioned trunk path",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="",  # repo root dir
-                properties={
-                    "svn:externals": (
-                        f"{svn_urljoin(external_repo_url, 'code/foo.sh')} trunk/code/foo.sh\n"  # noqa
-                        f"{svn_urljoin(external_repo_url, 'code/link')} trunk/link"
-                    )
-                },
-            ),
-        ],
-    )
-
-    # third commit
-    add_commit(
-        repo_url,
-        "Remove external on root dir",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="",
-                properties={"svn:externals": None},
-            ),
-        ],
-    )
-
-    loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
-    )
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-
-
-def test_loader_modify_external_same_path(
-    swh_storage, repo_url, external_repo_url, tmp_path
-):
-    # first commit on external
-    add_commit(
-        external_repo_url,
-        "Create a file in an external repository",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="code/foo.sh",
-                data=b"#!/bin/bash\necho foo",
-            ),
-        ],
-    )
-
-    # first commit
-    add_commit(
-        repo_url,
-        "Add trunk dir",
-        [CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/")],
-    )
-
-    # second commit
-    add_commit(
-        repo_url,
-        "Set external code on trunk dir",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/",
-                properties={
-                    "svn:externals": (f"{svn_urljoin(external_repo_url, 'code')} code")
-                },
-            ),
-        ],
-    )
-
-    # third commit
-    add_commit(
-        repo_url,
-        "Change code external on trunk targeting an invalid URL",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/",
-                properties={"svn:externals": "file:///tmp/invalid/svn/repo/path code"},
-            ),
-        ],
-    )
-
-    loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
-    )
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-
-
-def test_loader_with_recursive_external(
-    swh_storage, repo_url, external_repo_url, tmp_path
-):
-    # first commit on external
-    add_commit(
-        external_repo_url,
-        "Create a file in an external repository",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="code/foo.sh",
-                data=b"#!/bin/bash\necho foo",
-            ),
-        ],
-    )
-
-    # first commit
-    add_commit(
-        repo_url,
-        "Add trunk dir and a file",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/bar.sh",
-                data=b"#!/bin/bash\necho bar",
-            )
-        ],
-    )
-
-    # second commit
-    add_commit(
-        repo_url,
-        "Set externals code on trunk/externals dir, one being recursive",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/externals/",
-                properties={
-                    "svn:externals": (
-                        f"{svn_urljoin(external_repo_url, 'code')} code\n"
-                        f"{repo_url} recursive"
-                    )
-                },
-            ),
-        ],
-    )
-
-    # first load
-    loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
-    )
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-    assert loader.svnrepo.has_recursive_externals
-
-    # second load on stale repo
-    loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
-    )
-    assert loader.load() == {"status": "uneventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-    assert loader.svnrepo.has_recursive_externals
-
-    # third commit
-    add_commit(
-        repo_url,
-        "Remove recursive external on trunk/externals dir",
-        [
-            CommitChange(
-                change_type=CommitChangeType.AddOrUpdate,
-                path="trunk/externals/",
-                properties={
-                    "svn:externals": (f"{svn_urljoin(external_repo_url, 'code')} code")
-                },
-            ),
-        ],
-    )
-
-    # third load
-    loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
-    )
-    assert loader.load() == {"status": "eventful"}
-    assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
-    )
-    check_snapshot(loader.snapshot, loader.storage)
-    assert not loader.svnrepo.has_recursive_externals
+        # each project origin must have
+        assert get_stats(loader.storage) == {
+            "content": i,  # one content
+            "directory": 2 * i,  # two directories
+            "origin": i,
+            "origin_visit": 2 * i,  # two visits
+            "release": 0,
+            "revision": i,  # one revision
+            "skipped_content": 0,
+            "snapshot": i,  # one snapshot
+        }

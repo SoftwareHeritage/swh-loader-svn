@@ -1736,6 +1736,15 @@ def test_loader_svn_empty_local_dir_before_post_load(swh_storage, datadir, tmp_p
     check_snapshot(GOURMET_SNAPSHOT, loader.storage)
 
 
+def _dump_project(tmp_path, origin_url):
+    svnrdump_cmd = ["svnrdump", "dump", origin_url]
+    dump_path = f"{tmp_path}/repo.dump"
+    with open(dump_path, "wb") as dump_file:
+        subprocess.run(svnrdump_cmd, stdout=dump_file)
+    subprocess.run(["gzip", dump_path])
+    return dump_path + ".gz"
+
+
 def test_loader_svn_add_property_on_directory_link(swh_storage, repo_url, tmp_path):
 
     # first commit
@@ -1827,14 +1836,6 @@ def test_loader_with_subprojects(swh_storage, repo_url, tmp_path, svn_loader_cls
         ],
     )
 
-    def dump_project(origin_url):
-        svnrdump_cmd = ["svnrdump", "dump", origin_url]
-        dump_path = f"{tmp_path}/repo.dump"
-        with open(dump_path, "wb") as dump_file:
-            subprocess.run(svnrdump_cmd, stdout=dump_file)
-        subprocess.run(["gzip", dump_path])
-        return dump_path + ".gz"
-
     for i in range(1, 4):
         # load each project in the repository separately
         origin_url = f"{repo_url}/project{i}"
@@ -1849,7 +1850,7 @@ def test_loader_with_subprojects(swh_storage, repo_url, tmp_path, svn_loader_cls
         }
 
         if svn_loader_cls == SvnLoaderFromDumpArchive:
-            loader_params["archive_path"] = dump_project(origin_url)
+            loader_params["archive_path"] = _dump_project(tmp_path, origin_url)
 
         loader = svn_loader_cls(**loader_params)
 
@@ -1860,7 +1861,7 @@ def test_loader_with_subprojects(swh_storage, repo_url, tmp_path, svn_loader_cls
         check_snapshot(loader.snapshot, loader.storage)
 
         if svn_loader_cls == SvnLoaderFromDumpArchive:
-            loader_params["archive_path"] = dump_project(origin_url)
+            loader_params["archive_path"] = _dump_project(tmp_path, origin_url)
 
         loader = svn_loader_cls(**loader_params)
 
@@ -1877,3 +1878,73 @@ def test_loader_with_subprojects(swh_storage, repo_url, tmp_path, svn_loader_cls
             "skipped_content": 0,
             "snapshot": i,  # one snapshot
         }
+
+
+@pytest.mark.parametrize(
+    "svn_loader_cls", [SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump]
+)
+def test_loader_subproject_root_dir_removal(
+    swh_storage, repo_url, tmp_path, svn_loader_cls
+):
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Add project in repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="project/foo.sh",
+                data=b"#!/bin/bash\necho foo",
+            ),
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Remove project root directory",
+        [CommitChange(change_type=CommitChangeType.Delete, path="project/")],
+    )
+
+    # third commit
+    add_commit(
+        repo_url,
+        "Re-add project in repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="project/foo.sh",
+                data=b"#!/bin/bash\necho foo",
+            ),
+        ],
+    )
+
+    origin_url = f"{repo_url}/project"
+
+    loader_params = {
+        "storage": swh_storage,
+        "url": origin_url,
+        "origin_url": origin_url,
+        "temp_directory": tmp_path,
+        "incremental": True,
+        "check_revision": 1,
+    }
+
+    if svn_loader_cls == SvnLoaderFromDumpArchive:
+        loader_params["archive_path"] = _dump_project(tmp_path, origin_url)
+
+    loader = svn_loader_cls(**loader_params)
+
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, origin_url, status="full", type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+
+    if svn_loader_cls == SvnLoaderFromDumpArchive:
+        loader_params["archive_path"] = _dump_project(tmp_path, origin_url)
+
+    loader = svn_loader_cls(**loader_params)
+
+    assert loader.load() == {"status": "uneventful"}

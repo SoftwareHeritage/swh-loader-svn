@@ -1,3 +1,11 @@
+swh-loader-svn (1.2.1-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 1.2.1     - (tagged by Antoine Lambert
+    <anlambert@softwareheritage.org> on 2022-03-09 13:57:18 +0100)
+  * Upstream changes:     - version 1.2.1
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Wed, 09 Mar 2022 13:00:41 +0000
+
 swh-loader-svn (1.2.0-1~swh2) unstable-swh; urgency=medium
 
   * Bump new release

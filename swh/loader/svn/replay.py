@@ -743,7 +743,11 @@ class DirEditor:
                 # copy_tree needs sub-directories to exist in destination
                 for root, dirs, files in os.walk(temp_path):
                     for dir in dirs:
-                        subdir = os.path.join(root, dir).replace(temp_path + b"/", b"")
+                        temp_dir_fullpath = os.path.join(root, dir)
+                        if os.path.islink(temp_dir_fullpath):
+                            # do not create folder if it's a link or copy_tree will fail
+                            continue
+                        subdir = temp_dir_fullpath.replace(temp_path + b"/", b"")
                         self.add_directory(
                             os.fsdecode(os.path.join(dest_fullpath, subdir))
                         )

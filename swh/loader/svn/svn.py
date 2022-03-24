@@ -8,7 +8,6 @@ representations including the hash tree/content computations per svn
 commit.
 
 """
-
 import logging
 import os
 import shutil
@@ -28,11 +27,11 @@ from swh.model.model import (
 )
 
 from . import converters, replay
+from .svn_retry import svn_retry
 from .utils import is_recursive_external, parse_external_definition
 
 # When log message contains empty data
 DEFAULT_AUTHOR_MESSAGE = ""
-
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +60,9 @@ class SvnRepo:
 
         auth = Auth([get_username_provider()])
         # one connection for log iteration
-        self.conn_log = RemoteAccess(self.remote_url, auth=auth)
+        self.conn_log = self.remote_access(auth)
         # another for replay
-        self.conn = RemoteAccess(self.remote_url, auth=auth)
+        self.conn = self.remote_access(auth)
         # one client for update operation
         self.client = client.Client(auth=auth)
 
@@ -213,6 +212,125 @@ class SvnRepo:
         ):
             yield self.__to_entry(log_entry)
 
+    @svn_retry()
+    def remote_access(self, auth: Auth) -> RemoteAccess:
+        """Simple wrapper around subvertpy.ra.RemoteAccess creation
+        enabling to retry the operation if a network error occurs."""
+        return RemoteAccess(self.remote_url, auth=auth)
+
+    @svn_retry()
+    def export(
+        self,
+        url: str,
+        to: str,
+        rev: Optional[int] = None,
+        peg_rev: Optional[int] = None,
+        recurse: bool = True,
+        ignore_externals: bool = False,
+        overwrite: bool = False,
+        ignore_keywords: bool = False,
+    ) -> int:
+        """Simple wrapper around subvertpy.client.Client.export enabling to retry
+        the command if a network error occurs.
+
+        See documentation of svn_client_export5 function from subversion C API
+        to get details about parameters.
+        """
+        # remove export path as command can be retried
+        if os.path.isfile(to) or os.path.islink(to):
+            os.remove(to)
+        elif os.path.isdir(to):
+            shutil.rmtree(to)
+        options = []
+        if rev is not None:
+            options.append(f"-r {rev}")
+        if recurse:
+            options.append("--depth infinity")
+        if ignore_externals:
+            options.append("--ignore-externals")
+        if overwrite:
+            options.append("--force")
+        if ignore_keywords:
+            options.append("--ignore-keywords")
+        logger.debug(
+            "svn export %s %s%s %s",
+            " ".join(options),
+            url,
+            f"@{peg_rev}" if peg_rev else "",
+            to,
+        )
+        return self.client.export(
+            url,
+            to=to,
+            rev=rev,
+            peg_rev=peg_rev,
+            recurse=recurse,
+            ignore_externals=ignore_externals,
+            overwrite=overwrite,
+            ignore_keywords=ignore_keywords,
+        )
+
+    @svn_retry()
+    def checkout(
+        self,
+        url: str,
+        path: str,
+        rev: Optional[int] = None,
+        peg_rev: Optional[int] = None,
+        recurse: bool = True,
+        ignore_externals: bool = False,
+        allow_unver_obstructions: bool = False,
+    ) -> int:
+        """Simple wrapper around subvertpy.client.Client.checkout enabling to retry
+        the command if a network error occurs.
+
+        See documentation of svn_client_checkout3 function from subversion C API
+        to get details about parameters.
+        """
+        # remove checkout path as command can be retried
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        options = []
+        if rev is not None:
+            options.append(f"-r {rev}")
+        if recurse:
+            options.append("--depth infinity")
+        if ignore_externals:
+            options.append("--ignore-externals")
+        logger.debug(
+            "svn checkout %s %s%s %s",
+            " ".join(options),
+            self.remote_url,
+            f"@{peg_rev}" if peg_rev else "",
+            path,
+        )
+        return self.client.checkout(
+            url,
+            path=path,
+            rev=rev,
+            peg_rev=peg_rev,
+            recurse=recurse,
+            ignore_externals=ignore_externals,
+            allow_unver_obstructions=allow_unver_obstructions,
+        )
+
+    @svn_retry()
+    def propget(
+        self,
+        name: str,
+        target: str,
+        peg_rev: Optional[int],
+        rev: Optional[int] = None,
+        recurse: bool = False,
+    ):
+        """Simple wrapper around subvertpy.client.Client.propget enabling to retry
+        the command if a network error occurs.
+
+        See documentation of svn_client_propget5 function from subversion C API
+        to get details about parameters.
+        """
+        return self.client.propget(name, target, peg_rev, rev, recurse)
+
     def export_temporary(self, revision: int) -> Tuple[str, bytes]:
         """Export the repository to a given revision in a temporary location. This is up
         to the caller of this function to clean up the temporary location when done (cf.
@@ -248,16 +366,12 @@ class SvnRepo:
             with tempfile.TemporaryDirectory(
                 dir=self.local_dirname, prefix=f"checkout-revision-{revision}."
             ) as co_dirname:
-                logger.debug(
-                    "svn checkout --ignore-externals %s@%s", self.remote_url, revision,
-                )
-                self.client.checkout(
+
+                self.checkout(
                     self.remote_url, co_dirname, revision, ignore_externals=True
                 )
                 # get all svn:externals properties recursively
-                externals = self.client.propget(
-                    "svn:externals", co_dirname, None, None, True
-                )
+                externals = self.propget("svn:externals", co_dirname, None, None, True)
                 self.has_relative_externals = False
                 self.has_recursive_externals = False
                 for path, external_defs in externals.items():
@@ -291,10 +405,8 @@ class SvnRepo:
 
         try:
             url = url.rstrip("/")
-            logger.debug(
-                "svn export --ignore-keywords %s@%s", url, revision,
-            )
-            self.client.export(
+
+            self.export(
                 url,
                 to=local_url,
                 rev=revision,

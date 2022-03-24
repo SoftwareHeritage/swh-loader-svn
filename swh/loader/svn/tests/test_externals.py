@@ -5,11 +5,19 @@
 
 import pytest
 
-from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
+from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump, SvnRepo
 from swh.loader.svn.utils import svn_urljoin
 from swh.loader.tests import assert_last_visit_matches, check_snapshot
 
 from .utils import CommitChange, CommitChangeType, add_commit, create_repo
+
+
+@pytest.fixture(autouse=True)
+def svn_retry_sleep_mocker(mocker):
+    mocker.patch.object(SvnRepo.export.retry, "sleep")
+    mocker.patch.object(SvnRepo.checkout.retry, "sleep")
+    mocker.patch.object(SvnRepo.propget.retry, "sleep")
+    mocker.patch.object(SvnRepo.remote_access.retry, "sleep")
 
 
 @pytest.fixture
@@ -110,7 +118,7 @@ def test_loader_with_valid_svn_externals(
     check_snapshot(loader.snapshot, loader.storage)
 
 
-def test_loader_with_invalid_svn_externals(swh_storage, repo_url, tmp_path):
+def test_loader_with_invalid_svn_externals(swh_storage, repo_url, tmp_path, mocker):
 
     # first commit
     add_commit(
@@ -1258,6 +1266,63 @@ def test_loader_externals_add_remove_readd_on_subpath(
                         f"{svn_urljoin(external_repo_url, 'src/bar.sh')} src/bar.sh"
                     )
                 },
+            ),
+        ],
+    )
+
+    loader = SvnLoader(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage, repo_url, status="full", type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_directory_symlink_in_external(
+    swh_storage, repo_url, external_repo_url, tmp_path
+):
+    # first commit on external
+    add_commit(
+        external_repo_url,
+        "Create dirs in an external repository",
+        [
+            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="src/apps/",),
+            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="src/deps/",),
+        ],
+    )
+
+    # second commit on external
+    add_commit(
+        external_repo_url,
+        "Add symlink to src/deps in src/apps directory",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="src/apps/deps",
+                data=b"link ../deps",
+                properties={"svn:special": "*"},
+            ),
+        ],
+    )
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Add deps dir",
+        [CommitChange(change_type=CommitChangeType.AddOrUpdate, path="deps/")],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Set external to deps folder",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="deps/",
+                properties={"svn:externals": (f"{external_repo_url} external")},
             ),
         ],
     )

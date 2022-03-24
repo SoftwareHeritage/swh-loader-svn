@@ -19,6 +19,7 @@ Build-Depends: debhelper (>= 9),
                python3-swh.model (>= 0.4.0~),
                python3-swh.scheduler (>= 0.0.39~),
                python3-swh.storage (>= 0.11.3~),
+               python3-tenacity,
                python3-typing-extensions (>= 3.7.4~),
                subversion
 Standards-Version: 3.9.6

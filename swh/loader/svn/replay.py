@@ -181,9 +181,7 @@ class FileState:
 
 
 class FileEditor:
-    """File Editor in charge of updating file on disk and memory objects.
-
-    """
+    """File Editor in charge of updating file on disk and memory objects."""
 
     __slots__ = [
         "directory",
@@ -444,9 +442,7 @@ class DirEditor:
         self.editor.modified_paths.discard(path)
 
     def open_directory(self, path: str, *args) -> DirEditor:
-        """Updating existing directory.
-
-        """
+        """Updating existing directory."""
         return DirEditor(
             self.directory,
             rootpath=self.rootpath,
@@ -457,9 +453,7 @@ class DirEditor:
         )
 
     def add_directory(self, path: str, *args) -> DirEditor:
-        """Adding a new directory.
-
-        """
+        """Adding a new directory."""
         path_bytes = os.fsencode(path)
 
         os.makedirs(os.path.join(self.rootpath, path_bytes), exist_ok=True)
@@ -477,9 +471,7 @@ class DirEditor:
         )
 
     def open_file(self, path: str, *args) -> FileEditor:
-        """Updating existing file.
-
-        """
+        """Updating existing file."""
         path_bytes = os.fsencode(path)
         self.directory[path_bytes] = from_disk.Content()
         fullpath = os.path.join(self.rootpath, path_bytes)
@@ -492,9 +484,7 @@ class DirEditor:
         )
 
     def add_file(self, path: str, *args) -> FileEditor:
-        """Creating a new file.
-
-        """
+        """Creating a new file."""
         path_bytes = os.fsencode(path)
         self.directory[path_bytes] = from_disk.Content()
         fullpath = os.path.join(self.rootpath, path_bytes)
@@ -508,9 +498,7 @@ class DirEditor:
         )
 
     def change_prop(self, key: str, value: str) -> None:
-        """Change property callback on directory.
-
-        """
+        """Change property callback on directory."""
         if key == properties.PROP_EXTERNALS:
             logger.debug(
                 "Setting '%s' property with value '%s' on path %s",
@@ -547,9 +535,7 @@ class DirEditor:
                 self.dir_states[self.path].externals = {}
 
     def delete_entry(self, path: str, revision: int) -> None:
-        """Remove a path.
-
-        """
+        """Remove a path."""
         path_bytes = os.fsencode(path)
         if path_bytes not in self.editor.external_paths:
             fullpath = os.path.join(self.rootpath, path_bytes)
@@ -683,7 +669,10 @@ class DirEditor:
                     ):
                         url = url.replace(origin_url, self.svnrepo.remote_url)
                     self.svnrepo.export(
-                        url, to=temp_path, peg_rev=revision, ignore_keywords=True,
+                        url,
+                        to=temp_path,
+                        peg_rev=revision,
+                        ignore_keywords=True,
                     )
                     self.editor.externals_cache[external] = temp_path
 
@@ -839,10 +828,10 @@ class DirEditor:
 
 class Editor:
     """Editor in charge of replaying svn events and computing objects
-       along.
+    along.
 
-       This implementation accounts for empty folder during hash
-       computations.
+    This implementation accounts for empty folder during hash
+    computations.
 
     """
 
@@ -890,8 +879,7 @@ class Editor:
 
 
 class Replay:
-    """Replay class.
-    """
+    """Replay class."""
 
     def __init__(
         self,
@@ -989,9 +977,7 @@ class Replay:
     help="Indicates whether to cleanup disk when done or not.",
 )
 def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
-    """Script to present how to use Replay class.
-
-    """
+    """Script to present how to use Replay class."""
     conn = RemoteAccess(svn_url.encode("utf-8"), auth=Auth([get_username_provider()]))
 
     os.makedirs(local_url, exist_ok=True)

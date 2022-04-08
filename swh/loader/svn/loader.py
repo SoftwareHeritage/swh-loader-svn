@@ -125,7 +125,7 @@ class SvnLoader(BaseLoader):
 
     def pre_cleanup(self):
         """Cleanup potential dangling files from prior runs (e.g. OOM killed
-           tasks)
+        tasks)
 
         """
         clean_dangling_folders(
@@ -135,9 +135,7 @@ class SvnLoader(BaseLoader):
         )
 
     def cleanup(self):
-        """Clean up the svn repository's working representation on disk.
-
-        """
+        """Clean up the svn repository's working representation on disk."""
         if not self.svnrepo:  # could happen if `prepare` fails
             return
         if self.debug:
@@ -166,7 +164,8 @@ Local repository not cleaned up for investigation: %s""",
         return root_dir.hash
 
     def _latest_snapshot_revision(
-        self, origin_url: str,
+        self,
+        origin_url: str,
     ) -> Optional[Tuple[Snapshot, Revision]]:
         """Look for latest snapshot revision and returns it if any.
 
@@ -226,9 +225,7 @@ Local repository not cleaned up for investigation: %s""",
         )
 
     def check_history_not_altered(self, revision_start: int, swh_rev: Revision) -> bool:
-        """Given a svn repository, check if the history was modified in between visits.
-
-        """
+        """Given a svn repository, check if the history was modified in between visits."""
         revision_id = swh_rev.id
         parents = swh_rev.parents
 
@@ -316,7 +313,10 @@ Local repository not cleaned up for investigation: %s""",
             err = (
                 "Hash tree computation divergence detected "
                 "(%s != %s), stopping!"
-                % (hashutil.hash_to_hex(dir_id), hashutil.hash_to_hex(checked_dir_id),)
+                % (
+                    hashutil.hash_to_hex(dir_id),
+                    hashutil.hash_to_hex(checked_dir_id),
+                )
             )
             raise ValueError(err)
 
@@ -465,10 +465,10 @@ Local repository not cleaned up for investigation: %s""",
 
     def store_data(self):
         """We store the data accumulated in internal instance variable.  If
-           the iteration over the svn revisions is done, we create the
-           snapshot and flush to storage the data.
+        the iteration over the svn revisions is done, we create the
+        snapshot and flush to storage the data.
 
-           This also resets the internal instance variable state.
+        This also resets the internal instance variable state.
 
         """
         self.storage.skipped_content_add(self._skipped_contents)
@@ -551,7 +551,7 @@ Local repository not cleaned up for investigation: %s""",
 
 class SvnLoaderFromDumpArchive(SvnLoader):
     """Uncompress an archive containing an svn dump, mount the svn dump as a local svn
-       repository and load that repository.
+    repository and load that repository.
 
     """
 

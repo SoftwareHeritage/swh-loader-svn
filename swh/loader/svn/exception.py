@@ -6,7 +6,7 @@
 
 class SvnLoaderEventful(ValueError):
     """Loading happens with some events. This transit the latest revision
-       seen.
+    seen.
 
     """
 
@@ -16,16 +16,12 @@ class SvnLoaderEventful(ValueError):
 
 
 class SvnLoaderUneventful(ValueError):
-    """'Loading did nothing.
-
-    """
+    """'Loading did nothing."""
 
     pass
 
 
 class SvnLoaderHistoryAltered(ValueError):
-    """History altered detected
-
-    """
+    """History altered detected"""
 
     pass

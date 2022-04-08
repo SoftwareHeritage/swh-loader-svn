@@ -59,12 +59,19 @@ def test_loader_svn_not_found_no_mock(swh_storage, tmp_path):
     assert loader.load() == {"status": "uneventful"}
 
     assert_last_visit_matches(
-        swh_storage, repo_url, status="not_found", type="svn",
+        swh_storage,
+        repo_url,
+        status="not_found",
+        type="svn",
     )
 
 
 @pytest.mark.parametrize(
-    "exception_msg", ["Unable to connect to a repository at URL", "Unknown URL type",]
+    "exception_msg",
+    [
+        "Unable to connect to a repository at URL",
+        "Unknown URL type",
+    ],
 )
 def test_loader_svn_not_found(swh_storage, tmp_path, exception_msg, mocker):
     """Given unknown repository issues, the loader visit ends up in status not_found"""
@@ -77,7 +84,10 @@ def test_loader_svn_not_found(swh_storage, tmp_path, exception_msg, mocker):
     assert loader.load() == {"status": "uneventful"}
 
     assert_last_visit_matches(
-        swh_storage, unknown_repo_url, status="not_found", type="svn",
+        swh_storage,
+        unknown_repo_url,
+        status="not_found",
+        type="svn",
     )
 
 
@@ -100,7 +110,10 @@ def test_loader_svn_failures(swh_storage, tmp_path, exception, mocker):
     assert loader.load() == {"status": "failed"}
 
     assert_last_visit_matches(
-        swh_storage, existing_repo_url, status="failed", type="svn",
+        swh_storage,
+        existing_repo_url,
+        status="failed",
+        type="svn",
     )
 
 
@@ -115,7 +128,10 @@ def test_loader_svnrdump_not_found(swh_storage, tmp_path, mocker):
     assert loader.load() == {"status": "uneventful"}
 
     assert_last_visit_matches(
-        swh_storage, unknown_repo_url, status="not_found", type="svn",
+        swh_storage,
+        unknown_repo_url,
+        status="not_found",
+        type="svn",
     )
 
 
@@ -145,7 +161,10 @@ def test_loader_svnrdump_no_such_revision(swh_storage, tmp_path, datadir):
     loader = SvnLoaderFromRemoteDump(swh_storage, repo_url, temp_directory=loading_path)
     assert loader.load() == {"status": "eventful"}
     actual_visit = assert_last_visit_matches(
-        swh_storage, repo_url, status="full", type="svn",
+        swh_storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -155,7 +174,10 @@ def test_loader_svnrdump_no_such_revision(swh_storage, tmp_path, datadir):
     # Visiting a second time the same repository should be uneventful...
     assert loader2.load() == {"status": "uneventful"}
     actual_visit2 = assert_last_visit_matches(
-        swh_storage, repo_url, status="full", type="svn",
+        swh_storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
 
     assert actual_visit.snapshot is not None
@@ -198,9 +220,7 @@ def test_loader_svn_new_visit(swh_storage, datadir, tmp_path):
 
 
 def test_loader_svn_2_visits_no_change(swh_storage, datadir, tmp_path):
-    """Visit multiple times a repository with no change should yield the same snapshot
-
-    """
+    """Visit multiple times a repository with no change should yield the same snapshot"""
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
@@ -258,20 +278,20 @@ def test_loader_svn_2_visits_no_change(swh_storage, datadir, tmp_path):
 
 def test_loader_tampered_repository(swh_storage, datadir, tmp_path):
     """In this scenario, the dump has been tampered with to modify the
-       commit log [1].  This results in a hash divergence which is
-       detected at startup after a new run for the same origin.
+    commit log [1].  This results in a hash divergence which is
+    detected at startup after a new run for the same origin.
 
-       In effect, this will perform a complete reloading of the repository.
+    In effect, this will perform a complete reloading of the repository.
 
-       [1] Tampering with revision 6 log message following:
+    [1] Tampering with revision 6 log message following:
 
-       ```
-        tar xvf pkg-gourmet.tgz  # initial repository ingested
-        cd pkg-gourmet/
-        echo "Tampering with commit log message for fun and profit" > log.txt
-        svnadmin setlog . -r 6 log.txt --bypass-hooks
-        tar cvf pkg-gourmet-tampered-rev6-log.tgz pkg-gourmet/
-       ```
+    ```
+     tar xvf pkg-gourmet.tgz  # initial repository ingested
+     cd pkg-gourmet/
+     echo "Tampering with commit log message for fun and profit" > log.txt
+     svnadmin setlog . -r 6 log.txt --bypass-hooks
+     tar cvf pkg-gourmet-tampered-rev6-log.tgz pkg-gourmet/
+    ```
     """
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
@@ -317,8 +337,8 @@ def test_loader_tampered_repository(swh_storage, datadir, tmp_path):
 
 def test_loader_svn_visit_with_changes(swh_storage, datadir, tmp_path):
     """In this scenario, the repository has been updated with new changes.
-       The loading visit should result in new objects stored and 1 new
-       snapshot.
+    The loading visit should result in new objects stored and 1 new
+    snapshot.
 
     """
     archive_name = "pkg-gourmet"
@@ -406,7 +426,7 @@ def test_loader_svn_visit_with_changes(swh_storage, datadir, tmp_path):
 
 def test_loader_svn_visit_start_from_revision(swh_storage, datadir, tmp_path):
     """Starting from existing revision, next visit on changed repo should yield 1 new
-       snapshot.
+    snapshot.
 
     """
     archive_name = "pkg-gourmet"
@@ -477,9 +497,9 @@ def test_loader_svn_visit_start_from_revision(swh_storage, datadir, tmp_path):
 
 def test_loader_svn_visit_with_eol_style(swh_storage, datadir, tmp_path):
     """Check that a svn repo containing a versioned file with CRLF line
-       endings with svn:eol-style property set to 'native' (this is a
-       violation of svn specification as the file should have been
-       stored with LF line endings) can be loaded anyway.
+    endings with svn:eol-style property set to 'native' (this is a
+    violation of svn specification as the file should have been
+    stored with LF line endings) can be loaded anyway.
 
     """
     archive_name = "mediawiki-repo-r407-eol-native-crlf"
@@ -541,7 +561,11 @@ def test_loader_svn_visit_with_mixed_crlf_lf(swh_storage, datadir, tmp_path):
     check_snapshot(pyang_snapshot, loader.storage)
 
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn", snapshot=pyang_snapshot.id,
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=pyang_snapshot.id,
     )
 
     stats = get_stats(loader.storage)
@@ -636,9 +660,7 @@ def test_loader_svn_with_wrong_symlinks(swh_storage, datadir, tmp_path):
 
 
 def test_loader_svn_cleanup_loader(swh_storage, datadir, tmp_path):
-    """Loader should clean up its working directory after the load
-
-    """
+    """Loader should clean up its working directory after the load"""
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
@@ -655,9 +677,7 @@ def test_loader_svn_cleanup_loader(swh_storage, datadir, tmp_path):
 
 
 def test_loader_svn_cleanup_loader_from_remote_dump(swh_storage, datadir, tmp_path):
-    """Loader should clean up its working directory after the load
-
-    """
+    """Loader should clean up its working directory after the load"""
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
@@ -679,9 +699,7 @@ def test_loader_svn_cleanup_loader_from_remote_dump(swh_storage, datadir, tmp_pa
 
 
 def test_loader_svn_cleanup_loader_from_dump_archive(swh_storage, datadir, tmp_path):
-    """Loader should clean up its working directory after the load
-
-    """
+    """Loader should clean up its working directory after the load"""
     archive_ori_dump = os.path.join(datadir, "penguinsdbtools2018.dump.gz")
     archive_dump_dir = os.path.join(tmp_path, "dump")
     os.mkdir(archive_dump_dir)
@@ -859,8 +877,8 @@ def test_svn_loader_from_remote_dump_incremental_load_on_non_stale_repo(
 
 def test_loader_user_defined_svn_properties(swh_storage, datadir, tmp_path):
     """Edge cases: The repository held some user defined svn-properties with special
-       encodings, this prevented the repository from being loaded even though we do not
-       ingest those information.
+    encodings, this prevented the repository from being loaded even though we do not
+    ingest those information.
 
     """
     archive_name = "httthttt"
@@ -906,7 +924,10 @@ def test_loader_svn_dir_added_then_removed(swh_storage, datadir, tmp_path):
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -980,7 +1001,12 @@ def test_loader_eol_style_file_property_handling_edge_case(
     add_commit(
         repo_url,
         "Remove previously added directory and file",
-        [CommitChange(change_type=CommitChangeType.Delete, path="directory/",)],
+        [
+            CommitChange(
+                change_type=CommitChangeType.Delete,
+                path="directory/",
+            )
+        ],
     )
 
     # third commit
@@ -1007,7 +1033,10 @@ def test_loader_eol_style_file_property_handling_edge_case(
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1068,7 +1097,10 @@ def test_loader_eol_style_on_svn_link_handling(swh_storage, repo_url, tmp_path):
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1155,7 +1187,10 @@ def test_loader_svn_special_property_unset(swh_storage, repo_url, tmp_path):
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1215,7 +1250,10 @@ def test_loader_invalid_svn_eol_style_property_value(swh_storage, repo_url, tmp_
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1258,7 +1296,10 @@ def test_loader_first_revision_is_not_number_one(
     assert loader.load() == {"status": "failed"}
 
     assert_last_visit_matches(
-        loader.storage, repo_url, status="partial", type="svn",
+        loader.storage,
+        repo_url,
+        status="partial",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1346,7 +1387,10 @@ def test_loader_svn_special_property_on_binary_file(swh_storage, repo_url, tmp_p
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1417,7 +1461,10 @@ def test_loader_delete_directory_while_file_has_same_prefix(
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1446,7 +1493,10 @@ def test_svn_loader_incremental(swh_storage, repo_url, tmp_path):
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1467,7 +1517,10 @@ def test_svn_loader_incremental(swh_storage, repo_url, tmp_path):
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1488,7 +1541,10 @@ def test_svn_loader_incremental(swh_storage, repo_url, tmp_path):
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1503,7 +1559,9 @@ def test_svn_loader_incremental_replay_start_with_empty_directory(
         ("Add a file"),
         [
             CommitChange(
-                change_type=CommitChangeType.AddOrUpdate, path="foo.txt", data=b"foo\n",
+                change_type=CommitChangeType.AddOrUpdate,
+                path="foo.txt",
+                data=b"foo\n",
             )
         ],
     )
@@ -1512,7 +1570,10 @@ def test_svn_loader_incremental_replay_start_with_empty_directory(
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1522,7 +1583,9 @@ def test_svn_loader_incremental_replay_start_with_empty_directory(
         "Modify previously added file",
         [
             CommitChange(
-                change_type=CommitChangeType.AddOrUpdate, path="foo.txt", data=b"bar\n",
+                change_type=CommitChangeType.AddOrUpdate,
+                path="foo.txt",
+                data=b"bar\n",
             )
         ],
     )
@@ -1604,7 +1667,10 @@ def test_loader_svn_executable_property_on_svn_link_handling(
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1651,7 +1717,10 @@ def test_loader_svn_add_property_on_link(swh_storage, repo_url, tmp_path):
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1698,7 +1767,10 @@ def test_loader_svn_link_parsing(swh_storage, repo_url, tmp_path):
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1787,7 +1859,10 @@ def test_loader_svn_add_property_on_directory_link(swh_storage, repo_url, tmp_pa
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1856,7 +1931,10 @@ def test_loader_with_subprojects(swh_storage, repo_url, tmp_path, svn_loader_cls
 
         assert loader.load() == {"status": "eventful"}
         assert_last_visit_matches(
-            loader.storage, origin_url, status="full", type="svn",
+            loader.storage,
+            origin_url,
+            status="full",
+            type="svn",
         )
         check_snapshot(loader.snapshot, loader.storage)
 
@@ -1938,7 +2016,10 @@ def test_loader_subproject_root_dir_removal(
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, origin_url, status="full", type="svn",
+        loader.storage,
+        origin_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 

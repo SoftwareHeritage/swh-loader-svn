@@ -63,14 +63,15 @@ def assert_sleep_calls(mock_sleep, mocker, nb_failures):
     mock_sleep.assert_has_calls(
         [
             mocker.call(param)
-            for param in [SVN_RETRY_WAIT_EXP_BASE ** i for i in range(nb_failures)]
+            for param in [SVN_RETRY_WAIT_EXP_BASE**i for i in range(nb_failures)]
         ]
     )
 
 
 RETRYABLE_EXCEPTIONS = [
     SubversionException(
-        "Error running context: The server unexpectedly closed the connection.", 120108,
+        "Error running context: The server unexpectedly closed the connection.",
+        120108,
     ),
     SubversionException("Connection timed out", 175012),
     SubversionException("Unable to connect to a repository at URL", 170013),
@@ -254,7 +255,10 @@ def test_remote_access_retry_success(
     mock_sleep = mocker.patch.object(SvnRepo.remote_access.retry, "sleep")
 
     SvnRepo(
-        sample_repo_url, sample_repo_url, tmp_path, max_content_length=100000,
+        sample_repo_url,
+        sample_repo_url,
+        tmp_path,
+        max_content_length=100000,
     )
 
     assert_sleep_calls(mock_sleep, mocker, nb_failed_calls)
@@ -279,7 +283,10 @@ def test_remote_access_retry_failure(
 
     with pytest.raises(type(exception_to_retry)):
         SvnRepo(
-            sample_repo_url, sample_repo_url, tmp_path, max_content_length=100000,
+            sample_repo_url,
+            sample_repo_url,
+            tmp_path,
+            max_content_length=100000,
         )
 
     assert_sleep_calls(mock_sleep, mocker, nb_failed_calls - 1)

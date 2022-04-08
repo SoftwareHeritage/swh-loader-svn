@@ -54,9 +54,18 @@ def test_loader_with_valid_svn_externals(
         repo_url,
         "Create repository structure.",
         [
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="branches/",),
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="tags/",),
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/",),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="branches/",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="tags/",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+            ),
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
                 path="trunk/bar.sh",
@@ -92,7 +101,10 @@ def test_loader_with_valid_svn_externals(
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -113,7 +125,10 @@ def test_loader_with_valid_svn_externals(
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -125,9 +140,18 @@ def test_loader_with_invalid_svn_externals(swh_storage, repo_url, tmp_path, mock
         repo_url,
         "Create repository structure.",
         [
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="branches/",),
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="tags/",),
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/",),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="branches/",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="tags/",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+            ),
         ],
     )
 
@@ -155,7 +179,10 @@ def test_loader_with_invalid_svn_externals(swh_storage, repo_url, tmp_path, mock
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -230,7 +257,10 @@ def test_loader_with_valid_externals_modification(
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -297,7 +327,10 @@ def test_loader_with_valid_externals_and_versioned_path(
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -339,7 +372,10 @@ def test_loader_with_invalid_externals_and_versioned_path(
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -396,7 +432,10 @@ def test_loader_set_externals_then_remove_and_add_as_local(
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -434,7 +473,10 @@ def test_loader_set_invalid_externals_then_remove(swh_storage, repo_url, tmp_pat
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -501,7 +543,10 @@ def test_loader_set_externals_with_versioned_file_overlap(
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -552,7 +597,10 @@ def test_dump_loader_relative_externals_detection(
     )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
     assert loader.svnrepo.has_relative_externals
@@ -574,7 +622,10 @@ def test_dump_loader_relative_externals_detection(
     )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
     assert not loader.svnrepo.has_relative_externals
@@ -601,8 +652,14 @@ def test_loader_externals_cache(swh_storage, repo_url, external_repo_url, tmp_pa
         repo_url,
         "Create repository structure.",
         [
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="project1/",),
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="project2/",),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="project1/",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="project2/",
+            ),
         ],
     )
 
@@ -632,7 +689,10 @@ def test_loader_externals_cache(swh_storage, repo_url, external_repo_url, tmp_pa
     loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -693,15 +753,26 @@ def test_loader_remove_versioned_path_with_external_overlap(
     add_commit(
         repo_url,
         "Remove trunk/project/ versioned path",
-        [CommitChange(change_type=CommitChangeType.Delete, path="trunk/project/",),],
+        [
+            CommitChange(
+                change_type=CommitChangeType.Delete,
+                path="trunk/project/",
+            ),
+        ],
     )
 
     loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
     )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -726,7 +797,12 @@ def test_loader_export_external_path_using_peg_rev(
     add_commit(
         external_repo_url,
         "Remove previously added file",
-        [CommitChange(change_type=CommitChangeType.Delete, path="code/foo.sh",),],
+        [
+            CommitChange(
+                change_type=CommitChangeType.Delete,
+                path="code/foo.sh",
+            ),
+        ],
     )
 
     # third commit on external
@@ -746,7 +822,12 @@ def test_loader_export_external_path_using_peg_rev(
     add_commit(
         repo_url,
         "Add trunk dir",
-        [CommitChange(change_type=CommitChangeType.AddOrUpdate, path="trunk/",),],
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+            ),
+        ],
     )
 
     # second commit
@@ -784,11 +865,17 @@ def test_loader_export_external_path_using_peg_rev(
     )
 
     loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
     )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -861,11 +948,17 @@ def test_loader_remove_external_overlapping_versioned_path(
     )
 
     loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
     )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -922,11 +1015,17 @@ def test_loader_modify_external_same_path(
     )
 
     loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
     )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -980,22 +1079,34 @@ def test_loader_with_recursive_external(
 
     # first load
     loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
     )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
     assert loader.svnrepo.has_recursive_externals
 
     # second load on stale repo
     loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
     )
     assert loader.load() == {"status": "uneventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
     assert loader.svnrepo.has_recursive_externals
@@ -1017,11 +1128,17 @@ def test_loader_with_recursive_external(
 
     # third load
     loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
     )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
     assert not loader.svnrepo.has_recursive_externals
@@ -1074,11 +1191,17 @@ def test_loader_externals_with_same_target(
     )
 
     loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
     )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1127,11 +1250,17 @@ def test_loader_external_in_versioned_path(
     )
 
     loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
     )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1271,11 +1400,17 @@ def test_loader_externals_add_remove_readd_on_subpath(
     )
 
     loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
     )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
 
@@ -1288,8 +1423,14 @@ def test_loader_directory_symlink_in_external(
         external_repo_url,
         "Create dirs in an external repository",
         [
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="src/apps/",),
-            CommitChange(change_type=CommitChangeType.AddOrUpdate, path="src/deps/",),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="src/apps/",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="src/deps/",
+            ),
         ],
     )
 
@@ -1328,10 +1469,16 @@ def test_loader_directory_symlink_in_external(
     )
 
     loader = SvnLoader(
-        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1,
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
     )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
-        loader.storage, repo_url, status="full", type="svn",
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)

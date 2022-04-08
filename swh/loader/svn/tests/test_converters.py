@@ -9,23 +9,27 @@ from swh.model.model import Person, Revision, Timestamp, TimestampWithTimezone
 
 
 def test_svn_author_to_swh_person():
-    """The author should have name, email and fullname filled.
-
-    """
+    """The author should have name, email and fullname filled."""
     actual_person = converters.svn_author_to_swh_person(b"tony <ynot@dagobah>")
 
     assert actual_person == Person.from_dict(
-        {"fullname": b"tony <ynot@dagobah>", "name": b"tony", "email": b"ynot@dagobah",}
+        {
+            "fullname": b"tony <ynot@dagobah>",
+            "name": b"tony",
+            "email": b"ynot@dagobah",
+        }
     )
 
 
 def test_svn_author_to_swh_person_no_email():
-    """The author and fullname should be the same as the input (author).
-
-    """
+    """The author and fullname should be the same as the input (author)."""
     actual_person = converters.svn_author_to_swh_person(b"tony")
     assert actual_person == Person.from_dict(
-        {"fullname": b"tony", "name": b"tony", "email": None,}
+        {
+            "fullname": b"tony",
+            "name": b"tony",
+            "email": None,
+        }
     )
 
 
@@ -36,7 +40,11 @@ def test_svn_author_to_swh_person_empty_person():
     """
     actual_person = converters.svn_author_to_swh_person(b"")
     assert actual_person == Person.from_dict(
-        {"fullname": b"", "name": None, "email": None,}
+        {
+            "fullname": b"",
+            "name": None,
+            "email": None,
+        }
     )
 
 
@@ -81,7 +89,10 @@ def test_build_swh_revision_default():
                 "fullname": b"theo <theo@uuid>",
             },
             "synthetic": True,
-            "extra_headers": ((b"svn_repo_uuid", b"uuid"), (b"svn_revision", b"10"),),
+            "extra_headers": (
+                (b"svn_repo_uuid", b"uuid"),
+                (b"svn_revision", b"10"),
+            ),
             "parents": (),
         }
     )

@@ -99,15 +99,11 @@ class SvnRepo:
         )
 
     def head_revision(self) -> int:
-        """Retrieve current head revision.
-
-        """
+        """Retrieve current head revision."""
         return self.conn.get_latest_revnum()
 
     def initial_revision(self) -> int:
-        """Retrieve the initial revision from which the remote url appeared.
-
-        """
+        """Retrieve the initial revision from which the remote url appeared."""
         return 1
 
     def convert_commit_message(self, msg: Union[str, bytes]) -> bytes:
@@ -392,7 +388,10 @@ class SvnRepo:
                         )
 
                         if is_recursive_external(
-                            self.origin_url, path, external_path, external_url,
+                            self.origin_url,
+                            path,
+                            external_path,
+                            external_url,
                         ):
                             self.has_recursive_externals = True
                             url = self.remote_url

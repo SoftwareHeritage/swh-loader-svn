@@ -14,7 +14,7 @@ import shutil
 import tempfile
 from typing import Dict, Iterator, List, Optional, Tuple, Union
 
-from subvertpy import SubversionException, client, properties
+from subvertpy import SubversionException, client, properties, wc
 from subvertpy.ra import Auth, RemoteAccess, get_username_provider
 
 from swh.model.from_disk import Directory as DirectoryFromDisk
@@ -283,8 +283,12 @@ class SvnRepo:
         See documentation of svn_client_checkout3 function from subversion C API
         to get details about parameters.
         """
-        # remove checkout path as command can be retried
-        if os.path.isdir(path):
+        if os.path.isdir(os.path.join(path, ".svn")):
+            # cleanup checkout path as command can be retried and svn working copy might
+            # be locked
+            wc.cleanup(path)
+        elif os.path.isdir(path):
+            # recursively remove checkout path otherwise if it is not a svn working copy
             shutil.rmtree(path)
         options = []
         if rev is not None:

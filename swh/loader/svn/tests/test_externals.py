@@ -1482,3 +1482,94 @@ def test_loader_directory_symlink_in_external(
         type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_with_externals_parsing_error(
+    swh_storage, repo_url, external_repo_url, tmp_path
+):
+    # first commit on external
+    add_commit(
+        external_repo_url,
+        "Create code directory",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/",
+            ),
+        ],
+    )
+
+    # second commit on external
+    add_commit(
+        external_repo_url,
+        "Create code/foo.sh file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/foo.sh",
+                properties={"svn:executable": "*"},
+                data=b"#!/bin/bash\necho foo",
+            ),
+        ],
+    )
+
+    # first commit
+    add_commit(
+        repo_url,
+        "Create trunk directory.",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+            ),
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        "Set external on trunk directory that will result in a parsing error.",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={
+                    "svn:externals": (
+                        f"-r2{svn_urljoin(external_repo_url, 'code/foo.sh')} foo.sh"
+                    )
+                },
+            ),
+        ],
+    )
+
+    # third commit
+    add_commit(
+        repo_url,
+        "Fix external definition on trunk directory.",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={
+                    "svn:externals": (
+                        f"-r2 {svn_urljoin(external_repo_url, 'code/foo.sh')} foo.sh"
+                    )
+                },
+            ),
+        ],
+    )
+
+    loader = SvnLoader(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)

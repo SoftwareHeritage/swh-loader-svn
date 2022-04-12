@@ -508,22 +508,35 @@ class DirEditor:
             )
             self.externals = defaultdict(list)
             if value is not None:
-                # externals are set on that directory path, parse and store them
-                # for later processing in the close method
-                for external in value.split("\n"):
-                    external = external.rstrip("\r")
-                    # skip empty line or comment
-                    if not external or external.startswith("#"):
-                        continue
-                    (
-                        path,
-                        external_url,
-                        revision,
-                        relative_url,
-                    ) = parse_external_definition(
-                        external, os.fsdecode(self.path), self.svnrepo.origin_url
+                try:
+                    # externals are set on that directory path, parse and store them
+                    # for later processing in the close method
+                    for external in value.split("\n"):
+                        external = external.rstrip("\r")
+                        # skip empty line or comment
+                        if not external or external.startswith("#"):
+                            continue
+                        (
+                            path,
+                            external_url,
+                            revision,
+                            relative_url,
+                        ) = parse_external_definition(
+                            external, os.fsdecode(self.path), self.svnrepo.origin_url
+                        )
+                        self.externals[path].append(
+                            (external_url, revision, relative_url)
+                        )
+                except ValueError:
+                    logger.debug(
+                        "Failed to parse external: %s\n"
+                        "Externals defined on path %s will not be processed",
+                        external,
+                        self.path,
                     )
-                    self.externals[path].append((external_url, revision, relative_url))
+                    # as the official subversion client, do not process externals in case
+                    # of parsing error
+                    self.externals = {}
 
             if not self.externals:
                 # externals might have been unset on that directory path,

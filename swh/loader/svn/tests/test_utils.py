@@ -286,6 +286,17 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             ),
         ),
         (
+            "^/../../skin-maker@21 third-party/skins/toolkit",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                "third-party/skins/toolkit",
+                "http://svn.example.org/skin-maker",
+                21,
+                True,
+            ),
+        ),
+        (
             "../skins skins",
             "trunk/externals",
             "http://svn.example.org/repos/test",

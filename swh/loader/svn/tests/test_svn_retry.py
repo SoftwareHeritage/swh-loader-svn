@@ -58,19 +58,23 @@ class SVNClientWrapper:
     def propget(self, *args, **kwargs):
         return self._wrapped_svn_cmd(self.client.propget, *args, **kwargs)
 
+    def info(self, *args, **kwargs):
+        return self._wrapped_svn_cmd(self.client.info, *args, **kwargs)
+
 
 def assert_sleep_calls(mock_sleep, mocker, nb_failures):
     mock_sleep.assert_has_calls(
         [
             mocker.call(param)
-            for param in [SVN_RETRY_WAIT_EXP_BASE ** i for i in range(nb_failures)]
+            for param in [SVN_RETRY_WAIT_EXP_BASE**i for i in range(nb_failures)]
         ]
     )
 
 
 RETRYABLE_EXCEPTIONS = [
     SubversionException(
-        "Error running context: The server unexpectedly closed the connection.", 120108,
+        "Error running context: The server unexpectedly closed the connection.",
+        120108,
     ),
     SubversionException("Connection timed out", 175012),
     SubversionException("Unable to connect to a repository at URL", 170013),
@@ -254,7 +258,10 @@ def test_remote_access_retry_success(
     mock_sleep = mocker.patch.object(SvnRepo.remote_access.retry, "sleep")
 
     SvnRepo(
-        sample_repo_url, sample_repo_url, tmp_path, max_content_length=100000,
+        sample_repo_url,
+        sample_repo_url,
+        tmp_path,
+        max_content_length=100000,
     )
 
     assert_sleep_calls(mock_sleep, mocker, nb_failed_calls)
@@ -279,7 +286,48 @@ def test_remote_access_retry_failure(
 
     with pytest.raises(type(exception_to_retry)):
         SvnRepo(
-            sample_repo_url, sample_repo_url, tmp_path, max_content_length=100000,
+            sample_repo_url,
+            sample_repo_url,
+            tmp_path,
+            max_content_length=100000,
         )
+
+    assert_sleep_calls(mock_sleep, mocker, nb_failed_calls - 1)
+
+
+@pytest.mark.parametrize("exception_to_retry", RETRYABLE_EXCEPTIONS)
+def test_svn_info_retry_success(mocker, tmp_path, sample_repo_url, exception_to_retry):
+    svnrepo = SvnRepo(
+        sample_repo_url, sample_repo_url, tmp_path, max_content_length=100000
+    )
+
+    mock_sleep = mocker.patch.object(svnrepo.info.retry, "sleep")
+
+    nb_failed_calls = 2
+    svnrepo.client = SVNClientWrapper(
+        svnrepo.client, exception_to_retry, nb_failed_calls
+    )
+
+    info = svnrepo.info(sample_repo_url)
+    assert info
+
+    assert_sleep_calls(mock_sleep, mocker, nb_failed_calls)
+
+
+@pytest.mark.parametrize("exception_to_retry", RETRYABLE_EXCEPTIONS)
+def test_svn_info_retry_failure(mocker, tmp_path, sample_repo_url, exception_to_retry):
+    svnrepo = SvnRepo(
+        sample_repo_url, sample_repo_url, tmp_path, max_content_length=100000
+    )
+
+    mock_sleep = mocker.patch.object(svnrepo.info.retry, "sleep")
+
+    nb_failed_calls = SVN_RETRY_MAX_ATTEMPTS
+    svnrepo.client = SVNClientWrapper(
+        svnrepo.client, exception_to_retry, nb_failed_calls
+    )
+
+    with pytest.raises(type(exception_to_retry)):
+        svnrepo.info(sample_repo_url)
 
     assert_sleep_calls(mock_sleep, mocker, nb_failed_calls - 1)

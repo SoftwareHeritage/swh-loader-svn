@@ -69,7 +69,10 @@ def test_svn_loader_from_remote_dump(
             "2021-11-23 09:41:02.434195+00:00",
             datetime(2021, 11, 23, 9, 41, 2, 434195, tzinfo=timezone.utc),
         ),
-        ("23112021", None,),  # failure to parse
+        (
+            "23112021",
+            None,
+        ),  # failure to parse
     ],
 )
 def test_convert_to_datetime(date, expected_result):

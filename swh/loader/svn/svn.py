@@ -14,7 +14,7 @@ import shutil
 import tempfile
 from typing import Dict, Iterator, List, Optional, Tuple, Union
 
-from subvertpy import SubversionException, client, properties
+from subvertpy import SubversionException, client, properties, wc
 from subvertpy.ra import Auth, RemoteAccess, get_username_provider
 
 from swh.model.from_disk import Directory as DirectoryFromDisk
@@ -84,8 +84,7 @@ class SvnRepo:
 
         # compute root directory path from the remote repository URL, required to
         # properly load the sub-tree of a repository mounted from a dump file
-        info = self.client.info(origin_url.rstrip("/"))
-        repos_root_url = next(iter(info.values())).repos_root_url
+        repos_root_url = self.info(origin_url).repos_root_url
         self.root_directory = origin_url.replace(repos_root_url, "", 1)
 
     def __str__(self):
@@ -99,15 +98,11 @@ class SvnRepo:
         )
 
     def head_revision(self) -> int:
-        """Retrieve current head revision.
-
-        """
+        """Retrieve current head revision."""
         return self.conn.get_latest_revnum()
 
     def initial_revision(self) -> int:
-        """Retrieve the initial revision from which the remote url appeared.
-
-        """
+        """Retrieve the initial revision from which the remote url appeared."""
         return 1
 
     def convert_commit_message(self, msg: Union[str, bytes]) -> bytes:
@@ -219,6 +214,13 @@ class SvnRepo:
         return RemoteAccess(self.remote_url, auth=auth)
 
     @svn_retry()
+    def info(self, origin_url: str):
+        """Simple wrapper around subvertpy.client.Client.info enabling to retry
+        the command if a network error occurs."""
+        info = self.client.info(origin_url.rstrip("/"))
+        return next(iter(info.values()))
+
+    @svn_retry()
     def export(
         self,
         url: str,
@@ -287,8 +289,12 @@ class SvnRepo:
         See documentation of svn_client_checkout3 function from subversion C API
         to get details about parameters.
         """
-        # remove checkout path as command can be retried
-        if os.path.isdir(path):
+        if os.path.isdir(os.path.join(path, ".svn")):
+            # cleanup checkout path as command can be retried and svn working copy might
+            # be locked
+            wc.cleanup(path)
+        elif os.path.isdir(path):
+            # recursively remove checkout path otherwise if it is not a svn working copy
             shutil.rmtree(path)
         options = []
         if rev is not None:
@@ -392,7 +398,10 @@ class SvnRepo:
                         )
 
                         if is_recursive_external(
-                            self.origin_url, path, external_path, external_url,
+                            self.origin_url,
+                            path,
+                            external_path,
+                            external_url,
                         ):
                             self.has_recursive_externals = True
                             url = self.remote_url

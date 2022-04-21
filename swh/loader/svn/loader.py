@@ -15,7 +15,7 @@ import re
 import shutil
 from subprocess import Popen
 import tempfile
-from typing import Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 from subvertpy import SubversionException
 
@@ -27,7 +27,6 @@ from swh.model import from_disk, hashutil
 from swh.model.model import (
     Content,
     Directory,
-    Origin,
     Revision,
     SkippedContent,
     Snapshot,
@@ -69,7 +68,7 @@ class SvnLoader(BaseLoader):
         temp_directory: str = "/tmp",
         debug: bool = False,
         check_revision: int = 0,
-        max_content_size: Optional[int] = None,
+        **kwargs: Any,
     ):
         """Load a svn repository (either remote or local).
 
@@ -89,15 +88,11 @@ class SvnLoader(BaseLoader):
             max_content_size: Default max content size allowed
 
         """
-        super().__init__(
-            storage=storage,
-            logging_class="swh.loader.svn.SvnLoader",
-            max_content_size=max_content_size,
-        )
         # technical svn uri to act on svn repository
         self.svn_url = url
         # origin url as unique identifier for origin in swh archive
-        self.origin_url = origin_url if origin_url else self.svn_url
+        origin_url = origin_url or self.svn_url
+        super().__init__(storage=storage, origin_url=origin_url, **kwargs)
         self.debug = debug
         self.temp_directory = temp_directory
         self.done = False
@@ -115,7 +110,7 @@ class SvnLoader(BaseLoader):
         self._last_revision = None
         self._visit_status = "full"
         self._load_status = "uneventful"
-        self.visit_date = visit_date
+        self.visit_date = visit_date or self.visit_date
         self.incremental = incremental
         self.snapshot: Optional[Snapshot] = None
         # state from previous visit
@@ -125,7 +120,7 @@ class SvnLoader(BaseLoader):
 
     def pre_cleanup(self):
         """Cleanup potential dangling files from prior runs (e.g. OOM killed
-           tasks)
+        tasks)
 
         """
         clean_dangling_folders(
@@ -135,9 +130,7 @@ class SvnLoader(BaseLoader):
         )
 
     def cleanup(self):
-        """Clean up the svn repository's working representation on disk.
-
-        """
+        """Clean up the svn repository's working representation on disk."""
         if not self.svnrepo:  # could happen if `prepare` fails
             return
         if self.debug:
@@ -166,7 +159,8 @@ Local repository not cleaned up for investigation: %s""",
         return root_dir.hash
 
     def _latest_snapshot_revision(
-        self, origin_url: str,
+        self,
+        origin_url: str,
     ) -> Optional[Tuple[Snapshot, Revision]]:
         """Look for latest snapshot revision and returns it if any.
 
@@ -226,9 +220,7 @@ Local repository not cleaned up for investigation: %s""",
         )
 
     def check_history_not_altered(self, revision_start: int, swh_rev: Revision) -> bool:
-        """Given a svn repository, check if the history was modified in between visits.
-
-        """
+        """Given a svn repository, check if the history was modified in between visits."""
         revision_id = swh_rev.id
         parents = swh_rev.parents
 
@@ -316,7 +308,10 @@ Local repository not cleaned up for investigation: %s""",
             err = (
                 "Hash tree computation divergence detected "
                 "(%s != %s), stopping!"
-                % (hashutil.hash_to_hex(dir_id), hashutil.hash_to_hex(checked_dir_id),)
+                % (
+                    hashutil.hash_to_hex(dir_id),
+                    hashutil.hash_to_hex(checked_dir_id),
+                )
             )
             raise ValueError(err)
 
@@ -378,27 +373,11 @@ Local repository not cleaned up for investigation: %s""",
             # before the post_load operation
             self.svnrepo.clean_fs(self.svnrepo.local_url)
 
-    def prepare_origin_visit(self):
-        self.origin = Origin(url=self.origin_url if self.origin_url else self.svn_url)
-
-    def prepare(self):
-        if self.incremental:
-            latest_snapshot_revision = self._latest_snapshot_revision(self.origin_url)
-            if latest_snapshot_revision:
-                self.latest_snapshot, self.latest_revision = latest_snapshot_revision
-                self._snapshot = self.latest_snapshot
-                self._last_revision = self.latest_revision
-
-        local_dirname = self._create_tmp_dir(self.temp_directory)
-
+    def svn_repo(self, *args, **kwargs):
+        """Wraps the creation of SvnRepo object and handles not found repository
+        errors."""
         try:
-            self.svnrepo = SvnRepo(
-                self.svn_url,
-                self.origin_url,
-                local_dirname,
-                self.max_content_size,
-                self.from_dump,
-            )
+            return SvnRepo(*args, **kwargs)
         except SubversionException as e:
             error_msgs = [
                 "Unable to connect to a repository at URL",
@@ -409,6 +388,24 @@ Local repository not cleaned up for investigation: %s""",
                     self._load_status = "uneventful"
                     raise NotFound(e)
             raise
+
+    def prepare(self):
+        if self.incremental:
+            latest_snapshot_revision = self._latest_snapshot_revision(self.origin.url)
+            if latest_snapshot_revision:
+                self.latest_snapshot, self.latest_revision = latest_snapshot_revision
+                self._snapshot = self.latest_snapshot
+                self._last_revision = self.latest_revision
+
+        local_dirname = self._create_tmp_dir(self.temp_directory)
+
+        self.svnrepo = self.svn_repo(
+            self.svn_url,
+            self.origin.url,
+            local_dirname,
+            self.max_content_size,
+            self.from_dump,
+        )
 
         try:
             revision_start, revision_end = self.start_from()
@@ -465,10 +462,10 @@ Local repository not cleaned up for investigation: %s""",
 
     def store_data(self):
         """We store the data accumulated in internal instance variable.  If
-           the iteration over the svn revisions is done, we create the
-           snapshot and flush to storage the data.
+        the iteration over the svn revisions is done, we create the
+        snapshot and flush to storage the data.
 
-           This also resets the internal instance variable state.
+        This also resets the internal instance variable state.
 
         """
         self.storage.skipped_content_add(self._skipped_contents)
@@ -551,7 +548,7 @@ Local repository not cleaned up for investigation: %s""",
 
 class SvnLoaderFromDumpArchive(SvnLoader):
     """Uncompress an archive containing an svn dump, mount the svn dump as a local svn
-       repository and load that repository.
+    repository and load that repository.
 
     """
 
@@ -781,11 +778,11 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         # is different from the last revision on the remote subversion server.
         # Skip the dump of all revisions and the loading process if they are identical
         # to save some disk space and processing time.
-        last_loaded_snp_and_rev = self._latest_snapshot_revision(self.origin_url)
+        last_loaded_snp_and_rev = self._latest_snapshot_revision(self.origin.url)
         if last_loaded_snp_and_rev is not None:
             last_loaded_snp, last_loaded_rev = last_loaded_snp_and_rev
-            self.svnrepo = SvnRepo(
-                self.origin_url, self.origin_url, self.temp_dir, self.max_content_size
+            self.svnrepo = self.svn_repo(
+                self.origin.url, self.origin.url, self.temp_dir, self.max_content_size
             )
             stale_repository = self.svnrepo.head_revision() == last_loaded_svn_rev
             if stale_repository and self.check_history_not_altered(

@@ -149,7 +149,11 @@ def test_init_svn_repo_from_archive_dump_and_cleanup(datadir, tmp_path):
             ["/repos", "test/"],
             "https://svn.example.org/foo/repos/test",
         ),
-        ("https://svn.example.org/foo", ["../bar"], "https://svn.example.org/bar",),
+        (
+            "https://svn.example.org/foo",
+            ["../bar"],
+            "https://svn.example.org/bar",
+        ),
     ],
 )
 def test_svn_urljoin(base_url, paths_to_join, expected_result):
@@ -277,6 +281,17 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             (
                 "third-party/skins/toolkit",
                 "http://svn.example.com/skin-maker",
+                21,
+                True,
+            ),
+        ),
+        (
+            "^/../../skin-maker@21 third-party/skins/toolkit",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                "third-party/skins/toolkit",
+                "http://svn.example.org/skin-maker",
                 21,
                 True,
             ),

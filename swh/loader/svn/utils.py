@@ -235,6 +235,7 @@ def parse_external_definition(
             # URL relative to the root of the repository in which the svn:externals
             # property is versioned
             external_url = svn_urljoin(repo_url, external_part[2:])
+            relative_url = not external_url.startswith(repo_url)
         elif external_part.startswith("//"):
             # URL relative to the scheme of the URL of the directory on which the
             # svn:externals property is set

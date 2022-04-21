@@ -84,8 +84,7 @@ class SvnRepo:
 
         # compute root directory path from the remote repository URL, required to
         # properly load the sub-tree of a repository mounted from a dump file
-        info = self.client.info(origin_url.rstrip("/"))
-        repos_root_url = next(iter(info.values())).repos_root_url
+        repos_root_url = self.info(origin_url).repos_root_url
         self.root_directory = origin_url.replace(repos_root_url, "", 1)
 
     def __str__(self):
@@ -213,6 +212,13 @@ class SvnRepo:
         """Simple wrapper around subvertpy.ra.RemoteAccess creation
         enabling to retry the operation if a network error occurs."""
         return RemoteAccess(self.remote_url, auth=auth)
+
+    @svn_retry()
+    def info(self, origin_url: str):
+        """Simple wrapper around subvertpy.client.Client.info enabling to retry
+        the command if a network error occurs."""
+        info = self.client.info(origin_url.rstrip("/"))
+        return next(iter(info.values()))
 
     @svn_retry()
     def export(

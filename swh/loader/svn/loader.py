@@ -15,7 +15,7 @@ import re
 import shutil
 from subprocess import Popen
 import tempfile
-from typing import Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 from subvertpy import SubversionException
 
@@ -27,7 +27,6 @@ from swh.model import from_disk, hashutil
 from swh.model.model import (
     Content,
     Directory,
-    Origin,
     Revision,
     SkippedContent,
     Snapshot,
@@ -69,7 +68,7 @@ class SvnLoader(BaseLoader):
         temp_directory: str = "/tmp",
         debug: bool = False,
         check_revision: int = 0,
-        max_content_size: Optional[int] = None,
+        **kwargs: Any,
     ):
         """Load a svn repository (either remote or local).
 
@@ -89,15 +88,11 @@ class SvnLoader(BaseLoader):
             max_content_size: Default max content size allowed
 
         """
-        super().__init__(
-            storage=storage,
-            logging_class="swh.loader.svn.SvnLoader",
-            max_content_size=max_content_size,
-        )
         # technical svn uri to act on svn repository
         self.svn_url = url
         # origin url as unique identifier for origin in swh archive
-        self.origin_url = origin_url if origin_url else self.svn_url
+        origin_url = origin_url or self.svn_url
+        super().__init__(storage=storage, origin_url=origin_url, **kwargs)
         self.debug = debug
         self.temp_directory = temp_directory
         self.done = False
@@ -115,7 +110,7 @@ class SvnLoader(BaseLoader):
         self._last_revision = None
         self._visit_status = "full"
         self._load_status = "uneventful"
-        self.visit_date = visit_date
+        self.visit_date = visit_date or self.visit_date
         self.incremental = incremental
         self.snapshot: Optional[Snapshot] = None
         # state from previous visit
@@ -378,12 +373,9 @@ Local repository not cleaned up for investigation: %s""",
             # before the post_load operation
             self.svnrepo.clean_fs(self.svnrepo.local_url)
 
-    def prepare_origin_visit(self):
-        self.origin = Origin(url=self.origin_url if self.origin_url else self.svn_url)
-
     def prepare(self):
         if self.incremental:
-            latest_snapshot_revision = self._latest_snapshot_revision(self.origin_url)
+            latest_snapshot_revision = self._latest_snapshot_revision(self.origin.url)
             if latest_snapshot_revision:
                 self.latest_snapshot, self.latest_revision = latest_snapshot_revision
                 self._snapshot = self.latest_snapshot
@@ -394,7 +386,7 @@ Local repository not cleaned up for investigation: %s""",
         try:
             self.svnrepo = SvnRepo(
                 self.svn_url,
-                self.origin_url,
+                self.origin.url,
                 local_dirname,
                 self.max_content_size,
                 self.from_dump,
@@ -781,11 +773,11 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         # is different from the last revision on the remote subversion server.
         # Skip the dump of all revisions and the loading process if they are identical
         # to save some disk space and processing time.
-        last_loaded_snp_and_rev = self._latest_snapshot_revision(self.origin_url)
+        last_loaded_snp_and_rev = self._latest_snapshot_revision(self.origin.url)
         if last_loaded_snp_and_rev is not None:
             last_loaded_snp, last_loaded_rev = last_loaded_snp_and_rev
             self.svnrepo = SvnRepo(
-                self.origin_url, self.origin_url, self.temp_dir, self.max_content_size
+                self.origin.url, self.origin.url, self.temp_dir, self.max_content_size
             )
             stale_repository = self.svnrepo.head_revision() == last_loaded_svn_rev
             if stale_repository and self.check_history_not_altered(

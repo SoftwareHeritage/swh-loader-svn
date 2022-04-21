@@ -373,24 +373,11 @@ Local repository not cleaned up for investigation: %s""",
             # before the post_load operation
             self.svnrepo.clean_fs(self.svnrepo.local_url)
 
-    def prepare(self):
-        if self.incremental:
-            latest_snapshot_revision = self._latest_snapshot_revision(self.origin.url)
-            if latest_snapshot_revision:
-                self.latest_snapshot, self.latest_revision = latest_snapshot_revision
-                self._snapshot = self.latest_snapshot
-                self._last_revision = self.latest_revision
-
-        local_dirname = self._create_tmp_dir(self.temp_directory)
-
+    def svn_repo(self, *args, **kwargs):
+        """Wraps the creation of SvnRepo object and handles not found repository
+        errors."""
         try:
-            self.svnrepo = SvnRepo(
-                self.svn_url,
-                self.origin.url,
-                local_dirname,
-                self.max_content_size,
-                self.from_dump,
-            )
+            return SvnRepo(*args, **kwargs)
         except SubversionException as e:
             error_msgs = [
                 "Unable to connect to a repository at URL",
@@ -401,6 +388,24 @@ Local repository not cleaned up for investigation: %s""",
                     self._load_status = "uneventful"
                     raise NotFound(e)
             raise
+
+    def prepare(self):
+        if self.incremental:
+            latest_snapshot_revision = self._latest_snapshot_revision(self.origin.url)
+            if latest_snapshot_revision:
+                self.latest_snapshot, self.latest_revision = latest_snapshot_revision
+                self._snapshot = self.latest_snapshot
+                self._last_revision = self.latest_revision
+
+        local_dirname = self._create_tmp_dir(self.temp_directory)
+
+        self.svnrepo = self.svn_repo(
+            self.svn_url,
+            self.origin.url,
+            local_dirname,
+            self.max_content_size,
+            self.from_dump,
+        )
 
         try:
             revision_start, revision_end = self.start_from()
@@ -776,7 +781,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         last_loaded_snp_and_rev = self._latest_snapshot_revision(self.origin.url)
         if last_loaded_snp_and_rev is not None:
             last_loaded_snp, last_loaded_rev = last_loaded_snp_and_rev
-            self.svnrepo = SvnRepo(
+            self.svnrepo = self.svn_repo(
                 self.origin.url, self.origin.url, self.temp_dir, self.max_content_size
             )
             stale_repository = self.svnrepo.head_revision() == last_loaded_svn_rev

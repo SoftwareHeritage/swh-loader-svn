@@ -2029,3 +2029,39 @@ def test_loader_subproject_root_dir_removal(
     loader = svn_loader_cls(**loader_params)
 
     assert loader.load() == {"status": "uneventful"}
+
+
+@pytest.mark.parametrize("svn_loader_cls", [SvnLoader, SvnLoaderFromRemoteDump])
+def test_loader_svn_not_found_after_successful_visit(
+    swh_storage, datadir, tmp_path, svn_loader_cls
+):
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
+
+    assert loader.load() == {"status": "eventful"}
+
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+
+    # simulate removal of remote repository
+    shutil.rmtree(repo_url.replace("file://", ""))
+
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
+
+    assert loader.load() == {"status": "uneventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="not_found",
+        type="svn",
+        snapshot=None,
+    )

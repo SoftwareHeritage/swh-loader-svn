@@ -7,6 +7,8 @@ from typing import Any, Dict
 
 import pytest
 
+from swh.loader.svn.loader import SvnRepo
+
 from .utils import create_repo
 
 
@@ -45,3 +47,11 @@ def swh_loader_config(swh_storage_backend_config) -> Dict[str, Any]:
 def repo_url(tmpdir_factory):
     # create a repository
     return create_repo(tmpdir_factory.mktemp("repos"))
+
+
+@pytest.fixture(autouse=True)
+def svn_retry_sleep_mocker(mocker):
+    mocker.patch.object(SvnRepo.export.retry, "sleep")
+    mocker.patch.object(SvnRepo.checkout.retry, "sleep")
+    mocker.patch.object(SvnRepo.propget.retry, "sleep")
+    mocker.patch.object(SvnRepo.remote_access.retry, "sleep")

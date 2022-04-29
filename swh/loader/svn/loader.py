@@ -85,7 +85,6 @@ class SvnLoader(BaseLoader):
                 temporary working directory is not cleaned up to ease inspection.
                 Defaults to false.
             check_revision: The number of svn commits between checks for hash divergence
-            max_content_size: Default max content size allowed
 
         """
         # technical svn uri to act on svn repository
@@ -563,7 +562,7 @@ class SvnLoaderFromDumpArchive(SvnLoader):
         temp_directory: str = "/tmp",
         debug: bool = False,
         check_revision: int = 0,
-        max_content_size: Optional[int] = None,
+        **kwargs: Any,
     ):
         super().__init__(
             storage=storage,
@@ -574,7 +573,7 @@ class SvnLoaderFromDumpArchive(SvnLoader):
             temp_directory=temp_directory,
             debug=debug,
             check_revision=check_revision,
-            max_content_size=max_content_size,
+            **kwargs,
         )
         self.archive_path = archive_path
         self.temp_dir = None
@@ -620,7 +619,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         temp_directory: str = "/tmp",
         debug: bool = False,
         check_revision: int = 0,
-        max_content_size: Optional[int] = None,
+        **kwargs: Any,
     ):
         super().__init__(
             storage=storage,
@@ -631,7 +630,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             temp_directory=temp_directory,
             debug=debug,
             check_revision=check_revision,
-            max_content_size=max_content_size,
+            **kwargs,
         )
         self.from_dump = True
         self.temp_dir = self._create_tmp_dir(self.temp_directory)

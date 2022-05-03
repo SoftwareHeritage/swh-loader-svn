@@ -2065,3 +2065,36 @@ def test_loader_svn_not_found_after_successful_visit(
         type="svn",
         snapshot=None,
     )
+
+
+def test_loader_svn_from_remote_dump_url_redirect(swh_storage, tmp_path, mocker):
+    repo_url = "http://svn.example.org/repo"
+    repo_redirect_url = "https://svn.example.org/repo"
+
+    # mock remote subversion operations
+    from swh.loader.svn.svn import client
+
+    mocker.patch("swh.loader.svn.svn.RemoteAccess")
+    init_svn_repo_from_dump = mocker.patch(
+        "swh.loader.svn.loader.init_svn_repo_from_dump"
+    )
+    init_svn_repo_from_dump.return_value = ("", "")
+    mock_client = mocker.MagicMock()
+    mocker.patch.object(client, "Client", mock_client)
+
+    class Info:
+        repos_root_url = repo_redirect_url
+        url = repo_redirect_url
+
+    mock_client().info.return_value = {"repo": Info()}
+
+    # init remote dump loader and mock some methods
+    loader = SvnLoaderFromRemoteDump(swh_storage, repo_url, temp_directory=tmp_path)
+    loader.dump_svn_revisions = mocker.MagicMock()
+    loader.start_from = mocker.MagicMock(return_value=(0, 0))
+
+    # prepare loading
+    loader.prepare()
+
+    # check redirection URL has been used to dump repository
+    assert loader.dump_svn_revisions.call_args_list[0][0][0] == repo_redirect_url

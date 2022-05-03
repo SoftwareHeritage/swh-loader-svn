@@ -59,12 +59,17 @@ class SvnRepo:
         self.from_dump = from_dump
 
         auth = Auth([get_username_provider()])
+        # one client for update operation
+        self.client = client.Client(auth=auth)
+
+        if not self.remote_url.startswith("file://"):
+            # use redirection URL if any for remote operations
+            self.remote_url = self.info(self.remote_url).url
+
         # one connection for log iteration
         self.conn_log = self.remote_access(auth)
         # another for replay
         self.conn = self.remote_access(auth)
-        # one client for update operation
-        self.client = client.Client(auth=auth)
 
         self.local_dirname = local_dirname
         local_name = os.path.basename(self.remote_url)

@@ -1912,8 +1912,9 @@ def test_loader_with_subprojects(swh_storage, repo_url, tmp_path, svn_loader_cls
     )
 
     for i in range(1, 4):
-        # load each project in the repository separately
-        origin_url = f"{repo_url}/project{i}"
+        # load each project in the repository separately and check behavior
+        # is the same if origin URL has a trailing slash or not
+        origin_url = f"{repo_url}/project{i}{'/' if i%2 else ''}"
 
         loader_params = {
             "storage": swh_storage,

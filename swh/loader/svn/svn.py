@@ -90,7 +90,7 @@ class SvnRepo:
         # compute root directory path from the remote repository URL, required to
         # properly load the sub-tree of a repository mounted from a dump file
         repos_root_url = self.info(origin_url).repos_root_url
-        self.root_directory = origin_url.replace(repos_root_url, "", 1)
+        self.root_directory = origin_url.rstrip("/").replace(repos_root_url, "", 1)
 
     def __str__(self):
         return str(

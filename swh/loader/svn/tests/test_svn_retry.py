@@ -78,6 +78,9 @@ RETRYABLE_EXCEPTIONS = [
     ),
     SubversionException("Connection timed out", 175012),
     SubversionException("Unable to connect to a repository at URL", 170013),
+    SubversionException(
+        "ra_serf: The server sent a truncated HTTP response body.", 120106
+    ),
     ConnectionResetError(),
     TimeoutError(),
 ]

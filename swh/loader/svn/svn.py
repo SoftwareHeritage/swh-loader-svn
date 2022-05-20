@@ -213,6 +213,19 @@ class SvnRepo:
             yield self.__to_entry(log_entry)
 
     @svn_retry()
+    def commit_info(self, revision: int) -> Optional[Dict]:
+        """Return commit information.
+
+        Args:
+            revision: svn revision to return commit info
+
+        Returns:
+            A dictionary filled with commit info, see :meth:`swh.loader.svn.svn.logs`
+            for details about its content.
+        """
+        return next(self.logs(revision, revision), None)
+
+    @svn_retry()
     def remote_access(self, auth: Auth) -> RemoteAccess:
         """Simple wrapper around subvertpy.ra.RemoteAccess creation
         enabling to retry the operation if a network error occurs."""
@@ -519,7 +532,7 @@ class SvnRepo:
         )
 
         # Retrieve the commit information for revision
-        commit = list(self.logs(revision, revision))[0]
+        commit = self.commit_info(revision)
 
         # Clean export directory
         self.clean_fs(local_dirname)

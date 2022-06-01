@@ -1,8 +1,10 @@
-swh-loader-svn (1.3.2-1~swh1~bpo10+1) buster-swh; urgency=medium
+swh-loader-svn (1.3.3-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 1.3.3     - (tagged by Antoine Lambert
+    <anlambert@softwareheritage.org> on 2022-06-01 11:49:17 +0200)
+  * Upstream changes:     - version 1.3.3
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 29 Apr 2022 10:13:33 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Wed, 01 Jun 2022 09:55:53 +0000
 
 swh-loader-svn (1.3.2-1~swh1) unstable-swh; urgency=medium
 

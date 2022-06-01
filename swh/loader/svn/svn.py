@@ -59,12 +59,17 @@ class SvnRepo:
         self.from_dump = from_dump
 
         auth = Auth([get_username_provider()])
+        # one client for update operation
+        self.client = client.Client(auth=auth)
+
+        if not self.remote_url.startswith("file://"):
+            # use redirection URL if any for remote operations
+            self.remote_url = self.info(self.remote_url).url
+
         # one connection for log iteration
         self.conn_log = self.remote_access(auth)
         # another for replay
         self.conn = self.remote_access(auth)
-        # one client for update operation
-        self.client = client.Client(auth=auth)
 
         self.local_dirname = local_dirname
         local_name = os.path.basename(self.remote_url)
@@ -85,7 +90,7 @@ class SvnRepo:
         # compute root directory path from the remote repository URL, required to
         # properly load the sub-tree of a repository mounted from a dump file
         repos_root_url = self.info(origin_url).repos_root_url
-        self.root_directory = origin_url.replace(repos_root_url, "", 1)
+        self.root_directory = origin_url.rstrip("/").replace(repos_root_url, "", 1)
 
     def __str__(self):
         return str(
@@ -206,6 +211,19 @@ class SvnRepo:
             discover_changed_paths=self.from_dump,
         ):
             yield self.__to_entry(log_entry)
+
+    @svn_retry()
+    def commit_info(self, revision: int) -> Optional[Dict]:
+        """Return commit information.
+
+        Args:
+            revision: svn revision to return commit info
+
+        Returns:
+            A dictionary filled with commit info, see :meth:`swh.loader.svn.svn.logs`
+            for details about its content.
+        """
+        return next(self.logs(revision, revision), None)
 
     @svn_retry()
     def remote_access(self, auth: Auth) -> RemoteAccess:
@@ -514,7 +532,7 @@ class SvnRepo:
         )
 
         # Retrieve the commit information for revision
-        commit = list(self.logs(revision, revision))[0]
+        commit = self.commit_info(revision)
 
         # Clean export directory
         self.clean_fs(local_dirname)

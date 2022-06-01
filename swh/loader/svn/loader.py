@@ -381,6 +381,7 @@ Local repository not cleaned up for investigation: %s""",
             error_msgs = [
                 "Unable to connect to a repository at URL",
                 "Unknown URL type",
+                "is not a working copy",
             ]
             for msg in error_msgs:
                 if msg in e.args[0]:
@@ -771,7 +772,15 @@ class SvnLoaderFromRemoteDump(SvnLoader):
     def prepare(self):
         # First, check if previous revisions have been loaded for the
         # subversion origin and get the number of the last one
-        last_loaded_svn_rev = self.get_last_loaded_svn_rev(self.svn_url)
+        last_loaded_svn_rev = self.get_last_loaded_svn_rev(self.origin.url)
+
+        self.svnrepo = self.svn_repo(
+            self.origin.url, self.origin.url, self.temp_dir, self.max_content_size
+        )
+
+        # Ensure to use remote URL retrieved by SvnRepo as origin URL might redirect
+        # and svnrdump does not handle URL redirection
+        self.svn_url = self.svnrepo.remote_url
 
         # Then for stale repository, check if the last loaded revision in the archive
         # is different from the last revision on the remote subversion server.
@@ -780,9 +789,6 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         last_loaded_snp_and_rev = self._latest_snapshot_revision(self.origin.url)
         if last_loaded_snp_and_rev is not None:
             last_loaded_snp, last_loaded_rev = last_loaded_snp_and_rev
-            self.svnrepo = self.svn_repo(
-                self.origin.url, self.origin.url, self.temp_dir, self.max_content_size
-            )
             stale_repository = self.svnrepo.head_revision() == last_loaded_svn_rev
             if stale_repository and self.check_history_not_altered(
                 last_loaded_svn_rev, last_loaded_rev

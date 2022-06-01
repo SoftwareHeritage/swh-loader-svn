@@ -56,3 +56,4 @@ def svn_retry_sleep_mocker(mocker):
     mocker.patch.object(SvnRepo.propget.retry, "sleep")
     mocker.patch.object(SvnRepo.remote_access.retry, "sleep")
     mocker.patch.object(SvnRepo.info.retry, "sleep")
+    mocker.patch.object(SvnRepo.commit_info.retry, "sleep")

@@ -288,7 +288,10 @@ def parse_external_definition(
         # http://svn.example.org/repos/test/path@XXX
         url, revision_s = external_url.rsplit("@", maxsplit=1)
         try:
-            revision = int(revision_s)
+            # ensure revision_s can be parsed to int
+            rev = int(revision_s)
+            # -r XXX takes priority over <svn_url>@XXX
+            revision = revision or rev
             external_url = url
         except ValueError:
             # handle URL like http://user@svn.example.org/

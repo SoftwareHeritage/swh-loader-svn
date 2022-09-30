@@ -6,6 +6,7 @@
 import os
 import shutil
 import subprocess
+import textwrap
 from typing import Any, Dict
 
 import pytest
@@ -2099,3 +2100,75 @@ def test_loader_svn_from_remote_dump_url_redirect(swh_storage, tmp_path, mocker)
 
     # check redirection URL has been used to dump repository
     assert loader.dump_svn_revisions.call_args_list[0][0][0] == repo_redirect_url
+
+
+@pytest.mark.parametrize("svn_loader_cls", [SvnLoader, SvnLoaderFromRemoteDump])
+def test_loader_basic_authentication_required(
+    swh_storage, repo_url, tmp_path, svn_loader_cls, svnserve
+):
+
+    # add file to empty test repo
+    add_commit(
+        repo_url,
+        "Add project in repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="project/foo.sh",
+                data=b"#!/bin/bash\necho foo",
+            ),
+        ],
+    )
+
+    # compute repo URLs that will be made available by svnserve
+    repo_path = repo_url.replace("file://", "")
+    repo_root = os.path.dirname(repo_path)
+    repo_name = os.path.basename(repo_path)
+    username = "anonymous"
+    password = "anonymous"
+    port = 12000
+    repo_url_no_auth = f"svn://localhost:{port}/{repo_name}"
+    repo_url = f"svn://{username}:{password}@localhost:{port}/{repo_name}"
+
+    # disable anonymous access and require authentication on test repo
+    with open(os.path.join(repo_path, "conf", "svnserve.conf"), "w") as svnserve_conf:
+        svnserve_conf.write(
+            textwrap.dedent(
+                """
+                [general]
+
+                # Authentication realm of the repository.
+                realm = test-repository
+                password-db = passwd
+
+                # Deny all anonymous access
+                anon-access = none
+
+                # Grant authenticated users read and write privileges
+                auth-access = write
+                """
+            )
+        )
+
+    # add a user with read/write access on test repo
+    with open(os.path.join(repo_path, "conf", "passwd"), "w") as passwd:
+        passwd.write(f"[users]\n{username} = {password}")
+
+    # execute svnserve
+    svnserve(repo_root, port)
+
+    # check loading failed with no authentication
+    loader = svn_loader_cls(swh_storage, repo_url_no_auth, temp_directory=tmp_path)
+    assert loader.load() == {"status": "uneventful"}
+
+    # check loading succeeded with authentication
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+
+    check_snapshot(loader.snapshot, loader.storage)

@@ -13,9 +13,15 @@ import os
 import shutil
 import tempfile
 from typing import Dict, Iterator, List, Optional, Tuple, Union
+from urllib.parse import urlparse, urlunparse
 
 from subvertpy import SubversionException, client, properties, wc
-from subvertpy.ra import Auth, RemoteAccess, get_username_provider
+from subvertpy.ra import (
+    Auth,
+    RemoteAccess,
+    get_simple_prompt_provider,
+    get_username_provider,
+)
 
 from swh.model.from_disk import Directory as DirectoryFromDisk
 from swh.model.model import (
@@ -54,11 +60,42 @@ class SvnRepo:
         max_content_length: int,
         from_dump: bool = False,
     ):
-        self.remote_url = remote_url.rstrip("/")
         self.origin_url = origin_url
         self.from_dump = from_dump
 
-        auth = Auth([get_username_provider()])
+        # default auth provider for anonymous access
+        auth_providers = [get_username_provider()]
+
+        # check if basic auth is required
+        parsed_origin_url = urlparse(origin_url)
+        self.username = parsed_origin_url.username or ""
+        self.password = parsed_origin_url.password or ""
+        if self.username:
+            # add basic auth provider for username/password
+            auth_providers.append(
+                get_simple_prompt_provider(
+                    lambda realm, uname, may_save: (
+                        self.username,
+                        self.password,
+                        False,
+                    ),
+                    0,
+                )
+            )
+
+            # we need to remove the authentication part in the origin URL to avoid
+            # errors when calling subversion API through subvertpy
+            self.origin_url = urlunparse(
+                parsed_origin_url._replace(
+                    netloc=parsed_origin_url.netloc.split("@", 1)[1]
+                )
+            )
+            if origin_url == remote_url:
+                remote_url = self.origin_url
+
+        self.remote_url = remote_url.rstrip("/")
+
+        auth = Auth(auth_providers)
         # one client for update operation
         self.client = client.Client(auth=auth)
 
@@ -89,8 +126,8 @@ class SvnRepo:
 
         # compute root directory path from the remote repository URL, required to
         # properly load the sub-tree of a repository mounted from a dump file
-        repos_root_url = self.info(origin_url).repos_root_url
-        self.root_directory = origin_url.rstrip("/").replace(repos_root_url, "", 1)
+        repos_root_url = self.info(self.origin_url).repos_root_url
+        self.root_directory = self.origin_url.rstrip("/").replace(repos_root_url, "", 1)
 
     def __str__(self):
         return str(

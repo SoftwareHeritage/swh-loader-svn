@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import subprocess
 from typing import Any, Dict
 
 import pytest
@@ -57,3 +58,28 @@ def svn_retry_sleep_mocker(mocker):
     mocker.patch.object(SvnRepo.remote_access.retry, "sleep")
     mocker.patch.object(SvnRepo.info.retry, "sleep")
     mocker.patch.object(SvnRepo.commit_info.retry, "sleep")
+
+
+@pytest.fixture
+def svnserve():
+    """Fixture wrapping svnserve execution and ensuring to terminate it
+    after test run"""
+    svnserve_proc = None
+
+    def run_svnserve(repo_root, port):
+        nonlocal svnserve_proc
+        svnserve_proc = subprocess.Popen(
+            [
+                "svnserve",
+                "-d",
+                "--foreground",
+                "--listen-port",
+                str(port),
+                "--root",
+                repo_root,
+            ]
+        )
+
+    yield run_svnserve
+
+    svnserve_proc.terminate()

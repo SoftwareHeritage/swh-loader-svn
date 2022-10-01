@@ -671,6 +671,14 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         """
         # Build the svnrdump command line
         svnrdump_cmd = ["svnrdump", "dump", svn_url]
+        assert self.svnrepo is not None
+        if self.svnrepo.username:
+            svnrdump_cmd += [
+                "--username",
+                self.svnrepo.username,
+                "--password",
+                self.svnrepo.password,
+            ]
 
         # Launch the svnrdump command while capturing stderr as
         # successfully dumped revision numbers are printed to it

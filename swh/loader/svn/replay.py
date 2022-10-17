@@ -209,8 +209,6 @@ class FileEditor:
         self.svnrepo = svnrepo
         self.editor = svnrepo.swhreplay.editor
 
-        self.editor.modified_paths.add(path)
-
     def change_prop(self, key: str, value: str) -> None:
         if key == properties.PROP_EXECUTABLE:
             if value is None:  # bit flip off
@@ -403,10 +401,6 @@ class DirEditor:
         self.editor = svnrepo.swhreplay.editor
         self.externals: Dict[str, List[ExternalDefinition]] = {}
 
-        # repository root dir has empty path
-        if path:
-            self.editor.modified_paths.add(path)
-
     def remove_child(self, path: bytes) -> None:
         """Remove a path from the current objects.
 
@@ -438,8 +432,6 @@ class DirEditor:
         for state_path in list(self.file_states):
             if state_path.startswith(fullpath + b"/"):
                 del self.file_states[state_path]
-
-        self.editor.modified_paths.discard(path)
 
     def open_directory(self, path: str, *args) -> DirEditor:
         """Updating existing directory."""
@@ -724,7 +716,6 @@ class DirEditor:
 
             # update from_disk model and store external paths
             self.editor.external_paths[dest_fullpath] += 1
-            self.editor.modified_paths.add(dest_fullpath)
 
             if os.path.isfile(temp_path):
                 if os.path.islink(fullpath):
@@ -771,8 +762,6 @@ class DirEditor:
                     )
                 for external_path in external_paths:
                     self.editor.external_paths[external_path] += 1
-
-                self.editor.modified_paths.update(external_paths)
 
             # ensure hash update for the directory with externals set
             self.directory[self.path].update_hash(force=True)
@@ -866,8 +855,6 @@ class Editor:
         self.externals_cache: Dict[ExternalDefinition, bytes] = {}
         self.svnrepo = svnrepo
         self.revnum = None
-        # to store the set of paths added or modified when replaying a revision
-        self.modified_paths: Set[bytes] = set()
 
     def set_target_revision(self, revnum) -> None:
         self.revnum = revnum
@@ -879,8 +866,6 @@ class Editor:
         pass
 
     def open_root(self, base_revnum: int) -> DirEditor:
-        # a new revision is being replayed so clear the modified_paths set
-        self.modified_paths.clear()
         return DirEditor(
             self.directory,
             rootpath=self.rootpath,
@@ -946,9 +931,8 @@ class Replay:
         skipped_contents: List[SkippedContent] = []
         directories: List[Directory] = []
 
-        directories.append(self.editor.directory.to_model())
-        for path in self.editor.modified_paths:
-            obj = self.directory[path].to_model()
+        for obj_node in self.directory.collect():
+            obj = obj_node.to_model()  # type: ignore
             obj_type = obj.object_type
             if obj_type in (Content.object_type, DiskBackedContent.object_type):
                 contents.append(obj.with_data())
@@ -956,6 +940,8 @@ class Replay:
                 skipped_contents.append(obj)
             elif obj_type == Directory.object_type:
                 directories.append(obj)
+            else:
+                assert False, obj_type
 
         return contents, skipped_contents, directories
 

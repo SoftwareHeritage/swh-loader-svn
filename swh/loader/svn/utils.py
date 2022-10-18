@@ -8,7 +8,7 @@ import logging
 import os
 import re
 import shutil
-from subprocess import PIPE, Popen, call
+from subprocess import PIPE, Popen, call, run
 import tempfile
 from typing import Optional, Tuple
 from urllib.parse import quote, urlparse, urlunparse
@@ -111,10 +111,13 @@ def init_svn_repo_from_dump(
             # are already handled in loader implementation (see _ra_codecs_error_handler
             # in ra.py)
             cmd = ["svnadmin", "load", "-q", "--bypass-prop-validation", repo_path]
-            r = call(cmd, stdin=dump.stdout)
-            if r != 0:
+            completed_process = run(
+                cmd, stdin=dump.stdout, capture_output=True, text=True
+            )
+            if completed_process.returncode != 0:
                 raise ValueError(
-                    "Failed to mount the svn dump for project %s" % project_name
+                    f"Failed to mount the svn dump for project {project_name}\n"
+                    + completed_process.stderr
                 )
             return temp_dir, repo_path
     except Exception as e:

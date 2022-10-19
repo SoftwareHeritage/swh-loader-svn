@@ -105,7 +105,7 @@ As this is thought as genuine implementation, we adapted the revision
 message to also use the repository's uuid in the author's email.
 
 Also, optimization are done as well:
-- instead of walking the disk from the top leve at each revision (slow
+- instead of walking the disk from the top level at each revision (slow
   for huge repository like svn.apache.org), compute from the svn log's
   changed paths between the previous revision and the current one, the
   lowest common path. Then, walk only that path to compute the updated

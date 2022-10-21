@@ -23,6 +23,8 @@ class CommitChange(TypedDict, total=False):
     path: str
     properties: Dict[str, str]
     data: bytes
+    copyfrom_path: str
+    copyfrom_rev: int
 
 
 def add_commit(repo_url: str, message: str, changes: List[CommitChange]) -> None:
@@ -35,17 +37,19 @@ def add_commit(repo_url: str, message: str, changes: List[CommitChange]) -> None
         else:
             dir_change = change["path"].endswith("/")
             split_path = change["path"].rstrip("/").split("/")
+            copyfrom_path = change.get("copyfrom_path")
+            copyfrom_rev = change.get("copyfrom_rev", -1)
             for i in range(len(split_path)):
                 path = "/".join(split_path[0 : i + 1])
                 if i < len(split_path) - 1:
                     try:
-                        root.add_directory(path).close()
+                        root.add_directory(path, copyfrom_path, copyfrom_rev).close()
                     except SubversionException:
                         pass
                 else:
                     if dir_change:
                         try:
-                            dir = root.add_directory(path)
+                            dir = root.add_directory(path, copyfrom_path, copyfrom_rev)
                         except SubversionException:
                             dir = root.open_directory(path)
                         if "properties" in change:
@@ -54,7 +58,7 @@ def add_commit(repo_url: str, message: str, changes: List[CommitChange]) -> None
                         dir.close()
                     else:
                         try:
-                            file = root.add_file(path)
+                            file = root.add_file(path, copyfrom_path, copyfrom_rev)
                         except SubversionException:
                             file = root.open_file(path)
                         if "properties" in change:

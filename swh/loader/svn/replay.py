@@ -443,14 +443,30 @@ class DirEditor:
             svnrepo=self.svnrepo,
         )
 
-    def add_directory(self, path: str, *args) -> DirEditor:
+    def add_directory(
+        self, path: str, copyfrom_path: Optional[str] = None, copyfrom_rev: int = -1
+    ) -> DirEditor:
         """Adding a new directory."""
         path_bytes = os.fsencode(path)
+        fullpath = os.path.join(self.rootpath, path_bytes)
 
-        os.makedirs(os.path.join(self.rootpath, path_bytes), exist_ok=True)
-        if path_bytes and path_bytes not in self.directory:
-            self.dir_states[path_bytes] = DirState()
-            self.directory[path_bytes] = from_disk.Directory()
+        os.makedirs(fullpath, exist_ok=True)
+        if copyfrom_rev == -1:
+            if path_bytes and path_bytes not in self.directory:
+                self.dir_states[path_bytes] = DirState()
+                self.directory[path_bytes] = from_disk.Directory()
+        else:
+            url = svn_urljoin(self.svnrepo.remote_url, copyfrom_path)
+            self.remove_child(path_bytes)
+            self.svnrepo.export(
+                url,
+                to=fullpath,
+                peg_rev=copyfrom_rev,
+                ignore_keywords=True,
+                overwrite=True,
+                ignore_externals=True,
+            )
+            self.directory[path_bytes] = from_disk.Directory.from_disk(path=fullpath)
 
         return DirEditor(
             self.directory,
@@ -474,12 +490,28 @@ class DirEditor:
             svnrepo=self.svnrepo,
         )
 
-    def add_file(self, path: str, *args) -> FileEditor:
+    def add_file(
+        self, path: str, copyfrom_path: Optional[str] = None, copyfrom_rev: int = -1
+    ) -> FileEditor:
         """Creating a new file."""
         path_bytes = os.fsencode(path)
-        self.directory[path_bytes] = from_disk.Content()
         fullpath = os.path.join(self.rootpath, path_bytes)
+
         self.file_states[fullpath] = FileState()
+        if copyfrom_rev == -1:
+            self.directory[path_bytes] = from_disk.Content()
+        else:
+            url = svn_urljoin(self.svnrepo.remote_url, copyfrom_path)
+            self.remove_child(path_bytes)
+            self.svnrepo.export(
+                url,
+                to=fullpath,
+                peg_rev=copyfrom_rev,
+                ignore_keywords=True,
+                overwrite=True,
+            )
+            self.directory[path_bytes] = from_disk.Content.from_file(path=fullpath)
+
         return FileEditor(
             self.directory,
             self.rootpath,
@@ -931,7 +963,7 @@ class Replay:
             rootpath=rootpath, directory=directory, svnrepo=svnrepo, temp_dir=temp_dir
         )
 
-    def replay(self, rev: int) -> from_disk.Directory:
+    def replay(self, rev: int, low_water_mark: int) -> from_disk.Directory:
         """Replay svn actions between rev and rev+1.
 
         This method updates in place the self.editor.directory, as well as the
@@ -942,12 +974,12 @@ class Replay:
 
         """
         codecs.register_error("strict", _ra_codecs_error_handler)
-        self.conn.replay(rev, rev + 1, self.editor)
+        self.conn.replay(rev, low_water_mark, self.editor)
         codecs.register_error("strict", codecs.strict_errors)
         return self.editor.directory
 
     def compute_objects(
-        self, rev: int
+        self, rev: int, low_water_mark: int
     ) -> Tuple[List[Content], List[SkippedContent], List[Directory]]:
         """Compute objects added or modified at revisions rev.
         Expects the state to be at previous revision's objects.
@@ -960,7 +992,7 @@ class Replay:
             mutates the filesystem at rootpath accordingly.
 
         """
-        self.replay(rev)
+        self.replay(rev, low_water_mark)
 
         contents: List[Content] = []
         skipped_contents: List[SkippedContent] = []

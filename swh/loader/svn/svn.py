@@ -220,6 +220,7 @@ class SvnRepo:
             "author_name": author,
             "message": message,
             "has_changes": has_changes,
+            "changed_paths": changed_paths,
         }
 
     def logs(self, revision_start: int, revision_end: int) -> Iterator[Dict]:
@@ -249,7 +250,7 @@ class SvnRepo:
             paths=None,
             start=revision_start,
             end=revision_end,
-            discover_changed_paths=self.from_dump,
+            discover_changed_paths=True,
         ):
             yield self.__to_entry(log_entry)
 
@@ -539,7 +540,23 @@ class SvnRepo:
         first_revision = 1 if start_revision else 0  # handle empty repository edge case
         for commit in self.logs(first_revision, end_revision):
             rev = commit["rev"]
-            objects = self.swhreplay.compute_objects(rev)
+            copyfrom_revs = (
+                [
+                    copyfrom_rev
+                    for (_, _, copyfrom_rev, _) in commit["changed_paths"].values()
+                    if copyfrom_rev != -1
+                ]
+                if commit["changed_paths"]
+                else None
+            )
+            low_water_mark = rev + 1
+            if copyfrom_revs:
+                # when files or directories in the revision to replay have been copied from
+                # ancestor revisions, we need to adjust the low water mark revision used by
+                # svn replay API to handle the copies in our commit editor and to ensure
+                # replace operations after copy will be replayed
+                low_water_mark = min(copyfrom_revs)
+            objects = self.swhreplay.compute_objects(rev, low_water_mark)
 
             if rev >= start_revision:
                 # start yielding new data to archive once we reached the revision to

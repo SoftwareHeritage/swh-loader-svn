@@ -361,6 +361,8 @@ class DirState:
     externals: Dict[str, List[ExternalDefinition]] = field(default_factory=dict)
     """Map a path in the directory to a list of (external_url, revision, relative_url)
     targeting it"""
+    externals_paths: Set[bytes] = field(default_factory=set)
+    """Keep track of all external paths reachable from the directory"""
 
 
 class DirEditor:
@@ -413,11 +415,8 @@ class DirEditor:
             path: to remove from the current objects.
 
         """
-        try:
+        if path in self.directory:
             entry_removed = self.directory[path]
-        except KeyError:
-            entry_removed = None
-        else:
             del self.directory[path]
             fpath = os.path.join(self.rootpath, path)
             if isinstance(entry_removed, from_disk.Directory):
@@ -542,10 +541,33 @@ class DirEditor:
     def delete_entry(self, path: str, revision: int) -> None:
         """Remove a path."""
         path_bytes = os.fsencode(path)
+        fullpath = os.path.join(self.rootpath, path_bytes)
+
+        if os.path.isdir(fullpath):
+            # remove all external paths associated to the removed directory
+            # (we cannot simply remove a root external directory as externals
+            # paths associated to ancestor directories can overlap)
+            for external_path in self.dir_states[path_bytes].externals_paths:
+                self.remove_external_path(
+                    external_path,
+                    root_path=path_bytes,
+                    remove_subpaths=False,
+                    force=True,
+                )
+
         if path_bytes not in self.editor.external_paths:
-            fullpath = os.path.join(self.rootpath, path_bytes)
             self.file_states.pop(fullpath, None)
             self.remove_child(path_bytes)
+        elif os.path.isdir(fullpath):
+            # versioned and external paths can overlap so we need to iterate on
+            # all subpaths to check which ones to remove
+            for root, dirs, files in os.walk(fullpath):
+                for p in chain(dirs, files):
+                    full_repo_path = os.path.join(root, p)
+                    repo_path = full_repo_path.replace(self.rootpath + b"/", b"")
+                    if repo_path not in self.editor.external_paths:
+                        self.file_states.pop(full_repo_path, None)
+                        self.remove_child(repo_path)
 
     def close(self):
         """Function called when we finish processing a repository.
@@ -714,9 +736,6 @@ class DirEditor:
             # copy exported path to reconstructed filesystem
             fullpath = os.path.join(self.rootpath, dest_fullpath)
 
-            # update from_disk model and store external paths
-            self.editor.external_paths[dest_fullpath] += 1
-
             if os.path.isfile(temp_path):
                 if os.path.islink(fullpath):
                     # remove destination file if it is a link
@@ -752,37 +771,53 @@ class DirEditor:
                 self.directory[dest_fullpath] = from_disk.Directory.from_disk(
                     path=fullpath
                 )
-                external_paths = set()
-                for root, dirs, files in os.walk(fullpath):
-                    external_paths.update(
-                        [
-                            os.path.join(root.replace(self.rootpath + b"/", b""), p)
-                            for p in chain(dirs, files)
-                        ]
-                    )
-                for external_path in external_paths:
-                    self.editor.external_paths[external_path] += 1
+
+            # update set of external paths reachable from the directory
+            external_paths = set()
+            dest_path_part = dest_path.split(b"/")
+            for i in range(1, len(dest_path_part) + 1):
+                external_paths.add(b"/".join(dest_path_part[:i]))
+
+            for root, dirs, files in os.walk(temp_path):
+                external_paths.update(
+                    [
+                        os.path.join(
+                            dest_path,
+                            os.path.join(root, p).replace(temp_path, b"").strip(b"/"),
+                        )
+                        for p in chain(dirs, files)
+                    ]
+                )
+
+            self.dir_states[self.path].externals_paths.update(external_paths)
+
+            for external_path in external_paths:
+                self.editor.external_paths[os.path.join(self.path, external_path)] += 1
 
             # ensure hash update for the directory with externals set
             self.directory[self.path].update_hash(force=True)
 
     def remove_external_path(
-        self, external_path: bytes, remove_subpaths: bool = True, force: bool = False
+        self,
+        external_path: bytes,
+        remove_subpaths: bool = True,
+        force: bool = False,
+        root_path: Optional[bytes] = None,
     ) -> None:
         """Remove a previously exported SVN external path from
         the reconstructed filesystem.
         """
-        fullpath = os.path.join(self.path, external_path)
+        path = root_path if root_path else self.path
+        fullpath = os.path.join(path, external_path)
 
         # decrement number of references for external path when we really remove it
         # (when remove_subpaths is False, we just cleanup the external path before
         # copying exported paths in it)
-        if fullpath in self.editor.external_paths and remove_subpaths:
+        if force or (fullpath in self.editor.external_paths and remove_subpaths):
             self.editor.external_paths[fullpath] -= 1
 
         if (
-            force
-            or fullpath in self.editor.external_paths
+            fullpath in self.editor.external_paths
             and self.editor.external_paths[fullpath] == 0
         ):
             self.remove_child(fullpath)
@@ -795,10 +830,10 @@ class DirEditor:
                         self.editor.external_paths.pop(path)
 
         if remove_subpaths:
-            subpath_split = external_path.split(b"/")[:-1]
+            subpath_split = fullpath.split(b"/")[:-1]
             for i in reversed(range(1, len(subpath_split) + 1)):
                 # delete external sub-directory only if it is not versioned
-                subpath = os.path.join(self.path, b"/".join(subpath_split[0:i]))
+                subpath = b"/".join(subpath_split[0:i])
                 try:
                     self.svnrepo.client.info(
                         svn_urljoin(self.svnrepo.remote_url, os.fsdecode(subpath)),

@@ -2092,7 +2092,7 @@ def test_loader_svn_from_remote_dump_url_redirect(swh_storage, tmp_path, mocker)
 
     # init remote dump loader and mock some methods
     loader = SvnLoaderFromRemoteDump(swh_storage, repo_url, temp_directory=tmp_path)
-    loader.dump_svn_revisions = mocker.MagicMock()
+    loader.dump_svn_revisions = mocker.MagicMock(return_value=("", -1))
     loader.start_from = mocker.MagicMock(return_value=(0, 0))
 
     # prepare loading

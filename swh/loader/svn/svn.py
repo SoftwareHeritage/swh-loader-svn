@@ -42,6 +42,10 @@ DEFAULT_AUTHOR_MESSAGE = ""
 logger = logging.getLogger(__name__)
 
 
+def quote_svn_url(url: str) -> str:
+    return url.replace(" ", "%20")
+
+
 class SvnRepo:
     """Svn repository representation.
 
@@ -272,7 +276,7 @@ class SvnRepo:
     def info(self, origin_url: str):
         """Simple wrapper around subvertpy.client.Client.info enabling to retry
         the command if a network error occurs."""
-        info = self.client.info(origin_url.rstrip("/"))
+        info = self.client.info(quote_svn_url(origin_url).rstrip("/"))
         return next(iter(info.values()))
 
     @svn_retry()
@@ -312,12 +316,12 @@ class SvnRepo:
         logger.debug(
             "svn export %s %s%s %s",
             " ".join(options),
-            url,
+            quote_svn_url(url),
             f"@{peg_rev}" if peg_rev else "",
             to,
         )
         return self.client.export(
-            url,
+            quote_svn_url(url),
             to=to,
             rev=rev,
             peg_rev=peg_rev,
@@ -361,12 +365,12 @@ class SvnRepo:
         logger.debug(
             "svn checkout %s %s%s %s",
             " ".join(options),
-            self.remote_url,
+            quote_svn_url(url),
             f"@{peg_rev}" if peg_rev else "",
             path,
         )
         return self.client.checkout(
-            url,
+            quote_svn_url(url),
             path=path,
             rev=rev,
             peg_rev=peg_rev,

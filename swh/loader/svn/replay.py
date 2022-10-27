@@ -304,7 +304,7 @@ class FileEditor:
                 with open(self.fullpath, "rb") as f:
                     content = f.read()
                 self.svnrepo.export(
-                    os.path.join(self.svnrepo.remote_url.encode(), self.path),
+                    os.path.join(self.svnrepo.remote_url, os.fsdecode(self.path)),
                     to=self.fullpath,
                     peg_rev=self.editor.revnum,
                     ignore_keywords=True,

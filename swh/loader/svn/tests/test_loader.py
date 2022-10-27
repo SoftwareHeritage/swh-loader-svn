@@ -2172,3 +2172,28 @@ def test_loader_basic_authentication_required(
     )
 
     check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_with_spaces_in_svn_url(swh_storage, repo_url, tmp_path):
+    filename = "file with spaces.txt"
+    content = b"foo"
+
+    add_commit(
+        repo_url,
+        "Add file with spaces in its name",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path=filename,
+                data=content,
+            ),
+        ],
+    )
+
+    svnrepo = SvnRepo(repo_url, repo_url, tmp_path, max_content_length=10000)
+
+    dest_path = f"{tmp_path}/file"
+    svnrepo.export(f"{repo_url}/{filename}", to=dest_path)
+
+    with open(dest_path, "rb") as f:
+        assert f.read() == content

@@ -2092,7 +2092,7 @@ def test_loader_svn_from_remote_dump_url_redirect(swh_storage, tmp_path, mocker)
 
     # init remote dump loader and mock some methods
     loader = SvnLoaderFromRemoteDump(swh_storage, repo_url, temp_directory=tmp_path)
-    loader.dump_svn_revisions = mocker.MagicMock()
+    loader.dump_svn_revisions = mocker.MagicMock(return_value=("", -1))
     loader.start_from = mocker.MagicMock(return_value=(0, 0))
 
     # prepare loading
@@ -2171,4 +2171,118 @@ def test_loader_basic_authentication_required(
         type="svn",
     )
 
+    check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_with_spaces_in_svn_url(swh_storage, repo_url, tmp_path):
+    filename = "file with spaces.txt"
+    content = b"foo"
+
+    add_commit(
+        repo_url,
+        "Add file with spaces in its name",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path=filename,
+                data=content,
+            ),
+        ],
+    )
+
+    svnrepo = SvnRepo(repo_url, repo_url, tmp_path, max_content_length=10000)
+
+    dest_path = f"{tmp_path}/file"
+    svnrepo.export(f"{repo_url}/{filename}", to=dest_path)
+
+    with open(dest_path, "rb") as f:
+        assert f.read() == content
+
+
+@pytest.mark.parametrize("svn_loader_cls", [SvnLoader, SvnLoaderFromRemoteDump])
+def test_loader_repo_with_copyfrom_and_replace_operations(
+    swh_storage, repo_url, tmp_path, svn_loader_cls
+):
+    add_commit(
+        repo_url,
+        "Create trunk/data folder",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/foo",
+                data=b"foo",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/bar",
+                data=b"bar",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/baz/",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Create trunk/project folder",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/project/",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Create trunk/project/bar as copy of trunk/data/bar from revision 1",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/project/bar",
+                copyfrom_path=repo_url + "/trunk/data/bar",
+                copyfrom_rev=1,
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        (
+            "Create trunk/project/data/ folder as a copy of /trunk/data from revision 1"
+            " and replace the trunk/project/data/baz/ folder by a trunk/project/data/baz file"
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/project/data/",
+                copyfrom_path=repo_url + "/trunk/data/",
+                copyfrom_rev=1,
+            ),
+            CommitChange(
+                change_type=CommitChangeType.Delete,
+                path="trunk/project/data/baz/",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/project/data/baz",
+                data=b"baz",
+            ),
+        ],
+    )
+
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
+
+    assert loader.load() == {"status": "eventful"}
+
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
     check_snapshot(loader.snapshot, loader.storage)

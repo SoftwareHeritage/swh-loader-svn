@@ -1565,3 +1565,78 @@ def test_loader_with_externals_parsing_error(
         type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+@pytest.mark.parametrize("remote_external_path", ["src/main/project", "src/main"])
+def test_loader_overlapping_external_paths_removal(
+    swh_storage, repo_url, external_repo_url, tmp_path, remote_external_path
+):
+    add_commit(
+        external_repo_url,
+        "Create external repository layout",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="src/main/project/foo/bar",
+                data=b"bar",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Create repository layout",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/src/main/project/",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Add overlapping externals",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/src/main/",
+                properties={
+                    "svn:externals": f"{svn_urljoin(external_repo_url, remote_external_path)} project"  # noqa
+                },
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/src/main/project/",
+                properties={
+                    "svn:externals": f'{svn_urljoin(external_repo_url, "src/main/project/foo")} foo'  # noqa
+                },
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Remove directory with externals overlapping with those from ancestor directory",
+        [
+            CommitChange(
+                change_type=CommitChangeType.Delete,
+                path="trunk/src/main/project/",
+            ),
+        ],
+    )
+
+    loader = SvnLoader(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)

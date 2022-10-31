@@ -7,12 +7,14 @@ import logging
 import os
 from pathlib import Path
 import pty
+import re
 import shutil
-from subprocess import Popen
+from subprocess import Popen, run
 
 import pytest
 
 from swh.loader.svn import utils
+from swh.loader.tests import prepare_repository_from_archive
 
 
 def test_outputstream():
@@ -104,6 +106,44 @@ def test_init_svn_repo_from_dump_and_cleanup_already_done(
     assert len(caplog.record_tuples) == 1
     assert "Failure to remove" in caplog.record_tuples[0][2]
     assert mock_remove.called
+
+
+def test_init_svn_repo_from_truncated_dump(datadir, tmp_path):
+    """Mounting partial svn repository from a truncated dump should work"""
+
+    # prepare a repository
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    # dump it to file
+    dump_path = str(tmp_path / f"{archive_name}.dump")
+    truncated_dump_path = str(tmp_path / f"{archive_name}_truncated.dump")
+    svnrdump_cmd = ["svnrdump", "dump", repo_url]
+    with open(dump_path, "wb") as dump:
+        run(svnrdump_cmd, stdout=dump)
+
+    # create a truncated dump file that will generate a "svnadmin load" error
+    with open(dump_path, "rb") as dump, open(
+        truncated_dump_path, "wb"
+    ) as truncated_dump:
+        dump_lines = dump.readlines()
+        assert len(dump_lines) > 150
+        truncated_dump_content = b"".join(dump_lines[:150])
+        truncated_dump.write(truncated_dump_content)
+
+        # compute max revision number with non truncated data
+        revs = re.findall(rb"Revision-number: ([0-9]+)", truncated_dump_content)
+        max_rev = int(revs[-1]) - 1
+
+    # prepare repository from truncated dump
+    _, repo_path = utils.init_svn_repo_from_dump(
+        truncated_dump_path, gzip=False, root_dir=tmp_path, max_rev=max_rev
+    )
+
+    # check expected number of revisions have been loaded
+    svnadmin_info = run(["svnadmin", "info", repo_path], capture_output=True, text=True)
+    assert f"Revisions: {max_rev}\n" in svnadmin_info.stdout
 
 
 def test_init_svn_repo_from_archive_dump(datadir, tmp_path):

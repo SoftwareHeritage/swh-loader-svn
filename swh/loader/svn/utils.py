@@ -65,6 +65,7 @@ def init_svn_repo_from_dump(
     root_dir: str = "/tmp",
     gzip: bool = False,
     cleanup_dump: bool = True,
+    max_rev: int = -1,
 ) -> Tuple[str, str]:
     """Given a path to a svn dump, initialize an svn repository with the content of said
     dump.
@@ -110,14 +111,24 @@ def init_svn_repo_from_dump(
             # load dump and bypass properties validation as Unicode decoding errors
             # are already handled in loader implementation (see _ra_codecs_error_handler
             # in ra.py)
-            cmd = ["svnadmin", "load", "-q", "--bypass-prop-validation", repo_path]
-            completed_process = run(
-                cmd, stdin=dump.stdout, capture_output=True, text=True
-            )
-            if completed_process.returncode != 0:
+            cmd = ["svnadmin", "load", "-q", "--bypass-prop-validation"]
+            if max_rev > 0:
+                cmd.append(f"-r1:{max_rev}")
+            cmd.append(repo_path)
+            svnadmin_load = run(cmd, stdin=dump.stdout, capture_output=True, text=True)
+            if svnadmin_load.returncode != 0:
+                if max_rev > 0:
+                    # if max_rev is specified, we might have a truncated dump due to
+                    # an error when executing svnrdump, check if max_rev have been
+                    # loaded and continue loading process if it is the case
+                    svnadmin_info = run(
+                        ["svnadmin", "info", repo_path], capture_output=True, text=True
+                    )
+                    if f"Revisions: {max_rev}\n" in svnadmin_info.stdout:
+                        return temp_dir, repo_path
                 raise ValueError(
                     f"Failed to mount the svn dump for project {project_name}\n"
-                    + completed_process.stderr
+                    + svnadmin_load.stderr
                 )
             return temp_dir, repo_path
     except Exception as e:

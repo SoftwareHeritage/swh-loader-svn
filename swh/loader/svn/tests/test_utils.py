@@ -5,6 +5,7 @@
 
 import logging
 import os
+from pathlib import Path
 import pty
 import shutil
 from subprocess import Popen
@@ -41,6 +42,18 @@ def test_init_svn_repo_from_dump(datadir, tmp_path):
 
     assert os.path.exists(dump_path), "Dump path should still exists"
     assert os.path.exists(repo_path), "Repository should exists"
+
+
+def test_init_svn_repo_from_dump_svnadmin_error(tmp_path):
+    """svnadmin load error should be reported in exception text"""
+    dump_path = os.path.join(tmp_path, "foo")
+    Path(dump_path).touch()
+
+    with pytest.raises(
+        ValueError,
+        match="svnadmin: E200003: Premature end of content data in dumpstream",
+    ):
+        utils.init_svn_repo_from_dump(dump_path, cleanup_dump=False, root_dir=tmp_path)
 
 
 def test_init_svn_repo_from_dump_and_cleanup(datadir, tmp_path):

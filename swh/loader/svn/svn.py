@@ -42,6 +42,10 @@ DEFAULT_AUTHOR_MESSAGE = ""
 logger = logging.getLogger(__name__)
 
 
+def quote_svn_url(url: str) -> str:
+    return url.replace(" ", "%20")
+
+
 class SvnRepo:
     """Svn repository representation.
 
@@ -216,6 +220,7 @@ class SvnRepo:
             "author_name": author,
             "message": message,
             "has_changes": has_changes,
+            "changed_paths": changed_paths,
         }
 
     def logs(self, revision_start: int, revision_end: int) -> Iterator[Dict]:
@@ -245,7 +250,7 @@ class SvnRepo:
             paths=None,
             start=revision_start,
             end=revision_end,
-            discover_changed_paths=self.from_dump,
+            discover_changed_paths=True,
         ):
             yield self.__to_entry(log_entry)
 
@@ -272,7 +277,7 @@ class SvnRepo:
     def info(self, origin_url: str):
         """Simple wrapper around subvertpy.client.Client.info enabling to retry
         the command if a network error occurs."""
-        info = self.client.info(origin_url.rstrip("/"))
+        info = self.client.info(quote_svn_url(origin_url).rstrip("/"))
         return next(iter(info.values()))
 
     @svn_retry()
@@ -312,12 +317,12 @@ class SvnRepo:
         logger.debug(
             "svn export %s %s%s %s",
             " ".join(options),
-            url,
+            quote_svn_url(url),
             f"@{peg_rev}" if peg_rev else "",
             to,
         )
         return self.client.export(
-            url,
+            quote_svn_url(url),
             to=to,
             rev=rev,
             peg_rev=peg_rev,
@@ -361,12 +366,12 @@ class SvnRepo:
         logger.debug(
             "svn checkout %s %s%s %s",
             " ".join(options),
-            self.remote_url,
+            quote_svn_url(url),
             f"@{peg_rev}" if peg_rev else "",
             path,
         )
         return self.client.checkout(
-            url,
+            quote_svn_url(url),
             path=path,
             rev=rev,
             peg_rev=peg_rev,
@@ -535,7 +540,23 @@ class SvnRepo:
         first_revision = 1 if start_revision else 0  # handle empty repository edge case
         for commit in self.logs(first_revision, end_revision):
             rev = commit["rev"]
-            objects = self.swhreplay.compute_objects(rev)
+            copyfrom_revs = (
+                [
+                    copyfrom_rev
+                    for (_, _, copyfrom_rev, _) in commit["changed_paths"].values()
+                    if copyfrom_rev != -1
+                ]
+                if commit["changed_paths"]
+                else None
+            )
+            low_water_mark = rev + 1
+            if copyfrom_revs:
+                # when files or directories in the revision to replay have been copied from
+                # ancestor revisions, we need to adjust the low water mark revision used by
+                # svn replay API to handle the copies in our commit editor and to ensure
+                # replace operations after copy will be replayed
+                low_water_mark = min(copyfrom_revs)
+            objects = self.swhreplay.compute_objects(rev, low_water_mark)
 
             if rev >= start_revision:
                 # start yielding new data to archive once we reached the revision to

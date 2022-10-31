@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2021  The Software Heritage developers
+# Copyright (C) 2015-2022  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -8,12 +8,11 @@ swh-storage.
 
 """
 from datetime import datetime
-from mmap import ACCESS_WRITE, mmap
 import os
 import pty
 import re
 import shutil
-from subprocess import Popen
+from subprocess import PIPE, Popen
 import tempfile
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
@@ -657,17 +656,19 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             pass
         return svn_revision
 
-    def dump_svn_revisions(self, svn_url: str, last_loaded_svn_rev: int = -1) -> str:
-        """Generate a subversion dump file using the svnrdump tool. If the svnrdump
-        command failed somehow, the produced dump file is analyzed to determine if a
-        partial loading is still feasible.
+    def dump_svn_revisions(
+        self, svn_url: str, last_loaded_svn_rev: int = -1
+    ) -> Tuple[str, int]:
+        """Generate a compressed subversion dump file using the svnrdump tool and gzip.
+        If the svnrdump command failed somehow, the produced dump file is analyzed to
+        determine if a partial loading is still feasible.
 
         Raises:
             NotFound when the repository is no longer found at url
 
         Returns:
-            The dump_path of the repository mounted
-
+            The dump_path of the repository mounted and the max dumped revision number
+            (-1 if all revisions were dumped)
         """
         # Build the svnrdump command line
         svnrdump_cmd = ["svnrdump", "dump", svn_url]
@@ -684,12 +685,13 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         # successfully dumped revision numbers are printed to it
         dump_temp_dir = tempfile.mkdtemp(dir=self.temp_dir)
         dump_name = "".join(c for c in svn_url if c.isalnum())
-        dump_path = "%s/%s.svndump" % (dump_temp_dir, dump_name)
+        dump_path = "%s/%s.svndump.gz" % (dump_temp_dir, dump_name)
         stderr_lines = []
         self.log.debug("Executing %s", " ".join(svnrdump_cmd))
         with open(dump_path, "wb") as dump_file:
+            gzip = Popen(["gzip"], stdin=PIPE, stdout=dump_file)
             stderr_r, stderr_w = pty.openpty()
-            svnrdump = Popen(svnrdump_cmd, stdout=dump_file, stderr=stderr_w)
+            svnrdump = Popen(svnrdump_cmd, stdout=gzip.stdin, stderr=stderr_w)
             os.close(stderr_w)
             stderr_stream = OutputStream(stderr_r)
             readable = True
@@ -706,9 +708,12 @@ class SvnLoaderFromRemoteDump(SvnLoader):
                         error_messages.append(line)
             svnrdump.wait()
             os.close(stderr_r)
+            # denote end of read file
+            gzip.stdin.close()
+            gzip.wait()
 
         if svnrdump.returncode == 0:
-            return dump_path
+            return dump_path, -1
 
         # There was an error but it does not mean that no revisions
         # can be loaded.
@@ -736,27 +741,8 @@ class SvnLoaderFromRemoteDump(SvnLoader):
                     last_loaded_svn_rev + 1,
                     last_dumped_rev,
                 )
-                # Truncate the dump file after the last successfully dumped
-                # revision to avoid the loading of corrupted data
-                self.log.debug(
-                    (
-                        "Truncating dump file after the last "
-                        "successfully dumped revision (%s) to avoid "
-                        "the loading of corrupted data"
-                    ),
-                    last_dumped_rev,
-                )
-
-                with open(dump_path, "r+b") as f:
-                    with mmap(f.fileno(), 0, access=ACCESS_WRITE) as s:
-                        pattern = (
-                            "Revision-number: %s" % (last_dumped_rev + 1)
-                        ).encode()
-                        n = s.rfind(pattern)
-                        if n != -1:
-                            s.resize(n)
                 self.truncated_dump = True
-                return dump_path
+                return dump_path, last_dumped_rev
             elif last_dumped_rev != -1 and last_dumped_rev < last_loaded_svn_rev:
                 raise Exception(
                     (
@@ -809,7 +795,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
 
         # Then try to generate a dump file containing relevant svn revisions
         # to load, an exception will be thrown if something wrong happened
-        dump_path = self.dump_svn_revisions(self.svn_url, last_loaded_svn_rev)
+        dump_path, max_rev = self.dump_svn_revisions(self.svn_url, last_loaded_svn_rev)
 
         # Finally, mount the dump and load the repository
         self.log.debug('Mounting dump file with "svnadmin load".')
@@ -818,6 +804,8 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             prefix=TEMPORARY_DIR_PREFIX_PATTERN,
             suffix="-%s" % os.getpid(),
             root_dir=self.temp_dir,
+            gzip=True,
+            max_rev=max_rev,
         )
         self.svn_url = "file://%s" % self.repo_path
         super().prepare()

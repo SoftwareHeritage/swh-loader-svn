@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import logging
 import os
 import shutil
 import subprocess
@@ -25,7 +26,7 @@ from swh.loader.tests import (
     get_stats,
     prepare_repository_from_archive,
 )
-from swh.model.from_disk import DentryPerms
+from swh.model.from_disk import DentryPerms, Directory
 from swh.model.hashutil import hash_to_bytes
 from swh.model.model import Snapshot, SnapshotBranch, TargetType
 
@@ -2286,3 +2287,65 @@ def test_loader_repo_with_copyfrom_and_replace_operations(
         type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_check_tree_divergence(swh_storage, repo_url, tmp_path, caplog):
+    # create sample repository
+    add_commit(
+        repo_url,
+        "Create trunk/data folder",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/foo",
+                data=b"foo",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/bar",
+                data=b"bar",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/baz/",
+            ),
+        ],
+    )
+
+    # load it
+    loader = SvnLoader(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        debug=True,
+        check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+
+    # export it to a temporary directory
+    export_path, _ = loader.svnrepo.export_temporary(revision=1)
+    export_path = os.path.join(export_path, repo_url.split("/")[-1])
+
+    # modify some file content in the export and remove a path
+    with open(os.path.join(export_path, "trunk/data/foo"), "wb") as f:
+        f.write(b"baz")
+    shutil.rmtree(os.path.join(export_path, "trunk/data/baz/"))
+
+    # create directory model from the modified export
+    export_dir = Directory.from_disk(path=export_path.encode())
+
+    # ensure debug logs
+    caplog.set_level(logging.DEBUG)
+
+    # check exported tree and repository tree are diverging
+    with pytest.raises(ValueError):
+        loader._check_revision_divergence(1, export_dir.hash, export_dir)
+
+    # check diverging paths have been detected and logged
+    for debug_log in (
+        "directory with path b'trunk' has different hash in reconstructed repository filesystem",  # noqa
+        "directory with path b'trunk/data' has different hash in reconstructed repository filesystem",  # noqa
+        "content with path b'trunk/data/foo' has different hash in reconstructed repository filesystem",  # noqa
+        "directory with path b'trunk/data/baz' is missing in reconstructed repository filesystem",  # noqa
+    ):
+        assert debug_log in caplog.text

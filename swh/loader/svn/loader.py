@@ -140,7 +140,9 @@ Local repository not cleaned up for investigation: %s""",
             return
         self.svnrepo.clean_fs()
 
-    def swh_revision_hash_tree_at_svn_revision(self, revision: int) -> bytes:
+    def swh_revision_hash_tree_at_svn_revision(
+        self, revision: int
+    ) -> from_disk.Directory:
         """Compute and return the hash tree at a given svn revision.
 
         Args:
@@ -154,7 +156,7 @@ Local repository not cleaned up for investigation: %s""",
         local_dirname, local_url = self.svnrepo.export_temporary(revision)
         root_dir = from_disk.Directory.from_disk(path=local_url)
         self.svnrepo.clean_fs(local_dirname)
-        return root_dir.hash
+        return root_dir
 
     def _latest_snapshot_revision(
         self,
@@ -284,7 +286,9 @@ Local repository not cleaned up for investigation: %s""",
 
         return revision_start, revision_end
 
-    def _check_revision_divergence(self, rev: int, dir_id: bytes) -> None:
+    def _check_revision_divergence(
+        self, rev: int, dir_id: bytes, dir: from_disk.Directory
+    ) -> None:
         """Check for hash revision computation divergence.
 
            The Rationale behind this is that svn can trigger unknown edge cases (mixed
@@ -301,12 +305,37 @@ Local repository not cleaned up for investigation: %s""",
         """
 
         self.log.debug("Checking hash computations on revision %s...", rev)
-        checked_dir_id = self.swh_revision_hash_tree_at_svn_revision(rev)
+        checked_dir = self.swh_revision_hash_tree_at_svn_revision(rev)
+        checked_dir_id = checked_dir.hash
+
         if checked_dir_id != dir_id:
+            # do not bother checking tree differences if root directory id of reconstructed
+            # repository filesystem does not match the id of the one from the last loaded
+            # revision (can happen when called from post_load and tree differences were checked
+            # before the last revision to load)
+            if self.debug and dir_id == dir.hash:
+                for obj in checked_dir.iter_tree():
+                    path = obj.data["path"].replace(checked_dir.data["path"], b"")[1:]
+                    if not path:
+                        # ignore root directory
+                        continue
+                    if path not in dir:
+                        self.log.debug(
+                            "%s with path %s is missing in reconstructed repository filesystem",
+                            obj.object_type,  # type: ignore
+                            path,
+                        )
+                    elif dir[path].hash != checked_dir[path].hash:
+                        self.log.debug(
+                            "%s with path %s has different hash in reconstructed repository filesystem",  # noqa
+                            obj.object_type,  # type: ignore
+                            path,
+                        )
             err = (
-                "Hash tree computation divergence detected "
+                "Hash tree computation divergence detected at revision %s "
                 "(%s != %s), stopping!"
                 % (
+                    rev,
                     hashutil.hash_to_hex(dir_id),
                     hashutil.hash_to_hex(checked_dir_id),
                 )
@@ -360,7 +389,7 @@ Local repository not cleaned up for investigation: %s""",
                 and self.check_revision != 0
                 and count % self.check_revision == 0
             ):
-                self._check_revision_divergence(rev, dir_id)
+                self._check_revision_divergence(rev, dir_id, root_directory)
 
             parents = (swh_revision.id,)
 
@@ -535,6 +564,7 @@ Local repository not cleaned up for investigation: %s""",
             self._check_revision_divergence(
                 int(dict(self._last_revision.extra_headers)[b"svn_revision"]),
                 self._last_revision.directory,
+                self.svnrepo.swhreplay.directory,
             )
 
     def _create_tmp_dir(self, root_tmp_dir: str) -> str:

@@ -2291,6 +2291,79 @@ def test_loader_repo_with_copyfrom_and_replace_operations(
     check_snapshot(loader.snapshot, loader.storage)
 
 
+@pytest.mark.parametrize("svn_loader_cls", [SvnLoader, SvnLoaderFromRemoteDump])
+def test_loader_repo_with_copyfrom_operations_and_eol_style(
+    swh_storage, repo_url, tmp_path, svn_loader_cls
+):
+    add_commit(
+        repo_url,
+        "Create trunk/code/foo file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/code/foo",
+                data=b"foo\n",
+                properties={"svn:eol-style": "CRLF"},
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="branches/code/",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Modify svn:eol-style property for the trunk/code/foo file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/code/foo",
+                properties={"svn:eol-style": "native"},
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Copy trunk/code/foo folder from revision 1",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="branches/code/foo",
+                copyfrom_path=repo_url + "/trunk/code/foo",
+                copyfrom_rev=1,
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Modify branches/code/foo previously copied",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="branches/code/foo",
+                data=b"foo\r\nbar\n",
+            ),
+        ],
+    )
+
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
+
+    assert loader.load() == {"status": "eventful"}
+
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+
+
 def test_loader_check_tree_divergence(swh_storage, repo_url, tmp_path, caplog):
     # create sample repository
     add_commit(

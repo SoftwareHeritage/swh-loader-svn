@@ -317,7 +317,7 @@ Local repository not cleaned up for investigation: %s""",
             # before the last revision to load)
             if self.debug and dir_id == dir.hash:
                 for obj in checked_dir.iter_tree():
-                    path = obj.data["path"].replace(checked_dir.data["path"], b"")[1:]
+                    path = obj.data["path"].replace(checked_dir.data["path"], b"")
                     if not path:
                         # ignore root directory
                         continue

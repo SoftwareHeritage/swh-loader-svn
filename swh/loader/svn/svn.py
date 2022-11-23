@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 
 def quote_svn_url(url: str) -> str:
-    return url.replace(" ", "%20")
+    return url.replace(" ", "%20").replace("#", "%23")
 
 
 class SvnRepo:

@@ -2175,8 +2175,10 @@ def test_loader_basic_authentication_required(
     check_snapshot(loader.snapshot, loader.storage)
 
 
-def test_loader_with_spaces_in_svn_url(swh_storage, repo_url, tmp_path):
-    filename = "file with spaces.txt"
+@pytest.mark.parametrize(
+    "filename", ["file with spaces.txt", "file#with#hash#signs.txt"]
+)
+def test_loader_with_special_chars_in_svn_url(repo_url, tmp_path, filename):
     content = b"foo"
 
     add_commit(

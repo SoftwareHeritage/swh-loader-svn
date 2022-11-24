@@ -482,7 +482,6 @@ class DirEditor:
                 peg_rev=copyfrom_rev,
                 ignore_keywords=True,
                 overwrite=True,
-                ignore_externals=True,
             )
             self.directory[path_bytes] = from_disk.Directory.from_disk(path=fullpath)
 

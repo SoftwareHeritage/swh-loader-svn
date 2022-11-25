@@ -210,6 +210,10 @@ class FileEditor:
         self.editor = svnrepo.swhreplay.editor
 
     def change_prop(self, key: str, value: str) -> None:
+        if self.editor.debug:
+            logger.debug(
+                "Setting property %s to value %s on path %s", key, value, self.path
+            )
         if key == properties.PROP_EXECUTABLE:
             if value is None:  # bit flip off
                 self.state.executable = NOEXEC_FLAG
@@ -258,6 +262,8 @@ class FileEditor:
         return sbuf
 
     def apply_textdelta(self, base_checksum) -> Callable[[Any, bytes, BinaryIO], None]:
+        if self.editor.debug:
+            logger.debug("Applying textdelta to file %s", self.path)
         # if the filepath matches an external, do not apply local patch
         if self.path in self.editor.external_paths:
             return lambda *args: None
@@ -289,6 +295,8 @@ class FileEditor:
           computation purposes)
 
         """
+        if self.editor.debug:
+            logger.debug("Closing file %s", self.path)
 
         if self.state.link:
             # can only check now that the link is a real one
@@ -434,6 +442,8 @@ class DirEditor:
 
     def open_directory(self, path: str, *args) -> DirEditor:
         """Updating existing directory."""
+        if self.editor.debug:
+            logger.debug("Opening directory %s", path)
         return DirEditor(
             self.directory,
             rootpath=self.rootpath,
@@ -447,6 +457,14 @@ class DirEditor:
         self, path: str, copyfrom_path: Optional[str] = None, copyfrom_rev: int = -1
     ) -> DirEditor:
         """Adding a new directory."""
+        if self.editor.debug:
+            logger.debug(
+                "Adding directory %s, copyfrom_path = %s, copyfrom_rev = %s",
+                path,
+                copyfrom_path,
+                copyfrom_rev,
+            )
+
         path_bytes = os.fsencode(path)
         fullpath = os.path.join(self.rootpath, path_bytes)
 
@@ -479,6 +497,9 @@ class DirEditor:
 
     def open_file(self, path: str, *args) -> FileEditor:
         """Updating existing file."""
+        if self.editor.debug:
+            logger.debug("Opening file %s", path)
+
         path_bytes = os.fsencode(path)
         self.directory[path_bytes] = from_disk.Content()
         fullpath = os.path.join(self.rootpath, path_bytes)
@@ -494,6 +515,14 @@ class DirEditor:
         self, path: str, copyfrom_path: Optional[str] = None, copyfrom_rev: int = -1
     ) -> FileEditor:
         """Creating a new file."""
+        if self.editor.debug:
+            logger.debug(
+                "Adding file %s, copyfrom_path = %s, copyfrom_rev = %s",
+                path,
+                copyfrom_path,
+                copyfrom_rev,
+            )
+
         path_bytes = os.fsencode(path)
         fullpath = os.path.join(self.rootpath, path_bytes)
 
@@ -572,6 +601,9 @@ class DirEditor:
 
     def delete_entry(self, path: str, revision: int) -> None:
         """Remove a path."""
+        if self.editor.debug:
+            logger.debug("Deleting directory entry %s", path)
+
         path_bytes = os.fsencode(path)
         fullpath = os.path.join(self.rootpath, path_bytes)
 
@@ -606,6 +638,8 @@ class DirEditor:
 
         SVN external definitions are processed by it.
         """
+        if self.editor.debug:
+            logger.debug("Closing directory %s", self.path)
 
         prev_externals = self.dir_states[self.path].externals
 
@@ -910,6 +944,7 @@ class Editor:
         directory: from_disk.Directory,
         svnrepo: SvnRepo,
         temp_dir: str,
+        debug: bool = False,
     ):
         self.rootpath = rootpath
         self.directory = directory
@@ -922,6 +957,7 @@ class Editor:
         self.externals_cache: Dict[ExternalDefinition, bytes] = {}
         self.svnrepo = svnrepo
         self.revnum = None
+        self.debug = debug
 
     def set_target_revision(self, revnum) -> None:
         self.revnum = revnum
@@ -953,6 +989,7 @@ class Replay:
         svnrepo: SvnRepo,
         temp_dir: str,
         directory: Optional[from_disk.Directory] = None,
+        debug: bool = False,
     ):
         self.conn = conn
         self.rootpath = rootpath
@@ -960,7 +997,11 @@ class Replay:
             directory = from_disk.Directory()
         self.directory = directory
         self.editor = Editor(
-            rootpath=rootpath, directory=directory, svnrepo=svnrepo, temp_dir=temp_dir
+            rootpath=rootpath,
+            directory=directory,
+            svnrepo=svnrepo,
+            temp_dir=temp_dir,
+            debug=debug,
         )
 
     def replay(self, rev: int, low_water_mark: int) -> from_disk.Directory:

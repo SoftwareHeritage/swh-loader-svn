@@ -63,6 +63,7 @@ class SvnRepo:
         local_dirname: str,
         max_content_length: int,
         from_dump: bool = False,
+        debug: bool = False,
     ):
         self.origin_url = origin_url
         self.from_dump = from_dump
@@ -122,6 +123,7 @@ class SvnRepo:
             rootpath=self.local_url,
             svnrepo=self,
             temp_dir=local_dirname,
+            debug=debug,
         )
         self.max_content_length = max_content_length
         self.has_relative_externals = False

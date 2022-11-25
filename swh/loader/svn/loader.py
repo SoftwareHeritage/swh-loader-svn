@@ -433,6 +433,7 @@ Local repository not cleaned up for investigation: %s""",
             local_dirname,
             self.max_content_size,
             self.from_dump,
+            debug=self.debug,
         )
 
         try:
@@ -799,7 +800,11 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         last_loaded_svn_rev = self.get_last_loaded_svn_rev(self.origin.url)
 
         self.svnrepo = self.svn_repo(
-            self.origin.url, self.origin.url, self.temp_dir, self.max_content_size
+            self.origin.url,
+            self.origin.url,
+            self.temp_dir,
+            self.max_content_size,
+            debug=self.debug,
         )
 
         # Ensure to use remote URL retrieved by SvnRepo as origin URL might redirect

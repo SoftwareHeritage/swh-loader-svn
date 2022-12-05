@@ -8,6 +8,7 @@ swh-storage.
 
 """
 from datetime import datetime
+import difflib
 import os
 import pty
 import re
@@ -41,6 +42,7 @@ from .utils import (
     OutputStream,
     init_svn_repo_from_archive_dump,
     init_svn_repo_from_dump,
+    svn_urljoin,
 )
 
 DEFAULT_BRANCH = b"HEAD"
@@ -331,6 +333,44 @@ Local repository not cleaned up for investigation: %s""",
                             obj.object_type,  # type: ignore
                             path,
                         )
+                        if obj.object_type == "content":  # type: ignore
+                            self.log.debug(
+                                "expected sha1: %s, actual sha1: %s",
+                                hashutil.hash_to_hex(checked_dir[path].data["sha1"]),
+                                hashutil.hash_to_hex(dir[path].data["sha1"]),
+                            )
+                            # compute and display diff between contents
+                            file_path = (
+                                checked_dir[path]
+                                .data["path"]
+                                .replace(checked_dir.data["path"], b"")
+                            ).decode()
+                            with tempfile.TemporaryDirectory() as tmpdir:
+                                export_path = os.path.join(
+                                    tmpdir, os.path.basename(file_path)
+                                )
+                                assert self.svnrepo is not None
+                                self.svnrepo.export(
+                                    url=svn_urljoin(self.svnrepo.remote_url, file_path),
+                                    to=export_path,
+                                    rev=rev,
+                                    peg_rev=rev,
+                                    ignore_keywords=True,
+                                    overwrite=True,
+                                )
+                                with open(export_path, "rb") as exported_file, open(
+                                    dir[path].data["path"], "rb"
+                                ) as checkout_file:
+                                    diff_lines = difflib.diff_bytes(
+                                        difflib.unified_diff,
+                                        exported_file.read().split(b"\n"),
+                                        checkout_file.read().split(b"\n"),
+                                    )
+                                    self.log.debug(
+                                        "below is diff between files:\n"
+                                        + os.fsdecode(b"\n".join(list(diff_lines)[2:]))
+                                    )
+
             err = (
                 "Hash tree computation divergence detected at revision %s "
                 "(%s != %s), stopping!"

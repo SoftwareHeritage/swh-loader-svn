@@ -2349,5 +2349,9 @@ def test_loader_check_tree_divergence(swh_storage, repo_url, tmp_path, caplog):
         "directory with path b'trunk/data' has different hash in reconstructed repository filesystem",  # noqa
         "content with path b'trunk/data/foo' has different hash in reconstructed repository filesystem",  # noqa
         "directory with path b'trunk/data/baz' is missing in reconstructed repository filesystem",  # noqa
+        "below is diff between files:",
+        "@@ -1 +1 @@",
+        "-foo",
+        "+baz",
     ):
         assert debug_log in caplog.text

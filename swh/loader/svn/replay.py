@@ -631,6 +631,9 @@ class DirEditor:
         path = root_path if root_path else self.path
         fullpath = os.path.join(path, external_path)
 
+        if self.editor.debug:
+            logger.debug("Removing external path %s", fullpath)
+
         # decrement number of references for external path when we really remove it
         # (when remove_subpaths is False, we just cleanup the external path before
         # copying exported paths in it)

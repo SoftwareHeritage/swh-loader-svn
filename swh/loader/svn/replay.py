@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import codecs
 from collections import defaultdict
+from copy import copy
 from dataclasses import dataclass, field
 from distutils.dir_util import copy_tree
 from itertools import chain
@@ -234,7 +235,6 @@ class DirEditor:
         os.makedirs(fullpath, exist_ok=True)
         if copyfrom_rev == -1:
             if path_bytes and path_bytes not in self.directory:
-                self.dir_states[path_bytes] = DirState()
                 self.directory[path_bytes] = from_disk.Directory()
         else:
             url = svn_urljoin(self.svnrepo.remote_url, copyfrom_path)
@@ -247,6 +247,26 @@ class DirEditor:
                 overwrite=True,
             )
             self.directory[path_bytes] = from_disk.Directory.from_disk(path=fullpath)
+
+            assert copyfrom_path is not None
+            copyfrom_path_bytes = os.fsencode(copyfrom_path).lstrip(b"/")
+            copyfrom_fullpath = os.path.join(self.rootpath, copyfrom_path_bytes)
+
+            def _copy_dir_state(path: bytes, copied_path: bytes):
+                self.dir_states[path] = copy(self.dir_states[copied_path])
+                for external_path in self.dir_states[path].externals_paths:
+                    self.editor.external_paths[os.path.join(path, external_path)] += 1
+
+            _copy_dir_state(path_bytes, copyfrom_path_bytes)
+            for root, dirs, _ in os.walk(fullpath):
+                for dir in dirs:
+                    dir_fullpath = os.path.join(root, dir)
+                    copied_dir_fullpath = dir_fullpath.replace(
+                        fullpath, copyfrom_fullpath
+                    )
+                    dir_path = dir_fullpath.replace(self.rootpath, b"").lstrip(b"/")
+                    copied_dir_path = copied_dir_fullpath.replace(self.rootpath, b"")
+                    _copy_dir_state(dir_path, copied_dir_path.lstrip(b"/"))
 
         return DirEditor(
             self.directory,

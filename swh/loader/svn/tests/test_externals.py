@@ -1689,6 +1689,18 @@ def test_loader_copyfrom_rev_with_externals(
         ],
     )
 
+    add_commit(
+        repo_url,
+        "Unset svn:externals property on copied path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/externals/",
+                properties={"svn:externals": None},
+            ),
+        ],
+    )
+
     loader = SvnLoader(
         swh_storage,
         repo_url,

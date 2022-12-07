@@ -13,7 +13,7 @@ import os
 import shutil
 import tempfile
 from typing import Dict, Iterator, List, Optional, Tuple, Union
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import quote, urlparse, urlunparse
 
 from subvertpy import SubversionException, client, properties, wc
 from subvertpy.ra import (
@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 
 def quote_svn_url(url: str) -> str:
-    return url.replace(" ", "%20").replace("#", "%23")
+    return quote(url, safe="/:!$&'()*+,=@")
 
 
 class SvnRepo:

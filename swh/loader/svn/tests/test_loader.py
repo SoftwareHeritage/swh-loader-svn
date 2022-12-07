@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import itertools
 import logging
 import os
 import shutil
@@ -2175,15 +2176,18 @@ def test_loader_basic_authentication_required(
     check_snapshot(loader.snapshot, loader.storage)
 
 
-@pytest.mark.parametrize(
-    "filename", ["file with spaces.txt", "file#with#hash#signs.txt"]
-)
-def test_loader_with_special_chars_in_svn_url(repo_url, tmp_path, filename):
+def test_loader_with_special_chars_in_svn_url(repo_url, tmp_path):
     content = b"foo"
+
+    filename = "".join(
+        itertools.chain(
+            (chr(i) for i in range(32, 127)), (chr(i) for i in range(161, 256))
+        )
+    )
 
     add_commit(
         repo_url,
-        "Add file with spaces in its name",
+        "Add file with characters to quote in its name",
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,

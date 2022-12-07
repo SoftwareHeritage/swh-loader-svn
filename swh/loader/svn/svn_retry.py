@@ -16,7 +16,7 @@ from tenacity.wait import wait_exponential
 logger = logging.getLogger(__name__)
 
 SVN_RETRY_WAIT_EXP_BASE = 10
-SVN_RETRY_MAX_ATTEMPTS = 5
+SVN_RETRY_MAX_ATTEMPTS = 3
 
 
 def is_retryable_svn_exception(exception):

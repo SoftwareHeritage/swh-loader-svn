@@ -446,51 +446,46 @@ class SvnRepo:
             url = self.origin_url
         elif not self.replay_started:
             # revisions replay has not started, we need to check if svn:externals
-            # properties are set from a checkout of the revision and if some
-            # external URLs are relative to pick the right export URL,
-            # recursive externals are also checked
-            with tempfile.TemporaryDirectory(
-                dir=self.local_dirname, prefix=f"checkout-revision-{revision}."
-            ) as co_dirname:
+            # properties are set and if some external URLs are relative to pick
+            # the right export URL,recursive externals are also checked
 
-                self.checkout(
-                    self.remote_url, co_dirname, revision, ignore_externals=True
-                )
-                # get all svn:externals properties recursively
-                externals = self.propget("svn:externals", co_dirname, None, None, True)
-                self.has_relative_externals = False
-                self.has_recursive_externals = False
-                for path, external_defs in externals.items():
-                    if self.has_relative_externals or self.has_recursive_externals:
+            # get all svn:externals properties recursively
+            externals = self.propget(
+                "svn:externals", self.remote_url, revision, revision, True
+            )
+            self.has_relative_externals = False
+            self.has_recursive_externals = False
+            for path, external_defs in externals.items():
+                if self.has_relative_externals or self.has_recursive_externals:
+                    break
+                path = path.replace(self.remote_url.rstrip("/") + "/", "")
+                for external_def in os.fsdecode(external_defs).split("\n"):
+                    # skip empty line or comment
+                    if not external_def or external_def.startswith("#"):
+                        continue
+                    (
+                        external_path,
+                        external_url,
+                        _,
+                        relative_url,
+                    ) = parse_external_definition(
+                        external_def.rstrip("\r"), path, self.origin_url
+                    )
+
+                    if is_recursive_external(
+                        self.origin_url,
+                        path,
+                        external_path,
+                        external_url,
+                    ):
+                        self.has_recursive_externals = True
+                        url = self.remote_url
                         break
-                    path = path.replace(self.remote_url.rstrip("/") + "/", "")
-                    for external_def in os.fsdecode(external_defs).split("\n"):
-                        # skip empty line or comment
-                        if not external_def or external_def.startswith("#"):
-                            continue
-                        (
-                            external_path,
-                            external_url,
-                            _,
-                            relative_url,
-                        ) = parse_external_definition(
-                            external_def.rstrip("\r"), path, self.origin_url
-                        )
 
-                        if is_recursive_external(
-                            self.origin_url,
-                            path,
-                            external_path,
-                            external_url,
-                        ):
-                            self.has_recursive_externals = True
-                            url = self.remote_url
-                            break
-
-                        if relative_url:
-                            self.has_relative_externals = True
-                            url = self.origin_url
-                            break
+                    if relative_url:
+                        self.has_relative_externals = True
+                        url = self.origin_url
+                        break
 
         try:
             url = url.rstrip("/")

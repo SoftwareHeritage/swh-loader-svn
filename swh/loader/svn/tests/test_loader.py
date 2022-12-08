@@ -2432,3 +2432,56 @@ def test_loader_check_tree_divergence(swh_storage, repo_url, tmp_path, caplog):
         "+baz",
     ):
         assert debug_log in caplog.text
+
+
+def test_loader_svnrepo_propget_on_url(swh_storage, repo_url, tmp_path):
+    # create sample repository
+    add_commit(
+        repo_url,
+        "Create files with some having svn:eol-style property set",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/foo",
+                data=b"foo\n",
+                properties={"svn:eol-style": "native"},
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/bar",
+                data=b"bar\n",
+                properties={"svn:eol-style": "native"},
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/baz",
+                data=b"baz\n",
+            ),
+        ],
+    )
+
+    # load it
+    loader = SvnLoader(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        debug=True,
+        check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+
+    foo_file_url = f"{repo_url}/trunk/data/foo"
+    bar_file_url = f"{repo_url}/trunk/data/bar"
+    baz_file_url = f"{repo_url}/trunk/data/baz"
+    assert loader.svnrepo.propget("svn:eol-style", foo_file_url, peg_rev=1, rev=1) == {
+        foo_file_url: b"native"
+    }
+
+    assert loader.svnrepo.propget(
+        "svn:eol-style", repo_url, peg_rev=1, rev=1, recurse=True
+    ) == {
+        foo_file_url: b"native",
+        bar_file_url: b"native",
+    }
+
+    assert loader.svnrepo.propget("svn:eol-style", baz_file_url, peg_rev=1, rev=1) == {}

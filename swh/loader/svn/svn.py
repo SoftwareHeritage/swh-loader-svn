@@ -393,14 +393,29 @@ class SvnRepo:
         peg_rev: Optional[int],
         rev: Optional[int] = None,
         recurse: bool = False,
-    ):
+    ) -> Dict[str, bytes]:
         """Simple wrapper around subvertpy.client.Client.propget enabling to retry
         the command if a network error occurs.
 
         See documentation of svn_client_propget5 function from subversion C API
         to get details about parameters.
         """
-        return self.client.propget(name, target, peg_rev, rev, recurse)
+        target_is_url = urlparse(target).scheme != ""
+        if target_is_url:
+            # subvertpy 0.11 has a buggy implementation of propget bindings when
+            # target is an URL (https://github.com/jelmer/subvertpy/issues/35)
+            # as a workaround we implement propget for URL using non buggy proplist bindings
+            svn_depth_infinity = 3
+            svn_depth_empty = 0
+            proplist = self.client.proplist(
+                quote_svn_url(target),
+                peg_revision=peg_rev,
+                revision=rev,
+                depth=svn_depth_infinity if recurse else svn_depth_empty,
+            )
+            return {path: props[name] for path, props in proplist if name in props}
+        else:
+            return self.client.propget(name, target, peg_rev, rev, recurse)
 
     def export_temporary(self, revision: int) -> Tuple[str, bytes]:
         """Export the repository to a given revision in a temporary location. This is up

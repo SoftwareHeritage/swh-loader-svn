@@ -13,7 +13,7 @@ import os
 import shutil
 import tempfile
 from typing import Dict, Iterator, List, Optional, Tuple, Union
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import quote, urlparse, urlunparse
 
 from subvertpy import SubversionException, client, properties, wc
 from subvertpy.ra import (
@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 
 def quote_svn_url(url: str) -> str:
-    return url.replace(" ", "%20")
+    return quote(url, safe="/:!$&'()*+,=@")
 
 
 class SvnRepo:
@@ -63,6 +63,7 @@ class SvnRepo:
         local_dirname: str,
         max_content_length: int,
         from_dump: bool = False,
+        debug: bool = False,
     ):
         self.origin_url = origin_url
         self.from_dump = from_dump
@@ -112,6 +113,9 @@ class SvnRepo:
         # another for replay
         self.conn = self.remote_access(auth)
 
+        if not self.from_dump:
+            self.remote_url = self.info(self.remote_url).repos_root_url
+
         self.local_dirname = local_dirname
         local_name = os.path.basename(self.remote_url)
         self.local_url = os.path.join(self.local_dirname, local_name).encode("utf-8")
@@ -122,6 +126,7 @@ class SvnRepo:
             rootpath=self.local_url,
             svnrepo=self,
             temp_dir=local_dirname,
+            debug=debug,
         )
         self.max_content_length = max_content_length
         self.has_relative_externals = False
@@ -388,14 +393,29 @@ class SvnRepo:
         peg_rev: Optional[int],
         rev: Optional[int] = None,
         recurse: bool = False,
-    ):
+    ) -> Dict[str, bytes]:
         """Simple wrapper around subvertpy.client.Client.propget enabling to retry
         the command if a network error occurs.
 
         See documentation of svn_client_propget5 function from subversion C API
         to get details about parameters.
         """
-        return self.client.propget(name, target, peg_rev, rev, recurse)
+        target_is_url = urlparse(target).scheme != ""
+        if target_is_url:
+            # subvertpy 0.11 has a buggy implementation of propget bindings when
+            # target is an URL (https://github.com/jelmer/subvertpy/issues/35)
+            # as a workaround we implement propget for URL using non buggy proplist bindings
+            svn_depth_infinity = 3
+            svn_depth_empty = 0
+            proplist = self.client.proplist(
+                quote_svn_url(target),
+                peg_revision=peg_rev,
+                revision=rev,
+                depth=svn_depth_infinity if recurse else svn_depth_empty,
+            )
+            return {path: props[name] for path, props in proplist if name in props}
+        else:
+            return self.client.propget(name, target, peg_rev, rev, recurse)
 
     def export_temporary(self, revision: int) -> Tuple[str, bytes]:
         """Export the repository to a given revision in a temporary location. This is up
@@ -426,51 +446,46 @@ class SvnRepo:
             url = self.origin_url
         elif not self.replay_started:
             # revisions replay has not started, we need to check if svn:externals
-            # properties are set from a checkout of the revision and if some
-            # external URLs are relative to pick the right export URL,
-            # recursive externals are also checked
-            with tempfile.TemporaryDirectory(
-                dir=self.local_dirname, prefix=f"checkout-revision-{revision}."
-            ) as co_dirname:
+            # properties are set and if some external URLs are relative to pick
+            # the right export URL,recursive externals are also checked
 
-                self.checkout(
-                    self.remote_url, co_dirname, revision, ignore_externals=True
-                )
-                # get all svn:externals properties recursively
-                externals = self.propget("svn:externals", co_dirname, None, None, True)
-                self.has_relative_externals = False
-                self.has_recursive_externals = False
-                for path, external_defs in externals.items():
-                    if self.has_relative_externals or self.has_recursive_externals:
+            # get all svn:externals properties recursively
+            externals = self.propget(
+                "svn:externals", self.remote_url, revision, revision, True
+            )
+            self.has_relative_externals = False
+            self.has_recursive_externals = False
+            for path, external_defs in externals.items():
+                if self.has_relative_externals or self.has_recursive_externals:
+                    break
+                path = path.replace(self.remote_url.rstrip("/") + "/", "")
+                for external_def in os.fsdecode(external_defs).split("\n"):
+                    # skip empty line or comment
+                    if not external_def or external_def.startswith("#"):
+                        continue
+                    (
+                        external_path,
+                        external_url,
+                        _,
+                        relative_url,
+                    ) = parse_external_definition(
+                        external_def.rstrip("\r"), path, self.origin_url
+                    )
+
+                    if is_recursive_external(
+                        self.origin_url,
+                        path,
+                        external_path,
+                        external_url,
+                    ):
+                        self.has_recursive_externals = True
+                        url = self.remote_url
                         break
-                    path = path.replace(self.remote_url.rstrip("/") + "/", "")
-                    for external_def in os.fsdecode(external_defs).split("\n"):
-                        # skip empty line or comment
-                        if not external_def or external_def.startswith("#"):
-                            continue
-                        (
-                            external_path,
-                            external_url,
-                            _,
-                            relative_url,
-                        ) = parse_external_definition(
-                            external_def.rstrip("\r"), path, self.origin_url
-                        )
 
-                        if is_recursive_external(
-                            self.origin_url,
-                            path,
-                            external_path,
-                            external_url,
-                        ):
-                            self.has_recursive_externals = True
-                            url = self.remote_url
-                            break
-
-                        if relative_url:
-                            self.has_relative_externals = True
-                            url = self.origin_url
-                            break
+                    if relative_url:
+                        self.has_relative_externals = True
+                        url = self.origin_url
+                        break
 
         try:
             url = url.rstrip("/")
@@ -493,15 +508,12 @@ class SvnRepo:
             else:
                 raise
 
-        if self.from_dump:
-            # when exporting a subpath of a subversion repository mounted from
-            # a dump file generated by svnrdump, exported paths are relative to
-            # the repository root path while they are relative to the subpath
-            # otherwise, so we need to adjust the URL of the exported filesystem
-            root_dir_local_url = os.path.join(local_url, self.root_directory.strip("/"))
-            # check that root directory of a subproject did not get removed in revision
-            if os.path.exists(root_dir_local_url):
-                local_url = root_dir_local_url
+        # exported paths are relative to the repository root path so we need to
+        # adjust the URL of the exported filesystem
+        root_dir_local_url = os.path.join(local_url, self.root_directory.strip("/"))
+        # check that root directory of a subproject did not get removed in revision
+        if os.path.exists(root_dir_local_url):
+            local_url = root_dir_local_url
 
         return local_dirname, os.fsencode(local_url)
 

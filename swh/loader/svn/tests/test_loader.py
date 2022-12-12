@@ -3,6 +3,8 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import itertools
+import logging
 import os
 import shutil
 import subprocess
@@ -25,7 +27,7 @@ from swh.loader.tests import (
     get_stats,
     prepare_repository_from_archive,
 )
-from swh.model.from_disk import DentryPerms
+from swh.model.from_disk import DentryPerms, Directory
 from swh.model.hashutil import hash_to_bytes
 from swh.model.model import Snapshot, SnapshotBranch, TargetType
 
@@ -2174,13 +2176,18 @@ def test_loader_basic_authentication_required(
     check_snapshot(loader.snapshot, loader.storage)
 
 
-def test_loader_with_spaces_in_svn_url(swh_storage, repo_url, tmp_path):
-    filename = "file with spaces.txt"
+def test_loader_with_special_chars_in_svn_url(repo_url, tmp_path):
     content = b"foo"
+
+    filename = "".join(
+        itertools.chain(
+            (chr(i) for i in range(32, 127)), (chr(i) for i in range(161, 256))
+        )
+    )
 
     add_commit(
         repo_url,
-        "Add file with spaces in its name",
+        "Add file with characters to quote in its name",
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
@@ -2286,3 +2293,195 @@ def test_loader_repo_with_copyfrom_and_replace_operations(
         type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+@pytest.mark.parametrize("svn_loader_cls", [SvnLoader, SvnLoaderFromRemoteDump])
+def test_loader_repo_with_copyfrom_operations_and_eol_style(
+    swh_storage, repo_url, tmp_path, svn_loader_cls
+):
+    add_commit(
+        repo_url,
+        "Create trunk/code/foo file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/code/foo",
+                data=b"foo\n",
+                properties={"svn:eol-style": "CRLF"},
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="branches/code/",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Modify svn:eol-style property for the trunk/code/foo file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/code/foo",
+                properties={"svn:eol-style": "native"},
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Copy trunk/code/foo folder from revision 1",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="branches/code/foo",
+                copyfrom_path=repo_url + "/trunk/code/foo",
+                copyfrom_rev=1,
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Modify branches/code/foo previously copied",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="branches/code/foo",
+                data=b"foo\r\nbar\n",
+            ),
+        ],
+    )
+
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
+
+    assert loader.load() == {"status": "eventful"}
+
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_check_tree_divergence(swh_storage, repo_url, tmp_path, caplog):
+    # create sample repository
+    add_commit(
+        repo_url,
+        "Create trunk/data folder",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/foo",
+                data=b"foo",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/bar",
+                data=b"bar",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/baz/",
+            ),
+        ],
+    )
+
+    # load it
+    loader = SvnLoader(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        debug=True,
+        check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+
+    # export it to a temporary directory
+    export_path, _ = loader.svnrepo.export_temporary(revision=1)
+    export_path = os.path.join(export_path, repo_url.split("/")[-1])
+
+    # modify some file content in the export and remove a path
+    with open(os.path.join(export_path, "trunk/data/foo"), "wb") as f:
+        f.write(b"baz")
+    shutil.rmtree(os.path.join(export_path, "trunk/data/baz/"))
+
+    # create directory model from the modified export
+    export_dir = Directory.from_disk(path=export_path.encode())
+
+    # ensure debug logs
+    caplog.set_level(logging.DEBUG)
+
+    # check exported tree and repository tree are diverging
+    with pytest.raises(ValueError):
+        loader._check_revision_divergence(1, export_dir.hash, export_dir)
+
+    # check diverging paths have been detected and logged
+    for debug_log in (
+        "directory with path b'trunk' has different hash in reconstructed repository filesystem",  # noqa
+        "directory with path b'trunk/data' has different hash in reconstructed repository filesystem",  # noqa
+        "content with path b'trunk/data/foo' has different hash in reconstructed repository filesystem",  # noqa
+        "directory with path b'trunk/data/baz' is missing in reconstructed repository filesystem",  # noqa
+        "below is diff between files:",
+        "@@ -1 +1 @@",
+        "-foo",
+        "+baz",
+    ):
+        assert debug_log in caplog.text
+
+
+def test_loader_svnrepo_propget_on_url(swh_storage, repo_url, tmp_path):
+    # create sample repository
+    add_commit(
+        repo_url,
+        "Create files with some having svn:eol-style property set",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/foo",
+                data=b"foo\n",
+                properties={"svn:eol-style": "native"},
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/bar",
+                data=b"bar\n",
+                properties={"svn:eol-style": "native"},
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/baz",
+                data=b"baz\n",
+            ),
+        ],
+    )
+
+    # load it
+    loader = SvnLoader(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        debug=True,
+        check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+
+    foo_file_url = f"{repo_url}/trunk/data/foo"
+    bar_file_url = f"{repo_url}/trunk/data/bar"
+    baz_file_url = f"{repo_url}/trunk/data/baz"
+    assert loader.svnrepo.propget("svn:eol-style", foo_file_url, peg_rev=1, rev=1) == {
+        foo_file_url: b"native"
+    }
+
+    assert loader.svnrepo.propget(
+        "svn:eol-style", repo_url, peg_rev=1, rev=1, recurse=True
+    ) == {
+        foo_file_url: b"native",
+        bar_file_url: b"native",
+    }
+
+    assert loader.svnrepo.propget("svn:eol-style", baz_file_url, peg_rev=1, rev=1) == {}

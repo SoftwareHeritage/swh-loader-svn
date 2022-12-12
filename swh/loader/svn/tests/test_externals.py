@@ -1640,3 +1640,173 @@ def test_loader_overlapping_external_paths_removal(
         type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_copyfrom_rev_with_externals(
+    swh_storage, repo_url, external_repo_url, tmp_path
+):
+    add_commit(
+        external_repo_url,
+        "Create some directories and files in an external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/hello/hello-world",
+                data=b"#!/bin/bash\necho Hello World !",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Create repository structure, one externals directory with svn:externals"
+        "property set and one trunk directory",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="externals/",
+                properties={
+                    "svn:externals": f'{svn_urljoin(external_repo_url, "code/hello/")} hello'  # noqa
+                },
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Add copy of externals directory to trunk from revision 1.",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/externals/",
+                copyfrom_path=repo_url + "/externals",
+                copyfrom_rev=1,
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Unset svn:externals property on copied path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/externals/",
+                properties={"svn:externals": None},
+            ),
+        ],
+    )
+
+    loader = SvnLoader(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_with_unparsable_external_on_path(
+    swh_storage, repo_url, external_repo_url, tmp_path
+):
+    # first commit on external
+    add_commit(
+        external_repo_url,
+        "Create some directories and files in an external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/hello/hello-world",
+                properties={"svn:executable": "*"},
+                data=b"#!/bin/bash\necho Hello World !",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/foo/foo.sh",
+                properties={"svn:executable": "*"},
+                data=b"#!/bin/bash\necho foo",
+            ),
+        ],
+    )
+
+    # first commit
+    add_commit(
+        repo_url,
+        (
+            "Set parsable svn:externals property on project1 path of repository to load."
+            "Add a code directory with a file in it."
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="project1/",
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(external_repo_url, 'code/hello')} hello\n"
+                    )
+                },
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/foo.sh",
+                properties={"svn:executable": "*"},
+                data=b"#!/bin/bash\necho foo",
+            ),
+        ],
+    )
+
+    # second commit
+    add_commit(
+        repo_url,
+        (
+            "Set unparsable svn:externals property on project2 path of repository to load."
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="project2/",
+                properties={"svn:externals": ("^code/foo foo\n")},
+            ),
+        ],
+    )
+
+    # third commit
+    add_commit(
+        repo_url,
+        (
+            "Fix unparsable svn:externals property on project2 path of repository to load."
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="project2/",
+                properties={"svn:externals": ("^/code/foo foo\n")},
+            ),
+        ],
+    )
+
+    loader = SvnLoader(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)

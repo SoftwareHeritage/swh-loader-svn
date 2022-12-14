@@ -310,6 +310,10 @@ def parse_external_definition(
         except ValueError:
             # handle URL like http://user@svn.example.org/
             pass
+
+    if not external_url or not path:
+        raise ValueError(f"Failed to parse external definition '{external}'")
+
     return (path.rstrip("/"), external_url, revision, relative_url)
 
 
@@ -329,6 +333,7 @@ def is_recursive_external(
     Returns:
         Whether the external definition is recursive
     """
+    assert external_url
     parsed_origin_url = urlparse(origin_url)
     parsed_external_url = urlparse(external_url)
     external_url = urlunparse(

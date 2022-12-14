@@ -479,3 +479,16 @@ def test_parse_external_definition(external, dir_path, repo_url, expected_result
     assert (
         utils.parse_external_definition(external, dir_path, repo_url) == expected_result
     )
+
+
+@pytest.mark.parametrize(
+    "invalid_external",
+    [
+        "^tests@21 tests",
+    ],
+)
+def test_parse_invalid_external_definition(invalid_external):
+    with pytest.raises(ValueError, match="Failed to parse external definition"):
+        utils.parse_external_definition(
+            invalid_external, "/trunk/externals", "http://svn.example.org/repo"
+        )

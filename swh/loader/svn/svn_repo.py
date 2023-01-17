@@ -59,12 +59,21 @@ class SvnRepo:
     def __init__(
         self,
         remote_url: str,
-        origin_url: str,
-        local_dirname: str,
-        max_content_length: int,
+        origin_url: Optional[str] = None,
+        local_dirname: Optional[str] = None,
+        max_content_length: int = 100000,
         from_dump: bool = False,
         debug: bool = False,
     ):
+        if origin_url is None:
+            origin_url = remote_url
+
+        self.manage_directory = False
+        if local_dirname is None:
+            local_dirname = tempfile.mkdtemp()
+            self.manage_directory = True
+        self.local_dirname = local_dirname
+
         self.origin_url = origin_url
         self.from_dump = from_dump
 
@@ -116,7 +125,6 @@ class SvnRepo:
         if not self.from_dump:
             self.remote_url = self.info(self.remote_url).repos_root_url
 
-        self.local_dirname = local_dirname
         local_name = os.path.basename(self.remote_url)
         self.local_url = os.path.join(self.local_dirname, local_name).encode("utf-8")
 
@@ -137,6 +145,11 @@ class SvnRepo:
         # properly load the sub-tree of a repository mounted from a dump file
         repos_root_url = self.info(self.origin_url).repos_root_url
         self.root_directory = self.origin_url.rstrip("/").replace(repos_root_url, "", 1)
+
+    def __del__(self):
+        # ensure temporary directory is removed when created by constructor
+        if self.manage_directory:
+            self.clean_fs()
 
     def __str__(self):
         return str(
@@ -279,10 +292,17 @@ class SvnRepo:
         return RemoteAccess(self.remote_url, auth=auth)
 
     @svn_retry()
-    def info(self, origin_url: str):
+    def info(self, origin_url: Optional[str] = None):
         """Simple wrapper around subvertpy.client.Client.info enabling to retry
-        the command if a network error occurs."""
-        info = self.client.info(quote_svn_url(origin_url).rstrip("/"))
+        the command if a network error occurs.
+
+        Args:
+            origin_url: If provided, query info about a specific repository,
+                currently set origin URL will be used otherwise
+        """
+        info = self.client.info(
+            quote_svn_url(origin_url or self.origin_url).rstrip("/")
+        )
         return next(iter(info.values()))
 
     @svn_retry()

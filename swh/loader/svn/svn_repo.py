@@ -12,7 +12,7 @@ import logging
 import os
 import shutil
 import tempfile
-from typing import Dict, Iterator, List, Optional, Tuple, Union
+from typing import Dict, Iterator, List, Optional, Tuple
 from urllib.parse import quote, urlparse, urlunparse
 
 from subvertpy import SubversionException, client, properties, wc
@@ -24,20 +24,14 @@ from subvertpy.ra import (
 )
 
 from swh.model.from_disk import Directory as DirectoryFromDisk
-from swh.model.model import (
-    Content,
-    Directory,
-    Person,
-    SkippedContent,
-    TimestampWithTimezone,
-)
+from swh.model.model import Content, Directory, SkippedContent
 
 from . import converters, replay
 from .svn_retry import svn_retry
 from .utils import is_recursive_external, parse_external_definition
 
 # When log message contains empty data
-DEFAULT_AUTHOR_MESSAGE = ""
+DEFAULT_AUTHOR_MESSAGE = b""
 
 logger = logging.getLogger(__name__)
 
@@ -169,59 +163,18 @@ class SvnRepo:
         """Retrieve the initial revision from which the remote url appeared."""
         return 1
 
-    def convert_commit_message(self, msg: Union[str, bytes]) -> bytes:
-        """Simply encode the commit message.
-
-        Args:
-            msg: the commit message to convert.
-
-        Returns:
-            The transformed message as bytes.
-
-        """
-        if isinstance(msg, bytes):
-            return msg
-        return msg.encode("utf-8")
-
-    def convert_commit_date(self, date: bytes) -> TimestampWithTimezone:
-        """Convert the message commit date into a timestamp in swh format.
-        The precision is kept.
-
-        Args:
-            date: the commit date to convert.
-
-        Returns:
-            The transformed date.
-
-        """
-        return converters.svn_date_to_swh_date(date)
-
-    def convert_commit_author(self, author: Optional[bytes]) -> Person:
-        """Convert the commit author into an swh person.
-
-        Args:
-            author: the commit author to convert.
-
-        Returns:
-            Person as model object
-
-        """
-        return converters.svn_author_to_swh_person(author)
-
     def __to_entry(self, log_entry: Tuple) -> Dict:
         changed_paths, rev, revprops, has_children = log_entry
 
-        author_date = self.convert_commit_date(
+        author_date = converters.svn_date_to_swh_date(
             revprops.get(properties.PROP_REVISION_DATE)
         )
 
-        author = self.convert_commit_author(
+        author = converters.svn_author_to_swh_person(
             revprops.get(properties.PROP_REVISION_AUTHOR)
         )
 
-        message = self.convert_commit_message(
-            revprops.get(properties.PROP_REVISION_LOG, DEFAULT_AUTHOR_MESSAGE)
-        )
+        message = revprops.get(properties.PROP_REVISION_LOG, DEFAULT_AUTHOR_MESSAGE)
 
         has_changes = (
             not self.from_dump

@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2022  The Software Heritage developers
+# Copyright (C) 2016-2023  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -42,7 +42,7 @@ from swh.model.from_disk import DiskBackedContent
 from swh.model.model import Content, Directory, SkippedContent
 
 if TYPE_CHECKING:
-    from swh.loader.svn.svn import SvnRepo
+    from swh.loader.svn.svn_repo import SvnRepo
 
 from swh.loader.svn.utils import (
     is_recursive_external,

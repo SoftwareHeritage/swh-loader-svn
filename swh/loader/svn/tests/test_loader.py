@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2022  The Software Heritage developers
+# Copyright (C) 2016-2023  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -19,7 +19,7 @@ from swh.loader.svn.loader import (
     SvnLoaderFromDumpArchive,
     SvnLoaderFromRemoteDump,
 )
-from swh.loader.svn.svn import SvnRepo
+from swh.loader.svn.svn_repo import SvnRepo
 from swh.loader.svn.utils import init_svn_repo_from_dump
 from swh.loader.tests import (
     assert_last_visit_matches,
@@ -2076,9 +2076,9 @@ def test_loader_svn_from_remote_dump_url_redirect(swh_storage, tmp_path, mocker)
     repo_redirect_url = "https://svn.example.org/repo"
 
     # mock remote subversion operations
-    from swh.loader.svn.svn import client
+    from swh.loader.svn.svn_repo import client
 
-    mocker.patch("swh.loader.svn.svn.RemoteAccess")
+    mocker.patch("swh.loader.svn.svn_repo.RemoteAccess")
     init_svn_repo_from_dump = mocker.patch(
         "swh.loader.svn.loader.init_svn_repo_from_dump"
     )

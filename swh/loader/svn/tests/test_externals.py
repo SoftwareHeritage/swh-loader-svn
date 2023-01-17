@@ -1,4 +1,4 @@
-# Copyright (C) 2022  The Software Heritage developers
+# Copyright (C) 2022-2023  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -1299,7 +1299,7 @@ def test_dump_loader_externals_in_loaded_repository(swh_storage, tmp_path, mocke
         ],
     )
 
-    from swh.loader.svn.svn import client
+    from swh.loader.svn.svn_repo import client
 
     mock_client = mocker.MagicMock()
     mocker.patch.object(client, "Client", mock_client)

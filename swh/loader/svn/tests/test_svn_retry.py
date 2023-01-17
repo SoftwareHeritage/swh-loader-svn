@@ -1,4 +1,4 @@
-# Copyright (C) 2022  The Software Heritage developers
+# Copyright (C) 2022-2023  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -9,7 +9,7 @@ import pytest
 from subvertpy import SubversionException
 from subvertpy.ra import Auth, RemoteAccess, get_username_provider
 
-from swh.loader.svn.svn import SvnRepo
+from swh.loader.svn.svn_repo import SvnRepo
 from swh.loader.svn.svn_retry import SVN_RETRY_MAX_ATTEMPTS, SVN_RETRY_WAIT_EXP_BASE
 from swh.loader.tests import prepare_repository_from_archive
 
@@ -273,7 +273,7 @@ def test_remote_access_retry_success(
 ):
 
     nb_failed_calls = 2
-    mock_ra = mocker.patch("swh.loader.svn.svn.RemoteAccess")
+    mock_ra = mocker.patch("swh.loader.svn.svn_repo.RemoteAccess")
     remote_access = RemoteAccess(sample_repo_url, auth=Auth([get_username_provider()]))
     mock_ra.side_effect = (
         [exception_to_retry] * nb_failed_calls
@@ -300,7 +300,7 @@ def test_remote_access_retry_failure(
 ):
 
     nb_failed_calls = SVN_RETRY_MAX_ATTEMPTS
-    mock_ra = mocker.patch("swh.loader.svn.svn.RemoteAccess")
+    mock_ra = mocker.patch("swh.loader.svn.svn_repo.RemoteAccess")
     remote_access = RemoteAccess(sample_repo_url, auth=Auth([get_username_provider()]))
     mock_ra.side_effect = (
         [exception_to_retry] * nb_failed_calls

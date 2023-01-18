@@ -1,8 +1,9 @@
-# Copyright (C) 2016-2022  The Software Heritage developers
+# Copyright (C) 2016-2023  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from datetime import datetime, timedelta, timezone
 import logging
 import os
 from pathlib import Path
@@ -15,6 +16,8 @@ import pytest
 
 from swh.loader.svn import utils
 from swh.loader.tests import prepare_repository_from_archive
+
+from .utils import CommitChange, CommitChangeType, add_commit
 
 
 def test_outputstream():
@@ -492,3 +495,68 @@ def test_parse_invalid_external_definition(invalid_external):
         utils.parse_external_definition(
             invalid_external, "/trunk/externals", "http://svn.example.org/repo"
         )
+
+
+FIRST_COMMIT_DATE = datetime(year=2020, month=7, day=14, tzinfo=timezone.utc)
+SECOND_COMMIT_DATE = FIRST_COMMIT_DATE + timedelta(minutes=10)
+THIRD_COMMIT_DATE = SECOND_COMMIT_DATE + timedelta(hours=1)
+
+
+@pytest.fixture
+def repo_url(repo_url):
+    add_commit(
+        repo_url,
+        "Add trunk/foo/foo path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/foo/foo",
+                data=b"foo",
+            )
+        ],
+        FIRST_COMMIT_DATE,
+    )
+    add_commit(
+        repo_url,
+        "Add trunk/bar/bar path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/bar/bar",
+                data=b"bar",
+            )
+        ],
+        SECOND_COMMIT_DATE,
+    )
+    add_commit(
+        repo_url,
+        "Remove trunk/foo/foo path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.Delete,
+                path="trunk/foo/",
+            )
+        ],
+        THIRD_COMMIT_DATE,
+    )
+    return repo_url
+
+
+def test_get_repo_root_url(repo_url):
+    utils.get_repo_root_url(repo_url) == repo_url
+    utils.get_repo_root_url(f"{repo_url}/trunk/foo/foo") == repo_url
+    utils.get_repo_root_url(f"{repo_url}/trunk/bar/bar") == repo_url
+
+
+def test_get_head_revision_at_date(repo_url):
+    utils.get_head_revision_at_date(repo_url, FIRST_COMMIT_DATE) == 1
+    utils.get_head_revision_at_date(repo_url, SECOND_COMMIT_DATE) == 2
+    utils.get_head_revision_at_date(repo_url, THIRD_COMMIT_DATE) == 3
+
+    utils.get_head_revision_at_date(
+        repo_url, FIRST_COMMIT_DATE + (SECOND_COMMIT_DATE - FIRST_COMMIT_DATE) / 2
+    ) == 1
+
+    utils.get_head_revision_at_date(
+        repo_url, SECOND_COMMIT_DATE + (THIRD_COMMIT_DATE - SECOND_COMMIT_DATE) / 2
+    ) == 2

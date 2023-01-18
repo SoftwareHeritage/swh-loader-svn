@@ -3,6 +3,8 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
@@ -1792,6 +1794,113 @@ def test_loader_with_unparsable_external_on_path(
                 change_type=CommitChangeType.AddOrUpdate,
                 path="project2/",
                 properties={"svn:externals": ("^/code/foo foo\n")},
+            ),
+        ],
+    )
+
+    loader = SvnLoader(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_with_revision_dates_in_externals(
+    swh_storage, repo_url, external_repo_url, tmp_path
+):
+    first_external_commit_date = datetime(
+        year=2020, month=7, day=14, tzinfo=timezone.utc
+    )
+    second_external_commit_date = first_external_commit_date + timedelta(minutes=10)
+    third_external_commit_date = second_external_commit_date + timedelta(hours=1)
+
+    add_commit(
+        external_repo_url,
+        "Add trunk/foo/foo path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/foo/foo",
+                data=b"foo",
+            )
+        ],
+        first_external_commit_date,
+    )
+    add_commit(
+        external_repo_url,
+        "Add trunk/bar/bar path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/bar/bar",
+                data=b"bar",
+            )
+        ],
+        second_external_commit_date,
+    )
+    add_commit(
+        external_repo_url,
+        "Remove trunk/bar path and update trunk/foo/foo content",
+        [
+            CommitChange(
+                change_type=CommitChangeType.Delete,
+                path="trunk/bar/",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/foo/foo",
+                data=b"foobar",
+            ),
+        ],
+        third_external_commit_date,
+    )
+
+    def iso_date(date):
+        return date.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    add_commit(
+        repo_url,
+        "Add externals with revisions as dates.",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="externals/",
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(external_repo_url, 'trunk/foo')}"
+                        f"@{{{iso_date(first_external_commit_date)}}} foo\n"
+                        f"{svn_urljoin(external_repo_url, 'trunk/bar')}"
+                        f"@{{{iso_date(second_external_commit_date)}}} bar\n"
+                    )
+                },
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Modify foo externals to another revision date.",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="externals/",
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(external_repo_url, 'trunk/foo')}"
+                        f"@{{{iso_date(third_external_commit_date)}}} foo\n"
+                        f"{svn_urljoin(external_repo_url, 'trunk/bar')}"
+                        f"@{{{iso_date(second_external_commit_date)}}} bar\n"
+                    )
+                },
             ),
         ],
     )

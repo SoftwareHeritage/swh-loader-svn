@@ -138,8 +138,10 @@ class SvnRepo:
 
         # compute root directory path from the remote repository URL, required to
         # properly load the sub-tree of a repository mounted from a dump file
-        repos_root_url = self.info(self.origin_url).repos_root_url
-        self.root_directory = self.origin_url.rstrip("/").replace(repos_root_url, "", 1)
+        self.repos_root_url = self.info(self.origin_url).repos_root_url
+        self.root_directory = self.origin_url.rstrip("/").replace(
+            self.repos_root_url, "", 1
+        )
 
     def __del__(self):
         # ensure temporary directory is removed when created by constructor

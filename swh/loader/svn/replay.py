@@ -528,7 +528,7 @@ class DirEditor:
                 )
                 temp_path = os.path.join(temp_dir, dest_path)
                 os.makedirs(b"/".join(temp_path.split(b"/")[:-1]), exist_ok=True)
-                if external_url not in self.editor.dead_externals:
+                if (external_url, revision) not in self.editor.dead_externals:
                     url = external_url.rstrip("/")
                     origin_url = self.svnrepo.origin_url.rstrip("/")
                     if (
@@ -547,7 +547,7 @@ class DirEditor:
             except SubversionException as se:
                 # external no longer available (404)
                 logger.debug(se)
-                self.editor.dead_externals.add(external_url)
+                self.editor.dead_externals.add((external_url, revision))
 
         else:
             temp_path = self.editor.externals_cache[external]
@@ -729,7 +729,7 @@ class Editor:
         self.dir_states: Dict[bytes, DirState] = defaultdict(DirState)
         self.external_paths: Dict[bytes, int] = defaultdict(int)
         self.valid_externals: Dict[bytes, Tuple[str, bool]] = {}
-        self.dead_externals: Set[str] = set()
+        self.dead_externals: Set[Tuple[str, Optional[int]]] = set()
         self.externals_cache_dir = tempfile.mkdtemp(dir=temp_dir)
         self.externals_cache: Dict[ExternalDefinition, bytes] = {}
         self.svnrepo = svnrepo

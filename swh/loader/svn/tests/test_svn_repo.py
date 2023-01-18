@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from datetime import datetime, timedelta, timezone
 import gc
 import os
 
@@ -12,9 +13,12 @@ from swh.loader.svn.svn_repo import SvnRepo
 
 from .utils import CommitChange, CommitChangeType, add_commit
 
+FIRST_COMMIT_DATE = datetime(year=2019, month=1, day=1, tzinfo=timezone.utc)
+NB_DAYS_BETWEEN_COMMITS = 2
 COMMITS = [
     {
         "message": f"Create trunk/{file} file",
+        "date": FIRST_COMMIT_DATE + i * timedelta(days=NB_DAYS_BETWEEN_COMMITS),
         "changes": [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
@@ -23,7 +27,7 @@ COMMITS = [
             ),
         ],
     }
-    for file in ("foo", "bar", "baz")
+    for i, file in enumerate(("foo", "bar", "baz"))
 ]
 
 
@@ -34,6 +38,7 @@ def repo_url(repo_url):
             repo_url,
             commit["message"],
             commit["changes"],
+            commit["date"],
         )
     return repo_url
 
@@ -61,6 +66,7 @@ def _assert_commit(i, commit):
     assert commit["message"] == COMMITS[i]["message"].encode()
     assert commit["has_changes"]
     assert commit["changed_paths"]
+    assert commit["author_date"].to_datetime() == COMMITS[i]["date"]
 
 
 def test_svn_repo_logs(svn_repo):
@@ -79,3 +85,28 @@ def test_svn_repo_info(svn_repo):
     assert info.url == svn_repo.origin_url
     assert info.repos_root_url == svn_repo.origin_url
     assert info.revision == len(COMMITS)
+
+
+def test_svn_repo_get_head_revision_at_date(svn_repo):
+    for i in range(len(COMMITS)):
+        assert svn_repo.get_head_revision_at_date(COMMITS[i]["date"]) == i + 1
+        if i == 0:
+            with pytest.raises(
+                ValueError, match="First revision date is greater than reference date"
+            ):
+                svn_repo.get_head_revision_at_date(
+                    COMMITS[i]["date"] - timedelta(days=NB_DAYS_BETWEEN_COMMITS - 1)
+                )
+        else:
+            assert (
+                svn_repo.get_head_revision_at_date(
+                    COMMITS[i]["date"] - timedelta(days=NB_DAYS_BETWEEN_COMMITS - 1)
+                )
+                == i
+            )
+            assert (
+                svn_repo.get_head_revision_at_date(
+                    COMMITS[i]["date"] + timedelta(days=NB_DAYS_BETWEEN_COMMITS - 1)
+                )
+                == i + 1
+            )

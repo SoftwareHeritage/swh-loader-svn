@@ -8,11 +8,14 @@ representations including the hash tree/content computations per svn
 commit.
 
 """
+
+import bisect
+from datetime import datetime
 import logging
 import os
 import shutil
 import tempfile
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 from urllib.parse import quote, urlparse, urlunparse
 
 from subvertpy import SubversionException, client, properties, wc
@@ -161,8 +164,8 @@ class SvnRepo:
         """Retrieve the initial revision from which the remote url appeared."""
         return 1
 
-    def __to_entry(self, log_entry: Tuple) -> Dict:
-        changed_paths, rev, revprops, has_children = log_entry
+    def _revision_data(self, log_entry: Tuple) -> Dict:
+        changed_paths, rev, revprops, _ = log_entry
 
         author_date = converters.svn_date_to_swh_date(
             revprops.get(properties.PROP_REVISION_DATE)
@@ -192,27 +195,29 @@ class SvnRepo:
             "changed_paths": changed_paths,
         }
 
-    def logs(self, revision_start: int, revision_end: int) -> Iterator[Dict]:
-        """Stream svn logs between revision_start and revision_end by chunks of
-        block_size logs.
+    def logs(
+        self,
+        revision_start: int,
+        revision_end: int,
+    ) -> Iterator[Dict]:
+        """Stream svn logs between revision_start and revision_end.
 
-        Yields revision and associated revision information between the
-        revision start and revision_end.
+        Yields revision information between revision_start and revision_end.
 
         Args:
             revision_start: the svn revision starting bound
             revision_end: the svn revision ending bound
 
         Yields:
-            tuple: tuple of revisions and logs:
+            dictionaries of revision data with the following keys:
 
-                - revisions: list of revisions in order
-                - logs: Dictionary with key revision number and value the log
-                  entry. The log entry is a dictionary with the following keys:
-
-                    - author_date: date of the commit
-                    - author_name: name of the author
-                    - message: commit message
+                - rev: revision number
+                - author_date: date of the commit
+                - author_name: name of the author of the commit
+                - message: commit message
+                - has_changes: whether the commit has changes
+                (can be False when loading subprojects)
+                - changed_paths: list of paths changed by the commit
 
         """
         for log_entry in self.remote_access().iter_log(
@@ -221,7 +226,7 @@ class SvnRepo:
             end=revision_end,
             discover_changed_paths=True,
         ):
-            yield self.__to_entry(log_entry)
+            yield self._revision_data(log_entry)
 
     @svn_retry()
     def commit_info(self, revision: int) -> Optional[Dict]:
@@ -592,3 +597,33 @@ class SvnRepo:
         if os.path.exists(dirname):
             logger.debug("cleanup %s", dirname)
             shutil.rmtree(dirname)
+
+    def get_head_revision_at_date(self, date: datetime) -> int:
+        """Get HEAD revision number for a given date.
+
+        Args:
+            date: the reference date
+
+        Returns:
+            the revision number of the HEAD revision at that date
+
+        Raises:
+            ValueError: first revision date is greater than given date
+        """
+
+        class RevisionList(Sequence[datetime]):
+            def __init__(self, svn_repo):
+                self.svn_repo = svn_repo
+                self.rev_ids = list(range(1, self.svn_repo.head_revision() + 1))
+
+            def __len__(self):
+                return len(self.rev_ids)
+
+            def __getitem__(self, i):
+                commit_info = self.svn_repo.commit_info(self.rev_ids[i])
+                return commit_info["author_date"].to_datetime()
+
+        if self.commit_info(1)["author_date"].to_datetime() > date:
+            raise ValueError("First revision date is greater than reference date")
+
+        return bisect.bisect_right(RevisionList(self), date)

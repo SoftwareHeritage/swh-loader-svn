@@ -371,9 +371,10 @@ def test_svn_commit_info_retry_success(
     mock_sleep = mocker.patch.object(svnrepo.commit_info.retry, "sleep")
 
     nb_failed_calls = 2
-    svnrepo.conn_log = SVNRemoteAccessWrapper(
-        svnrepo.conn_log, exception_to_retry, nb_failed_calls
+    remote_access = SVNRemoteAccessWrapper(
+        svnrepo.remote_access(), exception_to_retry, nb_failed_calls
     )
+    svnrepo.remote_access = lambda *args: remote_access
 
     commit = svnrepo.commit_info(revision=1)
     assert commit
@@ -392,9 +393,10 @@ def test_svn_commit_info_retry_failure(
     mock_sleep = mocker.patch.object(svnrepo.commit_info.retry, "sleep")
 
     nb_failed_calls = SVN_RETRY_MAX_ATTEMPTS
-    svnrepo.conn_log = SVNRemoteAccessWrapper(
-        svnrepo.conn_log, exception_to_retry, nb_failed_calls
+    remote_access = SVNRemoteAccessWrapper(
+        svnrepo.remote_access(), exception_to_retry, nb_failed_calls
     )
+    svnrepo.remote_access = lambda *args: remote_access
 
     with pytest.raises(type(exception_to_retry)):
         svnrepo.commit_info(sample_repo_url)

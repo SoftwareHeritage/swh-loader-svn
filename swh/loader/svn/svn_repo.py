@@ -103,18 +103,15 @@ class SvnRepo:
 
         self.remote_url = remote_url.rstrip("/")
 
-        auth = Auth(auth_providers)
+        self.auth = Auth(auth_providers)
         # one client for update operation
-        self.client = client.Client(auth=auth)
+        self.client = client.Client(auth=self.auth)
 
         if not self.remote_url.startswith("file://"):
             # use redirection URL if any for remote operations
             self.remote_url = self.info(self.remote_url).url
 
-        # one connection for log iteration
-        self.conn_log = self.remote_access(auth)
-        # another for replay
-        self.conn = self.remote_access(auth)
+        self.remote_access_url = self.remote_url
 
         if not self.from_dump:
             self.remote_url = self.info(self.remote_url).repos_root_url
@@ -122,9 +119,10 @@ class SvnRepo:
         local_name = os.path.basename(self.remote_url)
         self.local_url = os.path.join(self.local_dirname, local_name).encode("utf-8")
 
-        self.uuid = self.conn.get_uuid().encode("utf-8")
+        conn = self.remote_access()
+        self.uuid = conn.get_uuid().encode("utf-8")
         self.swhreplay = replay.Replay(
-            conn=self.conn,
+            conn=conn,
             rootpath=self.local_url,
             svnrepo=self,
             temp_dir=local_dirname,
@@ -157,7 +155,7 @@ class SvnRepo:
 
     def head_revision(self) -> int:
         """Retrieve current head revision."""
-        return self.conn.get_latest_revnum()
+        return self.remote_access().get_latest_revnum()
 
     def initial_revision(self) -> int:
         """Retrieve the initial revision from which the remote url appeared."""
@@ -217,7 +215,7 @@ class SvnRepo:
                     - message: commit message
 
         """
-        for log_entry in self.conn_log.iter_log(
+        for log_entry in self.remote_access().iter_log(
             paths=None,
             start=revision_start,
             end=revision_end,
@@ -239,10 +237,10 @@ class SvnRepo:
         return next(self.logs(revision, revision), None)
 
     @svn_retry()
-    def remote_access(self, auth: Auth) -> RemoteAccess:
+    def remote_access(self) -> RemoteAccess:
         """Simple wrapper around subvertpy.ra.RemoteAccess creation
         enabling to retry the operation if a network error occurs."""
-        return RemoteAccess(self.remote_url, auth=auth)
+        return RemoteAccess(self.remote_access_url, auth=self.auth)
 
     @svn_retry()
     def info(self, origin_url: Optional[str] = None):

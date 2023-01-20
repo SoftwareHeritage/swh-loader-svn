@@ -105,6 +105,7 @@ RETRYABLE_EXCEPTIONS = [
     SubversionException(
         "ra_serf: The server sent a truncated HTTP response body.", 120106
     ),
+    SubversionException("Unexpected HTTP status 504 'Gateway Time-out'", 175002),
     ConnectionResetError(),
     TimeoutError(),
 ]

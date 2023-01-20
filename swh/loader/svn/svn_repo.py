@@ -435,9 +435,25 @@ class SvnRepo:
             # the right export URL,recursive externals are also checked
 
             # get all svn:externals properties recursively
-            externals = self.propget(
-                "svn:externals", self.remote_url, revision, revision, True
-            )
+            if self.remote_url.startswith("file://"):
+                externals = self.propget(
+                    "svn:externals", self.remote_url, revision, revision, True
+                )
+            else:
+                # recursive propget operation is terribly slow over the network,
+                # better doing it from a freshly checked out working copy as it is faster
+                with tempfile.TemporaryDirectory(
+                    dir=self.local_dirname, prefix=f"checkout-revision-{revision}."
+                ) as co_dirname:
+
+                    self.checkout(
+                        self.remote_url, co_dirname, revision, ignore_externals=True
+                    )
+                    # get all svn:externals properties recursively
+                    externals = self.propget(
+                        "svn:externals", co_dirname, None, None, True
+                    )
+
             self.has_relative_externals = False
             self.has_recursive_externals = False
             for path, external_defs in externals.items():

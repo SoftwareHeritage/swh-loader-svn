@@ -378,6 +378,13 @@ class SvnRepo:
         See documentation of svn_client_propget5 function from subversion C API
         to get details about parameters.
         """
+        logger.debug(
+            "svn propget %s%s %s%s",
+            "--recursive " if recurse else "",
+            name,
+            quote_svn_url(target),
+            f"@{peg_rev}" if peg_rev else "",
+        )
         target_is_url = urlparse(target).scheme != ""
         if target_is_url:
             # subvertpy 0.11 has a buggy implementation of propget bindings when

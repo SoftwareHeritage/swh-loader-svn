@@ -223,6 +223,9 @@ Local repository not cleaned up for investigation: %s""",
 
     def check_history_not_altered(self, revision_start: int, swh_rev: Revision) -> bool:
         """Given a svn repository, check if the history was modified in between visits."""
+
+        self.log.debug("Checking if history of repository got altered since last visit")
+
         revision_id = swh_rev.id
         parents = swh_rev.parents
 

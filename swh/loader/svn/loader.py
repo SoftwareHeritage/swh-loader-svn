@@ -461,12 +461,14 @@ Local repository not cleaned up for investigation: %s""",
             raise
 
     def prepare(self):
-        if self.incremental:
-            latest_snapshot_revision = self._latest_snapshot_revision(self.origin.url)
-            if latest_snapshot_revision:
-                self.latest_snapshot, self.latest_revision = latest_snapshot_revision
-                self._snapshot = self.latest_snapshot
+        latest_snapshot_revision = self._latest_snapshot_revision(self.origin.url)
+        if latest_snapshot_revision:
+            self.latest_snapshot, self.latest_revision = latest_snapshot_revision
+            self._snapshot = self.latest_snapshot
+            if self.incremental:
                 self._last_revision = self.latest_revision
+            else:
+                self.latest_revision = None
 
         local_dirname = self._create_tmp_dir(self.temp_directory)
 
@@ -551,6 +553,12 @@ Local repository not cleaned up for investigation: %s""",
             )
             self.flush()
             self.loaded_snapshot_id = self.snapshot.id
+            if (
+                self.latest_snapshot
+                and self.latest_snapshot.id == self.loaded_snapshot_id
+            ):
+                # no new objects to archive found during the visit
+                self._load_status = "uneventful"
 
         # reset internal state for next iteration
         self._revisions = []

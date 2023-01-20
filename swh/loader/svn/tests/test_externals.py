@@ -21,7 +21,7 @@ def external_repo_url(tmpdir_factory):
 
 
 def test_loader_with_valid_svn_externals(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -92,7 +92,9 @@ def test_loader_with_valid_svn_externals(
     )
 
     # first load
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loader.storage,
@@ -116,7 +118,9 @@ def test_loader_with_valid_svn_externals(
     )
 
     # second load
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loader.storage,
@@ -127,7 +131,9 @@ def test_loader_with_valid_svn_externals(
     check_snapshot(loader.snapshot, loader.storage)
 
 
-def test_loader_with_invalid_svn_externals(swh_storage, repo_url, tmp_path, mocker):
+def test_loader_with_invalid_svn_externals(
+    svn_loader_cls, swh_storage, repo_url, tmp_path
+):
 
     # first commit
     add_commit(
@@ -170,7 +176,9 @@ def test_loader_with_invalid_svn_externals(swh_storage, repo_url, tmp_path, mock
         ],
     )
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loader.storage,
@@ -182,7 +190,7 @@ def test_loader_with_invalid_svn_externals(swh_storage, repo_url, tmp_path, mock
 
 
 def test_loader_with_valid_externals_modification(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -248,7 +256,9 @@ def test_loader_with_valid_externals_modification(
         ],
     )
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loader.storage,
@@ -260,7 +270,7 @@ def test_loader_with_valid_externals_modification(
 
 
 def test_loader_with_valid_externals_and_versioned_path(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -318,7 +328,9 @@ def test_loader_with_valid_externals_and_versioned_path(
         ],
     )
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loader.storage,
@@ -330,7 +342,7 @@ def test_loader_with_valid_externals_and_versioned_path(
 
 
 def test_loader_with_invalid_externals_and_versioned_path(
-    swh_storage, repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, tmp_path
 ):
 
     # first commit
@@ -363,7 +375,9 @@ def test_loader_with_invalid_externals_and_versioned_path(
         ],
     )
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loader.storage,
@@ -375,7 +389,7 @@ def test_loader_with_invalid_externals_and_versioned_path(
 
 
 def test_loader_set_externals_then_remove_and_add_as_local(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -423,7 +437,9 @@ def test_loader_set_externals_then_remove_and_add_as_local(
         ],
     )
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loader.storage,
@@ -434,7 +450,9 @@ def test_loader_set_externals_then_remove_and_add_as_local(
     check_snapshot(loader.snapshot, loader.storage)
 
 
-def test_loader_set_invalid_externals_then_remove(swh_storage, repo_url, tmp_path):
+def test_loader_set_invalid_externals_then_remove(
+    svn_loader_cls, swh_storage, repo_url, tmp_path
+):
 
     # first commit
     add_commit(
@@ -476,7 +494,7 @@ def test_loader_set_invalid_externals_then_remove(swh_storage, repo_url, tmp_pat
 
 
 def test_loader_set_externals_with_versioned_file_overlap(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -534,7 +552,9 @@ def test_loader_set_externals_with_versioned_file_overlap(
         ],
     )
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loader.storage,
@@ -625,7 +645,9 @@ def test_dump_loader_relative_externals_detection(
     assert not loader.svnrepo.has_relative_externals
 
 
-def test_loader_externals_cache(swh_storage, repo_url, external_repo_url, tmp_path):
+def test_loader_externals_cache(
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
+):
 
     # first commit on external
     add_commit(
@@ -680,7 +702,9 @@ def test_loader_externals_cache(swh_storage, repo_url, external_repo_url, tmp_pa
         ],
     )
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loader.storage,
@@ -699,7 +723,7 @@ def test_loader_externals_cache(swh_storage, repo_url, external_repo_url, tmp_pa
 
 
 def test_loader_remove_versioned_path_with_external_overlap(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -756,7 +780,7 @@ def test_loader_remove_versioned_path_with_external_overlap(
         ],
     )
 
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -773,7 +797,7 @@ def test_loader_remove_versioned_path_with_external_overlap(
 
 
 def test_loader_export_external_path_using_peg_rev(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -859,7 +883,7 @@ def test_loader_export_external_path_using_peg_rev(
         ],
     )
 
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -876,7 +900,7 @@ def test_loader_export_external_path_using_peg_rev(
 
 
 def test_loader_remove_external_overlapping_versioned_path(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -942,7 +966,7 @@ def test_loader_remove_external_overlapping_versioned_path(
         ],
     )
 
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -959,7 +983,7 @@ def test_loader_remove_external_overlapping_versioned_path(
 
 
 def test_loader_modify_external_same_path(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -1009,7 +1033,7 @@ def test_loader_modify_external_same_path(
         ],
     )
 
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -1026,7 +1050,7 @@ def test_loader_modify_external_same_path(
 
 
 def test_loader_with_recursive_external(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -1073,7 +1097,7 @@ def test_loader_with_recursive_external(
     )
 
     # first load
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -1090,7 +1114,7 @@ def test_loader_with_recursive_external(
     assert loader.svnrepo.has_recursive_externals
 
     # second load on stale repo
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -1122,7 +1146,7 @@ def test_loader_with_recursive_external(
     )
 
     # third load
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -1140,7 +1164,7 @@ def test_loader_with_recursive_external(
 
 
 def test_loader_externals_with_same_target(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -1185,7 +1209,7 @@ def test_loader_externals_with_same_target(
         ],
     )
 
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -1202,7 +1226,7 @@ def test_loader_externals_with_same_target(
 
 
 def test_loader_external_in_versioned_path(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -1244,7 +1268,7 @@ def test_loader_external_in_versioned_path(
         ],
     )
 
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -1331,7 +1355,7 @@ def test_dump_loader_externals_in_loaded_repository(swh_storage, tmp_path, mocke
 
 
 def test_loader_externals_add_remove_readd_on_subpath(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -1394,7 +1418,7 @@ def test_loader_externals_add_remove_readd_on_subpath(
         ],
     )
 
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -1411,7 +1435,7 @@ def test_loader_externals_add_remove_readd_on_subpath(
 
 
 def test_loader_directory_symlink_in_external(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -1463,7 +1487,7 @@ def test_loader_directory_symlink_in_external(
         ],
     )
 
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -1480,7 +1504,7 @@ def test_loader_directory_symlink_in_external(
 
 
 def test_loader_with_externals_parsing_error(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -1554,7 +1578,7 @@ def test_loader_with_externals_parsing_error(
         ],
     )
 
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -1572,7 +1596,12 @@ def test_loader_with_externals_parsing_error(
 
 @pytest.mark.parametrize("remote_external_path", ["src/main/project", "src/main"])
 def test_loader_overlapping_external_paths_removal(
-    swh_storage, repo_url, external_repo_url, tmp_path, remote_external_path
+    svn_loader_cls,
+    swh_storage,
+    repo_url,
+    external_repo_url,
+    tmp_path,
+    remote_external_path,
 ):
     add_commit(
         external_repo_url,
@@ -1629,7 +1658,7 @@ def test_loader_overlapping_external_paths_removal(
         ],
     )
 
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -1646,7 +1675,7 @@ def test_loader_overlapping_external_paths_removal(
 
 
 def test_loader_copyfrom_rev_with_externals(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     add_commit(
         external_repo_url,
@@ -1704,7 +1733,7 @@ def test_loader_copyfrom_rev_with_externals(
         ],
     )
 
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -1721,7 +1750,7 @@ def test_loader_copyfrom_rev_with_externals(
 
 
 def test_loader_with_unparsable_external_on_path(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     # first commit on external
     add_commit(
@@ -1799,7 +1828,7 @@ def test_loader_with_unparsable_external_on_path(
         ],
     )
 
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -1816,7 +1845,7 @@ def test_loader_with_unparsable_external_on_path(
 
 
 def test_loader_with_revision_dates_in_externals(
-    swh_storage, repo_url, external_repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):
     first_external_commit_date = datetime(
         year=2020, month=7, day=14, tzinfo=timezone.utc
@@ -1906,7 +1935,7 @@ def test_loader_with_revision_dates_in_externals(
         ],
     )
 
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,

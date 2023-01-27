@@ -688,7 +688,7 @@ class DirEditor:
                 # delete external sub-directory only if it is not versioned
                 subpath = b"/".join(subpath_split[0:i])
                 try:
-                    self.svnrepo.client.info(
+                    self.svnrepo.info(
                         svn_urljoin(self.svnrepo.remote_url, os.fsdecode(subpath)),
                         peg_revision=self.editor.revnum,
                         revision=self.editor.revnum,
@@ -702,11 +702,12 @@ class DirEditor:
             # externals can overlap with versioned files so we must restore
             # them after removing the path above
             dest_path = os.path.join(self.rootpath, fullpath)
-            self.svnrepo.client.export(
+            self.svnrepo.export(
                 svn_urljoin(self.svnrepo.remote_url, os.fsdecode(fullpath)),
                 to=dest_path,
                 peg_rev=self.editor.revnum,
                 ignore_keywords=True,
+                remove_dest_path=False,
             )
             if os.path.isfile(dest_path) or os.path.islink(dest_path):
                 self.directory[fullpath] = from_disk.Content.from_file(path=dest_path)

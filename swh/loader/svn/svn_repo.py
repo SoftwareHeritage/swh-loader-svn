@@ -250,7 +250,12 @@ class SvnRepo:
         return RemoteAccess(self.remote_access_url, auth=self.auth)
 
     @svn_retry()
-    def info(self, origin_url: Optional[str] = None):
+    def info(
+        self,
+        origin_url: Optional[str] = None,
+        peg_revision: Optional[int] = None,
+        revision: Optional[int] = None,
+    ):
         """Simple wrapper around subvertpy.client.Client.info enabling to retry
         the command if a network error occurs.
 
@@ -259,7 +264,9 @@ class SvnRepo:
                 currently set origin URL will be used otherwise
         """
         info = self.client.info(
-            quote_svn_url(origin_url or self.origin_url).rstrip("/")
+            quote_svn_url(origin_url or self.origin_url).rstrip("/"),
+            peg_revision=peg_revision,
+            revision=revision,
         )
         return next(iter(info.values()))
 
@@ -274,6 +281,7 @@ class SvnRepo:
         ignore_externals: bool = False,
         overwrite: bool = False,
         ignore_keywords: bool = False,
+        remove_dest_path: bool = True,
     ) -> int:
         """Simple wrapper around subvertpy.client.Client.export enabling to retry
         the command if a network error occurs.
@@ -281,11 +289,12 @@ class SvnRepo:
         See documentation of svn_client_export5 function from subversion C API
         to get details about parameters.
         """
-        # remove export path as command can be retried
-        if os.path.isfile(to) or os.path.islink(to):
-            os.remove(to)
-        elif os.path.isdir(to):
-            shutil.rmtree(to)
+        if remove_dest_path:
+            # remove export path as command can be retried
+            if os.path.isfile(to) or os.path.islink(to):
+                os.remove(to)
+            elif os.path.isdir(to):
+                shutil.rmtree(to)
         options = []
         if rev is not None:
             options.append(f"-r {rev}")

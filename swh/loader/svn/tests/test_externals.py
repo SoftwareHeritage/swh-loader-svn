@@ -693,6 +693,7 @@ def test_loader_externals_cache(swh_storage, repo_url, external_repo_url, tmp_pa
     assert (
         external_url,
         None,
+        None,
         False,
     ) in loader.svnrepo.swhreplay.editor.externals_cache
 
@@ -1901,6 +1902,100 @@ def test_loader_with_revision_dates_in_externals(
                         f"@{{{iso_date(second_external_commit_date)}}} bar\n"
                     )
                 },
+            ),
+        ],
+    )
+
+    loader = SvnLoader(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_with_missing_peg_rev_in_external(
+    swh_storage, repo_url, external_repo_url, tmp_path
+):
+
+    add_commit(
+        external_repo_url,
+        "Add foo/bar path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="foo/bar",
+                data=b"bar",
+            )
+        ],
+    )
+    add_commit(
+        external_repo_url,
+        "Rename foo directory to baz",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="baz/bar",
+                data=b"bar",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.Delete,
+                path="foo/",
+            ),
+        ],
+    )
+    add_commit(
+        external_repo_url,
+        "Add foo/bar path again but with different content",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="foo/bar",
+                data=b"baz",
+            )
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Add invalid external as peg revision is required to export it",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="externals/",
+                properties={"svn:externals": f"-r1 {external_repo_url}/foo/ foo"},
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Fix invalid external by adding peg revision in its definition",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="externals/",
+                properties={"svn:externals": f"-r1 {external_repo_url}/foo/@1 foo"},
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Bump revisions in external definition",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="externals/",
+                properties={"svn:externals": f"-r3 {external_repo_url}/foo/@3 foo"},
             ),
         ],
     )

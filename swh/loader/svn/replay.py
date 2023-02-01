@@ -134,7 +134,7 @@ class FileEditor:
         self.directory[self.path] = from_disk.Content.from_file(path=self.fullpath)
 
 
-ExternalDefinition = Tuple[str, Optional[int], bool]
+ExternalDefinition = Tuple[str, Optional[int], Optional[int], bool]
 
 
 @dataclass
@@ -349,12 +349,13 @@ class DirEditor:
                             path,
                             external_url,
                             revision,
+                            peg_revision,
                             relative_url,
                         ) = parse_external_definition(
                             external, os.fsdecode(self.path), self.svnrepo.origin_url
                         )
                         self.externals[path].append(
-                            (external_url, revision, relative_url)
+                            (external_url, revision, peg_revision, relative_url)
                         )
                 except ValueError:
                     logger.debug(
@@ -424,17 +425,17 @@ class DirEditor:
             # associated paths
             externals = self.externals
             prev_externals_set = {
-                (path, url, rev)
+                (path, url, rev, peg_rev)
                 for path in prev_externals.keys()
-                for (url, rev, _) in prev_externals[path]
+                for (url, rev, peg_rev, _) in prev_externals[path]
             }
             externals_set = {
-                (path, url, rev)
+                (path, url, rev, peg_rev)
                 for path in externals.keys()
-                for (url, rev, _) in externals[path]
+                for (url, rev, peg_rev, _) in externals[path]
             }
             old_externals = prev_externals_set - externals_set
-            for path, _, _ in old_externals:
+            for path, _, _, _ in old_externals:
                 self.remove_external_path(os.fsencode(path))
         else:
             # some external paths might have been removed in the current replayed
@@ -445,11 +446,12 @@ class DirEditor:
         # For each external, try to export it in reconstructed filesystem
         for path, externals_def in externals.items():
             for i, external in enumerate(externals_def):
-                external_url, revision, relative_url = external
+                external_url, revision, peg_revision, relative_url = external
                 self.process_external(
                     path,
                     external_url,
                     revision,
+                    peg_revision,
                     relative_url,
                     remove_target_path=i == 0,
                 )
@@ -474,7 +476,7 @@ class DirEditor:
                 )
                 for path, dir_state in self.dir_states.items()
                 for external_path in dir_state.externals.keys()
-                for (external_url, _, _) in dir_state.externals[external_path]
+                for (external_url, _, _, _) in dir_state.externals[external_path]
             )
             if self.svnrepo.has_recursive_externals:
                 # If the repository has recursive externals, we stop processing
@@ -489,10 +491,11 @@ class DirEditor:
         path: str,
         external_url: str,
         revision: Optional[int],
+        peg_revision: Optional[int],
         relative_url: bool,
         remove_target_path: bool = True,
     ) -> None:
-        external = (external_url, revision, relative_url)
+        external = (external_url, revision, peg_revision, relative_url)
         dest_path = os.fsencode(path)
         dest_fullpath = os.path.join(self.path, dest_path)
         prev_externals = self.dir_states[self.path].externals
@@ -511,9 +514,10 @@ class DirEditor:
             return
 
         logger.debug(
-            "Exporting external %s%s to path %s",
+            "Exporting external %s%s%s to path %s",
             external_url,
-            f"@{revision}" if revision else "",
+            f" at revision {revision}" if revision else "",
+            f" and peg revision {peg_revision}" if peg_revision else "",
             dest_fullpath,
         )
 
@@ -528,7 +532,11 @@ class DirEditor:
                 )
                 temp_path = os.path.join(temp_dir, dest_path)
                 os.makedirs(b"/".join(temp_path.split(b"/")[:-1]), exist_ok=True)
-                if (external_url, revision) not in self.editor.dead_externals:
+                if (
+                    external_url,
+                    revision,
+                    peg_revision,
+                ) not in self.editor.dead_externals:
                     url = external_url.rstrip("/")
                     origin_url = self.svnrepo.origin_url.rstrip("/")
                     if (
@@ -539,7 +547,8 @@ class DirEditor:
                     self.svnrepo.export(
                         url,
                         to=temp_path,
-                        peg_rev=revision,
+                        rev=revision,
+                        peg_rev=peg_revision,
                         ignore_keywords=True,
                     )
                     self.editor.externals_cache[external] = temp_path
@@ -547,7 +556,7 @@ class DirEditor:
             except SubversionException as se:
                 # external no longer available (404)
                 logger.debug(se)
-                self.editor.dead_externals.add((external_url, revision))
+                self.editor.dead_externals.add((external_url, revision, peg_revision))
 
         else:
             temp_path = self.editor.externals_cache[external]
@@ -729,7 +738,7 @@ class Editor:
         self.dir_states: Dict[bytes, DirState] = defaultdict(DirState)
         self.external_paths: Dict[bytes, int] = defaultdict(int)
         self.valid_externals: Dict[bytes, Tuple[str, bool]] = {}
-        self.dead_externals: Set[Tuple[str, Optional[int]]] = set()
+        self.dead_externals: Set[Tuple[str, Optional[int], Optional[int]]] = set()
         self.externals_cache_dir = tempfile.mkdtemp(dir=temp_dir)
         self.externals_cache: Dict[ExternalDefinition, bytes] = {}
         self.svnrepo = svnrepo

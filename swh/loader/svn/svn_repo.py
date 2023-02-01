@@ -445,6 +445,7 @@ class SvnRepo:
                         external_path,
                         external_url,
                         _,
+                        _,
                         relative_url,
                     ) = parse_external_definition(
                         external_def.rstrip("\r"), path, self.origin_url

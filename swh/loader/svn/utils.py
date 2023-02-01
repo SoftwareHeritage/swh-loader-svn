@@ -217,7 +217,7 @@ def svn_urljoin(base_url: str, *args) -> str:
 
 def parse_external_definition(
     external: str, dir_path: str, repo_url: str
-) -> Tuple[str, str, Optional[int], bool]:
+) -> Tuple[str, str, Optional[int], Optional[int], bool]:
     """Parse a subversion external definition.
 
     Args:
@@ -233,6 +233,7 @@ def parse_external_definition(
             - path relative to dir_path where the external should be exported
             - URL of the external to export
             - optional revision of the external to export
+            - optional peg revision of the external to export
             - boolean indicating if the external URL is relative to the repository
               URL and targets a path not in the repository
 
@@ -240,6 +241,7 @@ def parse_external_definition(
     path = ""
     external_url = ""
     revision = None
+    peg_revision = None
     relative_url = False
     prev_part = None
     # turn multiple spaces into a single one and split on space
@@ -308,9 +310,7 @@ def parse_external_definition(
         url, revision_s = external_url.rsplit("@", maxsplit=1)
         try:
             # ensure revision_s can be parsed to int
-            rev = int(revision_s)
-            # -r XXX takes priority over <svn_url>@XXX
-            revision = revision or rev
+            peg_revision = int(revision_s)
             external_url = url
         except ValueError:
             if urlparse(external_url).username is None:
@@ -322,7 +322,7 @@ def parse_external_definition(
                 try:
                     date = iso8601.parse_date(revision_s[1:-1])
                     repo_root_url = get_repo_root_url(external_url)
-                    revision = get_head_revision_at_date(repo_root_url, date)
+                    peg_revision = get_head_revision_at_date(repo_root_url, date)
                 except Exception as e:
                     # typically when repository no longer exists or temporary network failures,
                     # for the latter case if the loader did not export the external at the right
@@ -333,7 +333,7 @@ def parse_external_definition(
     if not external_url or not path:
         raise ValueError(f"Failed to parse external definition '{external}'")
 
-    return path.rstrip("/"), external_url, revision, relative_url
+    return path.rstrip("/"), external_url, revision, peg_revision, relative_url
 
 
 def is_recursive_external(

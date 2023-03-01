@@ -116,7 +116,13 @@ def init_svn_repo_from_dump(
             # load dump and bypass properties validation as Unicode decoding errors
             # are already handled in loader implementation (see _ra_codecs_error_handler
             # in ra.py)
-            cmd = ["svnadmin", "load", "-q", "--bypass-prop-validation"]
+            cmd = [
+                "svnadmin",
+                "load",
+                "-q",
+                "--bypass-prop-validation",
+                "--no-flush-to-disk",  # loading is significantly faster with this option
+            ]
             if max_rev > 0:
                 cmd.append(f"-r1:{max_rev}")
             cmd.append(repo_path)

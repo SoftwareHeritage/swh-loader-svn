@@ -856,6 +856,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             self.temp_dir,
             self.max_content_size,
             debug=self.debug,
+            from_dump=True,
         )
 
         # Ensure to use remote URL retrieved by SvnRepo as origin URL might redirect

@@ -1931,7 +1931,9 @@ def test_loader_svn_add_property_on_directory_link(
 @pytest.mark.parametrize(
     "svn_loader_cls", [SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump]
 )
-def test_loader_with_subprojects(swh_storage, repo_url, tmp_path, svn_loader_cls):
+def test_loader_with_subprojects(
+    swh_storage, repo_url, tmp_path, svn_loader_cls, mocker
+):
 
     # first commit
     add_commit(
@@ -1991,6 +1993,9 @@ def test_loader_with_subprojects(swh_storage, repo_url, tmp_path, svn_loader_cls
 
         loader = svn_loader_cls(**loader_params)
 
+        if svn_loader_cls == SvnLoaderFromRemoteDump:
+            dump_revisions = mocker.spy(loader, "dump_svn_revisions")
+
         assert loader.load() == {"status": "eventful"}
         assert_last_visit_matches(
             loader.storage,
@@ -1999,6 +2004,9 @@ def test_loader_with_subprojects(swh_storage, repo_url, tmp_path, svn_loader_cls
             type="svn",
         )
         check_snapshot(loader.snapshot, loader.storage)
+
+        if svn_loader_cls == SvnLoaderFromRemoteDump:
+            dump_revisions.assert_called_once_with(origin_url.rstrip("/"), -1)
 
         if svn_loader_cls == SvnLoaderFromDumpArchive:
             loader_params["archive_path"] = _dump_project(tmp_path, origin_url)

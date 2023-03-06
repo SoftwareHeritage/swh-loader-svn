@@ -1,12 +1,13 @@
-# Copyright (C) 2022  The Software Heritage developers
+# Copyright (C) 2022-2023  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from datetime import datetime
 from enum import Enum
 from io import BytesIO
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from subvertpy import SubversionException, delta, repos
 from subvertpy.ra import Auth, RemoteAccess, get_username_provider
@@ -27,7 +28,12 @@ class CommitChange(TypedDict, total=False):
     copyfrom_rev: int
 
 
-def add_commit(repo_url: str, message: str, changes: List[CommitChange]) -> None:
+def add_commit(
+    repo_url: str,
+    message: str,
+    changes: List[CommitChange],
+    date: Optional[datetime] = None,
+) -> None:
     conn = RemoteAccess(repo_url, auth=Auth([get_username_provider()]))
     editor = conn.get_commit_editor({"svn:log": message})
     root = editor.open_root()
@@ -71,8 +77,24 @@ def add_commit(repo_url: str, message: str, changes: List[CommitChange]) -> None
     root.close()
     editor.close()
 
+    if date is not None:
+        conn.change_rev_prop(
+            conn.get_latest_revnum(),
+            "svn:date",
+            date.strftime("%Y-%m-%dT%H:%M:%S.%fZ").encode(),
+        )
+
 
 def create_repo(tmp_path, repo_name="tmprepo"):
     repo_path = os.path.join(tmp_path, repo_name)
     repos.create(repo_path)
+    # add passthrough hooks to allow modifying revision properties like svn:date
+    hooks_path = f"{repo_path}/hooks"
+    for hook_file in (
+        f"{hooks_path}/pre-revprop-change",
+        f"{hooks_path}/post-revprop-change",
+    ):
+        with open(hook_file, "wb") as hook:
+            hook.write(b"#!/bin/sh\n\nexit 0")
+        os.chmod(hook_file, 0o775)
     return f"file://{repo_path}"

@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2022  The Software Heritage developers
+# Copyright (C) 2016-2023  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -19,7 +19,7 @@ from swh.loader.svn.loader import (
     SvnLoaderFromDumpArchive,
     SvnLoaderFromRemoteDump,
 )
-from swh.loader.svn.svn import SvnRepo
+from swh.loader.svn.svn_repo import SvnRepo
 from swh.loader.svn.utils import init_svn_repo_from_dump
 from swh.loader.tests import (
     assert_last_visit_matches,
@@ -54,10 +54,10 @@ GOURMET_UPDATES_SNAPSHOT = Snapshot(
 )
 
 
-def test_loader_svn_not_found_no_mock(swh_storage, tmp_path):
+def test_loader_svn_not_found_no_mock(svn_loader_cls, swh_storage, tmp_path):
     """Given an unknown repository, the loader visit ends up in status not_found"""
     repo_url = "unknown-repository"
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "uneventful"}
 
@@ -76,13 +76,15 @@ def test_loader_svn_not_found_no_mock(swh_storage, tmp_path):
         "Unknown URL type",
     ],
 )
-def test_loader_svn_not_found(swh_storage, tmp_path, exception_msg, mocker):
+def test_loader_svn_not_found(
+    svn_loader_cls, swh_storage, tmp_path, exception_msg, mocker
+):
     """Given unknown repository issues, the loader visit ends up in status not_found"""
     mock = mocker.patch("swh.loader.svn.loader.SvnRepo")
     mock.side_effect = SubversionException(exception_msg, 0)
 
     unknown_repo_url = "unknown-repository"
-    loader = SvnLoader(swh_storage, unknown_repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, unknown_repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "uneventful"}
 
@@ -102,13 +104,13 @@ def test_loader_svn_not_found(swh_storage, tmp_path, exception_msg, mocker):
         ValueError("considered a failure"),
     ],
 )
-def test_loader_svn_failures(swh_storage, tmp_path, exception, mocker):
+def test_loader_svn_failures(svn_loader_cls, swh_storage, tmp_path, exception, mocker):
     """Given any errors raised, the loader visit ends up in status failed"""
     mock = mocker.patch("swh.loader.svn.loader.SvnRepo")
     mock.side_effect = exception
 
     existing_repo_url = "existing-repo-url"
-    loader = SvnLoader(swh_storage, existing_repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, existing_repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "failed"}
 
@@ -188,13 +190,13 @@ def test_loader_svnrdump_no_such_revision(swh_storage, tmp_path, datadir):
     assert actual_visit2.snapshot == actual_visit.snapshot
 
 
-def test_loader_svn_new_visit(swh_storage, datadir, tmp_path):
+def test_loader_svn_new_visit(svn_loader_cls, swh_storage, datadir, tmp_path):
     """Eventful visit should yield 1 snapshot"""
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
 
@@ -222,13 +224,13 @@ def test_loader_svn_new_visit(swh_storage, datadir, tmp_path):
     check_snapshot(GOURMET_SNAPSHOT, loader.storage)
 
 
-def test_loader_svn_2_visits_no_change(swh_storage, datadir, tmp_path):
+def test_loader_svn_2_visits_no_change(svn_loader_cls, swh_storage, datadir, tmp_path):
     """Visit multiple times a repository with no change should yield the same snapshot"""
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     visit_status1 = assert_last_visit_matches(
@@ -239,6 +241,8 @@ def test_loader_svn_2_visits_no_change(swh_storage, datadir, tmp_path):
         snapshot=GOURMET_SNAPSHOT.id,
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "uneventful"}
     visit_status2 = assert_last_visit_matches(
@@ -262,7 +266,7 @@ def test_loader_svn_2_visits_no_change(swh_storage, datadir, tmp_path):
     )[0]
     assert start_revision is not None
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
     assert loader.load() == {"status": "uneventful"}
 
     stats = get_stats(loader.storage)
@@ -279,7 +283,7 @@ def test_loader_svn_2_visits_no_change(swh_storage, datadir, tmp_path):
     )
 
 
-def test_loader_tampered_repository(swh_storage, datadir, tmp_path):
+def test_loader_tampered_repository(svn_loader_cls, swh_storage, datadir, tmp_path):
     """In this scenario, the dump has been tampered with to modify the
     commit log [1].  This results in a hash divergence which is
     detected at startup after a new run for the same origin.
@@ -300,7 +304,7 @@ def test_loader_tampered_repository(swh_storage, datadir, tmp_path):
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
     assert loader.load() == {"status": "eventful"}
     check_snapshot(GOURMET_SNAPSHOT, loader.storage)
 
@@ -318,7 +322,7 @@ def test_loader_tampered_repository(swh_storage, datadir, tmp_path):
         archive_path2, archive_name, tmp_path
     )
 
-    loader2 = SvnLoader(
+    loader2 = svn_loader_cls(
         swh_storage, repo_tampered_url, origin_url=repo_url, temp_directory=tmp_path
     )
     assert loader2.load() == {"status": "eventful"}
@@ -338,7 +342,7 @@ def test_loader_tampered_repository(swh_storage, datadir, tmp_path):
     assert stats["snapshot"] == 2
 
 
-def test_loader_svn_visit_with_changes(swh_storage, datadir, tmp_path):
+def test_loader_svn_visit_with_changes(svn_loader_cls, swh_storage, datadir, tmp_path):
     """In this scenario, the repository has been updated with new changes.
     The loading visit should result in new objects stored and 1 new
     snapshot.
@@ -351,7 +355,7 @@ def test_loader_svn_visit_with_changes(swh_storage, datadir, tmp_path):
     )
 
     # repo_initial_url becomes the origin_url we want to visit some more below
-    loader = SvnLoader(swh_storage, repo_initial_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_initial_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     visit_status1 = assert_last_visit_matches(
@@ -368,7 +372,7 @@ def test_loader_svn_visit_with_changes(swh_storage, datadir, tmp_path):
         archive_path, "pkg-gourmet", tmp_path
     )
 
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_updated_url,
         origin_url=repo_initial_url,
@@ -402,14 +406,14 @@ def test_loader_svn_visit_with_changes(swh_storage, datadir, tmp_path):
     check_snapshot(GOURMET_UPDATES_SNAPSHOT, loader.storage)
 
     # Let's start the ingestion from the start, this should yield the same result
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_updated_url,
         origin_url=repo_initial_url,
         incremental=False,
         temp_directory=tmp_path,
     )
-    assert loader.load() == {"status": "eventful"}
+    assert loader.load() == {"status": "uneventful"}
     visit_status3 = assert_last_visit_matches(
         loader.storage,
         repo_updated_url,
@@ -427,7 +431,9 @@ def test_loader_svn_visit_with_changes(swh_storage, datadir, tmp_path):
     assert stats["snapshot"] == 2  # no new snapshot
 
 
-def test_loader_svn_visit_start_from_revision(swh_storage, datadir, tmp_path):
+def test_loader_svn_visit_start_from_revision(
+    svn_loader_cls, swh_storage, datadir, tmp_path
+):
     """Starting from existing revision, next visit on changed repo should yield 1 new
     snapshot.
 
@@ -439,7 +445,7 @@ def test_loader_svn_visit_start_from_revision(swh_storage, datadir, tmp_path):
     )
 
     # repo_initial_url becomes the origin_url we want to visit some more below
-    loader = SvnLoader(swh_storage, repo_initial_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_initial_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     visit_status1 = assert_last_visit_matches(
@@ -462,7 +468,7 @@ def test_loader_svn_visit_start_from_revision(swh_storage, datadir, tmp_path):
     )
 
     # we'll start from start_revision
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_updated_url,
         origin_url=repo_initial_url,
@@ -498,7 +504,9 @@ def test_loader_svn_visit_start_from_revision(swh_storage, datadir, tmp_path):
     check_snapshot(GOURMET_UPDATES_SNAPSHOT, loader.storage)
 
 
-def test_loader_svn_visit_with_eol_style(swh_storage, datadir, tmp_path):
+def test_loader_svn_visit_with_eol_style(
+    svn_loader_cls, swh_storage, datadir, tmp_path
+):
     """Check that a svn repo containing a versioned file with CRLF line
     endings with svn:eol-style property set to 'native' (this is a
     violation of svn specification as the file should have been
@@ -509,7 +517,7 @@ def test_loader_svn_visit_with_eol_style(swh_storage, datadir, tmp_path):
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     mediawiki_snapshot = Snapshot(
@@ -537,7 +545,9 @@ def test_loader_svn_visit_with_eol_style(swh_storage, datadir, tmp_path):
     assert stats["snapshot"] == 1
 
 
-def test_loader_svn_visit_with_mixed_crlf_lf(swh_storage, datadir, tmp_path):
+def test_loader_svn_visit_with_mixed_crlf_lf(
+    svn_loader_cls, swh_storage, datadir, tmp_path
+):
     """Check that a svn repo containing a versioned file with mixed
     CRLF/LF line endings with svn:eol-style property set to 'native'
     (this is a violation of svn specification as mixed line endings
@@ -549,7 +559,7 @@ def test_loader_svn_visit_with_mixed_crlf_lf(swh_storage, datadir, tmp_path):
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     pyang_snapshot = Snapshot(
@@ -577,7 +587,7 @@ def test_loader_svn_visit_with_mixed_crlf_lf(swh_storage, datadir, tmp_path):
     assert stats["snapshot"] == 1
 
 
-def test_loader_svn_with_symlink(swh_storage, datadir, tmp_path):
+def test_loader_svn_with_symlink(svn_loader_cls, swh_storage, datadir, tmp_path):
     """Repository with symlinks should be ingested ok
 
     Edge case:
@@ -592,7 +602,7 @@ def test_loader_svn_with_symlink(swh_storage, datadir, tmp_path):
     )
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     gourmet_edge_cases_snapshot = Snapshot(
@@ -621,7 +631,7 @@ def test_loader_svn_with_symlink(swh_storage, datadir, tmp_path):
     assert stats["revision"] == 19
 
 
-def test_loader_svn_with_wrong_symlinks(swh_storage, datadir, tmp_path):
+def test_loader_svn_with_wrong_symlinks(svn_loader_cls, swh_storage, datadir, tmp_path):
     """Repository with wrong symlinks should be ingested ok nonetheless
 
     Edge case:
@@ -633,7 +643,7 @@ def test_loader_svn_with_wrong_symlinks(swh_storage, datadir, tmp_path):
     archive_path = os.path.join(datadir, "pkg-gourmet-with-wrong-link-cases.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     gourmet_wrong_links_snapshot = Snapshot(
@@ -662,7 +672,7 @@ def test_loader_svn_with_wrong_symlinks(swh_storage, datadir, tmp_path):
     assert stats["revision"] == 21
 
 
-def test_loader_svn_cleanup_loader(swh_storage, datadir, tmp_path):
+def test_loader_svn_cleanup_loader(svn_loader_cls, swh_storage, datadir, tmp_path):
     """Loader should clean up its working directory after the load"""
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
@@ -670,7 +680,9 @@ def test_loader_svn_cleanup_loader(swh_storage, datadir, tmp_path):
 
     loading_temp_directory = str(tmp_path / "loading")
     os.mkdir(loading_temp_directory)
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=loading_temp_directory)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=loading_temp_directory
+    )
     assert loader.load() == {"status": "eventful"}
 
     # the root temporary directory still exists
@@ -878,7 +890,9 @@ def test_svn_loader_from_remote_dump_incremental_load_on_non_stale_repo(
     process_svn_revisions.assert_called()
 
 
-def test_loader_user_defined_svn_properties(swh_storage, datadir, tmp_path):
+def test_loader_user_defined_svn_properties(
+    svn_loader_cls, swh_storage, datadir, tmp_path
+):
     """Edge cases: The repository held some user defined svn-properties with special
     encodings, this prevented the repository from being loaded even though we do not
     ingest those information.
@@ -888,7 +902,7 @@ def test_loader_user_defined_svn_properties(swh_storage, datadir, tmp_path):
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url)
+    loader = svn_loader_cls(swh_storage, repo_url)
 
     assert loader.load() == {"status": "eventful"}
     expected_snapshot = Snapshot(
@@ -917,13 +931,15 @@ def test_loader_user_defined_svn_properties(swh_storage, datadir, tmp_path):
     assert stats["revision"] == 7
 
 
-def test_loader_svn_dir_added_then_removed(swh_storage, datadir, tmp_path):
+def test_loader_svn_dir_added_then_removed(
+    svn_loader_cls, swh_storage, datadir, tmp_path
+):
     """Loader should handle directory removal when processing a commit"""
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}-add-remove-dir.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
@@ -979,7 +995,7 @@ def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
 
 
 def test_loader_eol_style_file_property_handling_edge_case(
-    swh_storage, repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, tmp_path
 ):
 
     # # first commit
@@ -1032,7 +1048,9 @@ def test_loader_eol_style_file_property_handling_edge_case(
     # instantiate a svn loader checking after each processed revision that
     # the repository filesystem it reconstructed does not differ from a subversion
     # export of that revision
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
@@ -1067,7 +1085,9 @@ def get_head_revision_paths_info(loader: SvnLoader) -> Dict[bytes, Dict[str, Any
     return paths
 
 
-def test_loader_eol_style_on_svn_link_handling(swh_storage, repo_url, tmp_path):
+def test_loader_eol_style_on_svn_link_handling(
+    svn_loader_cls, swh_storage, repo_url, tmp_path
+):
 
     # first commit
     add_commit(
@@ -1096,7 +1116,9 @@ def test_loader_eol_style_on_svn_link_handling(swh_storage, repo_url, tmp_path):
     # instantiate a svn loader checking after each processed revision that
     # the repository filesystem it reconstructed does not differ from a subversion
     # export of that revision
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
@@ -1135,7 +1157,9 @@ def test_loader_eol_style_on_svn_link_handling(swh_storage, repo_url, tmp_path):
     )
 
 
-def test_loader_svn_special_property_unset(swh_storage, repo_url, tmp_path):
+def test_loader_svn_special_property_unset(
+    svn_loader_cls, swh_storage, repo_url, tmp_path
+):
 
     # first commit
     add_commit(
@@ -1186,7 +1210,9 @@ def test_loader_svn_special_property_unset(swh_storage, repo_url, tmp_path):
     # instantiate a svn loader checking after each processed revision that
     # the repository filesystem it reconstructed does not differ from a subversion
     # export of that revision
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
@@ -1224,7 +1250,9 @@ def test_loader_svn_special_property_unset(swh_storage, repo_url, tmp_path):
     )
 
 
-def test_loader_invalid_svn_eol_style_property_value(swh_storage, repo_url, tmp_path):
+def test_loader_invalid_svn_eol_style_property_value(
+    svn_loader_cls, swh_storage, repo_url, tmp_path
+):
 
     filename = "file_with_crlf_eol.txt"
     file_content = b"Hello world!\r\n"
@@ -1249,7 +1277,9 @@ def test_loader_invalid_svn_eol_style_property_value(swh_storage, repo_url, tmp_
     # instantiate a svn loader checking after each processed revision that
     # the repository filesystem it reconstructed does not differ from a subversion
     # export of that revision
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
@@ -1269,7 +1299,7 @@ def test_loader_invalid_svn_eol_style_property_value(swh_storage, repo_url, tmp_
 
 
 def test_loader_first_revision_is_not_number_one(
-    swh_storage, mocker, repo_url, tmp_path
+    svn_loader_cls, swh_storage, mocker, repo_url, tmp_path
 ):
     class SvnRepoSkipFirstRevision(SvnRepo):
         def logs(self, revision_start, revision_end):
@@ -1293,7 +1323,7 @@ def test_loader_first_revision_is_not_number_one(
             ],
         )
 
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
 
     # post loading will detect an issue and make a partial visit with a snapshot
     assert loader.load() == {"status": "failed"}
@@ -1318,7 +1348,9 @@ def test_loader_first_revision_is_not_number_one(
     }
 
 
-def test_loader_svn_special_property_on_binary_file(swh_storage, repo_url, tmp_path):
+def test_loader_svn_special_property_on_binary_file(
+    svn_loader_cls, swh_storage, repo_url, tmp_path
+):
     """When a file has the svn:special property set but is not a svn link,
     it might be truncated under certain conditions when performing an export
     operation."""
@@ -1386,7 +1418,9 @@ def test_loader_svn_special_property_on_binary_file(swh_storage, repo_url, tmp_p
     # instantiate a svn loader checking after each processed revision that
     # the repository filesystem it reconstructed does not differ from a subversion
     # export of that revision
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
@@ -1398,12 +1432,14 @@ def test_loader_svn_special_property_on_binary_file(swh_storage, repo_url, tmp_p
     check_snapshot(loader.snapshot, loader.storage)
 
 
-def test_loader_last_revision_divergence(swh_storage, datadir, tmp_path):
+def test_loader_last_revision_divergence(
+    svn_loader_cls, swh_storage, datadir, tmp_path
+):
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    class SvnLoaderRevisionDivergence(SvnLoader):
+    class SvnLoaderRevisionDivergence(svn_loader_cls):
         def _check_revision_divergence(self, count, rev, dir_id):
             raise ValueError("revision divergence detected")
 
@@ -1422,7 +1458,7 @@ def test_loader_last_revision_divergence(swh_storage, datadir, tmp_path):
 
 
 def test_loader_delete_directory_while_file_has_same_prefix(
-    swh_storage, repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, tmp_path
 ):
 
     # first commit
@@ -1460,7 +1496,9 @@ def test_loader_delete_directory_while_file_has_same_prefix(
     # instantiate a svn loader checking after each processed revision that
     # the repository filesystem it reconstructed does not differ from a subversion
     # export of that revision
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
@@ -1472,7 +1510,7 @@ def test_loader_delete_directory_while_file_has_same_prefix(
     check_snapshot(loader.snapshot, loader.storage)
 
 
-def test_svn_loader_incremental(swh_storage, repo_url, tmp_path):
+def test_svn_loader_incremental(svn_loader_cls, swh_storage, repo_url, tmp_path):
 
     # first commit
     add_commit(
@@ -1493,7 +1531,9 @@ def test_svn_loader_incremental(swh_storage, repo_url, tmp_path):
     )
 
     # first load
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loader.storage,
@@ -1517,7 +1557,9 @@ def test_svn_loader_incremental(swh_storage, repo_url, tmp_path):
     )
 
     # second load, incremental
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loader.storage,
@@ -1541,7 +1583,9 @@ def test_svn_loader_incremental(swh_storage, repo_url, tmp_path):
     )
 
     # third load, incremental
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loader.storage,
@@ -1553,7 +1597,7 @@ def test_svn_loader_incremental(swh_storage, repo_url, tmp_path):
 
 
 def test_svn_loader_incremental_replay_start_with_empty_directory(
-    swh_storage, mocker, repo_url, tmp_path
+    svn_loader_cls, swh_storage, mocker, repo_url, tmp_path
 ):
 
     # first commit
@@ -1570,7 +1614,7 @@ def test_svn_loader_incremental_replay_start_with_empty_directory(
     )
 
     # first load
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
         loader.storage,
@@ -1610,7 +1654,7 @@ def test_svn_loader_incremental_replay_start_with_empty_directory(
     mocker.patch.object(loader, "SvnRepo", SvnRepoCheckReplayStartWithEmptyDirectory)
 
     # second load, incremental
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path)
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
     loader.load()
 
     # check work directory was empty before replaying revisions
@@ -1618,7 +1662,7 @@ def test_svn_loader_incremental_replay_start_with_empty_directory(
 
 
 def test_loader_svn_executable_property_on_svn_link_handling(
-    swh_storage, repo_url, tmp_path
+    svn_loader_cls, swh_storage, repo_url, tmp_path
 ):
 
     # first commit
@@ -1666,7 +1710,9 @@ def test_loader_svn_executable_property_on_svn_link_handling(
     # instantiate a svn loader checking after each processed revision that
     # the repository filesystem it reconstructed does not differ from a subversion
     # export of that revision
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
@@ -1678,7 +1724,9 @@ def test_loader_svn_executable_property_on_svn_link_handling(
     check_snapshot(loader.snapshot, loader.storage)
 
 
-def test_loader_svn_add_property_on_link(swh_storage, repo_url, tmp_path):
+def test_loader_svn_add_property_on_link(
+    svn_loader_cls, swh_storage, repo_url, tmp_path
+):
 
     # first commit
     add_commit(
@@ -1716,7 +1764,9 @@ def test_loader_svn_add_property_on_link(swh_storage, repo_url, tmp_path):
     # instantiate a svn loader checking after each processed revision that
     # the repository filesystem it reconstructed does not differ from a subversion
     # export of that revision
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
@@ -1728,7 +1778,7 @@ def test_loader_svn_add_property_on_link(swh_storage, repo_url, tmp_path):
     check_snapshot(loader.snapshot, loader.storage)
 
 
-def test_loader_svn_link_parsing(swh_storage, repo_url, tmp_path):
+def test_loader_svn_link_parsing(svn_loader_cls, swh_storage, repo_url, tmp_path):
 
     # first commit
     add_commit(
@@ -1766,7 +1816,9 @@ def test_loader_svn_link_parsing(swh_storage, repo_url, tmp_path):
     # instantiate a svn loader checking after each processed revision that
     # the repository filesystem it reconstructed does not differ from a subversion
     # export of that revision
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
@@ -1778,12 +1830,14 @@ def test_loader_svn_link_parsing(swh_storage, repo_url, tmp_path):
     check_snapshot(loader.snapshot, loader.storage)
 
 
-def test_loader_svn_empty_local_dir_before_post_load(swh_storage, datadir, tmp_path):
+def test_loader_svn_empty_local_dir_before_post_load(
+    svn_loader_cls, swh_storage, datadir, tmp_path
+):
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
 
-    class SvnLoaderPostLoadLocalDirIsEmpty(SvnLoader):
+    class SvnLoaderPostLoadLocalDirIsEmpty(svn_loader_cls):
         def post_load(self, success=True):
             if success:
                 self.local_dirname_content = [
@@ -1820,7 +1874,9 @@ def _dump_project(tmp_path, origin_url):
     return dump_path + ".gz"
 
 
-def test_loader_svn_add_property_on_directory_link(swh_storage, repo_url, tmp_path):
+def test_loader_svn_add_property_on_directory_link(
+    svn_loader_cls, swh_storage, repo_url, tmp_path
+):
 
     # first commit
     add_commit(
@@ -1858,7 +1914,9 @@ def test_loader_svn_add_property_on_directory_link(swh_storage, repo_url, tmp_pa
     # instantiate a svn loader checking after each processed revision that
     # the repository filesystem it reconstructed does not differ from a subversion
     # export of that revision
-    loader = SvnLoader(swh_storage, repo_url, temp_directory=tmp_path, check_revision=1)
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1
+    )
 
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(
@@ -1873,7 +1931,9 @@ def test_loader_svn_add_property_on_directory_link(swh_storage, repo_url, tmp_pa
 @pytest.mark.parametrize(
     "svn_loader_cls", [SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump]
 )
-def test_loader_with_subprojects(swh_storage, repo_url, tmp_path, svn_loader_cls):
+def test_loader_with_subprojects(
+    swh_storage, repo_url, tmp_path, svn_loader_cls, mocker
+):
 
     # first commit
     add_commit(
@@ -1933,6 +1993,9 @@ def test_loader_with_subprojects(swh_storage, repo_url, tmp_path, svn_loader_cls
 
         loader = svn_loader_cls(**loader_params)
 
+        if svn_loader_cls == SvnLoaderFromRemoteDump:
+            dump_revisions = mocker.spy(loader, "dump_svn_revisions")
+
         assert loader.load() == {"status": "eventful"}
         assert_last_visit_matches(
             loader.storage,
@@ -1941,6 +2004,9 @@ def test_loader_with_subprojects(swh_storage, repo_url, tmp_path, svn_loader_cls
             type="svn",
         )
         check_snapshot(loader.snapshot, loader.storage)
+
+        if svn_loader_cls == SvnLoaderFromRemoteDump:
+            dump_revisions.assert_called_once_with(origin_url.rstrip("/"), -1)
 
         if svn_loader_cls == SvnLoaderFromDumpArchive:
             loader_params["archive_path"] = _dump_project(tmp_path, origin_url)
@@ -2076,9 +2142,9 @@ def test_loader_svn_from_remote_dump_url_redirect(swh_storage, tmp_path, mocker)
     repo_redirect_url = "https://svn.example.org/repo"
 
     # mock remote subversion operations
-    from swh.loader.svn.svn import client
+    from swh.loader.svn.svn_repo import client
 
-    mocker.patch("swh.loader.svn.svn.RemoteAccess")
+    mocker.patch("swh.loader.svn.svn_repo.RemoteAccess")
     init_svn_repo_from_dump = mocker.patch(
         "swh.loader.svn.loader.init_svn_repo_from_dump"
     )
@@ -2104,7 +2170,6 @@ def test_loader_svn_from_remote_dump_url_redirect(swh_storage, tmp_path, mocker)
     assert loader.dump_svn_revisions.call_args_list[0][0][0] == repo_redirect_url
 
 
-@pytest.mark.parametrize("svn_loader_cls", [SvnLoader, SvnLoaderFromRemoteDump])
 def test_loader_basic_authentication_required(
     swh_storage, repo_url, tmp_path, svn_loader_cls, svnserve
 ):
@@ -2206,7 +2271,6 @@ def test_loader_with_special_chars_in_svn_url(repo_url, tmp_path):
         assert f.read() == content
 
 
-@pytest.mark.parametrize("svn_loader_cls", [SvnLoader, SvnLoaderFromRemoteDump])
 def test_loader_repo_with_copyfrom_and_replace_operations(
     swh_storage, repo_url, tmp_path, svn_loader_cls
 ):
@@ -2295,7 +2359,6 @@ def test_loader_repo_with_copyfrom_and_replace_operations(
     check_snapshot(loader.snapshot, loader.storage)
 
 
-@pytest.mark.parametrize("svn_loader_cls", [SvnLoader, SvnLoaderFromRemoteDump])
 def test_loader_repo_with_copyfrom_operations_and_eol_style(
     swh_storage, repo_url, tmp_path, svn_loader_cls
 ):
@@ -2368,7 +2431,9 @@ def test_loader_repo_with_copyfrom_operations_and_eol_style(
     check_snapshot(loader.snapshot, loader.storage)
 
 
-def test_loader_check_tree_divergence(swh_storage, repo_url, tmp_path, caplog):
+def test_loader_check_tree_divergence(
+    svn_loader_cls, swh_storage, repo_url, tmp_path, caplog
+):
     # create sample repository
     add_commit(
         repo_url,
@@ -2392,7 +2457,7 @@ def test_loader_check_tree_divergence(swh_storage, repo_url, tmp_path, caplog):
     )
 
     # load it
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,
@@ -2402,6 +2467,7 @@ def test_loader_check_tree_divergence(swh_storage, repo_url, tmp_path, caplog):
     assert loader.load() == {"status": "eventful"}
 
     # export it to a temporary directory
+    loader.svnrepo = SvnRepo(repo_url)
     export_path, _ = loader.svnrepo.export_temporary(revision=1)
     export_path = os.path.join(export_path, repo_url.split("/")[-1])
 
@@ -2434,7 +2500,7 @@ def test_loader_check_tree_divergence(swh_storage, repo_url, tmp_path, caplog):
         assert debug_log in caplog.text
 
 
-def test_loader_svnrepo_propget_on_url(swh_storage, repo_url, tmp_path):
+def test_loader_svnrepo_propget_on_url(svn_loader_cls, swh_storage, repo_url, tmp_path):
     # create sample repository
     add_commit(
         repo_url,
@@ -2461,7 +2527,7 @@ def test_loader_svnrepo_propget_on_url(swh_storage, repo_url, tmp_path):
     )
 
     # load it
-    loader = SvnLoader(
+    loader = svn_loader_cls(
         swh_storage,
         repo_url,
         temp_directory=tmp_path,

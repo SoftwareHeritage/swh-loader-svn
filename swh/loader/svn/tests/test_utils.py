@@ -1,8 +1,9 @@
-# Copyright (C) 2016-2022  The Software Heritage developers
+# Copyright (C) 2016-2023  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from datetime import datetime, timedelta, timezone
 import logging
 import os
 from pathlib import Path
@@ -15,6 +16,8 @@ import pytest
 
 from swh.loader.svn import utils
 from swh.loader.tests import prepare_repository_from_archive
+
+from .utils import CommitChange, CommitChangeType, add_commit
 
 
 def test_outputstream():
@@ -221,13 +224,19 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             "third-party/sounds             http://svn.example.com/repos/sounds",
             "trunk/externals",
             "http://svn.example.org/repos/test",
-            ("third-party/sounds", "http://svn.example.com/repos/sounds", None, False),
+            (
+                "third-party/sounds",
+                "http://svn.example.com/repos/sounds",
+                None,
+                None,
+                False,
+            ),
         ),
         (
             "third-party/skins -r148        http://svn.example.com/skinproj",
             "trunk/externals",
             "http://svn.example.org/repos/test",
-            ("third-party/skins", "http://svn.example.com/skinproj", 148, False),
+            ("third-party/skins", "http://svn.example.com/skinproj", 148, None, False),
         ),
         (
             "third-party/skins/toolkit -r21 http://svn.example.com/skin-maker",
@@ -237,6 +246,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
                 "third-party/skins/toolkit",
                 "http://svn.example.com/skin-maker",
                 21,
+                None,
                 False,
             ),
         ),
@@ -245,13 +255,19 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             "      http://svn.example.com/repos/sounds third-party/sounds",
             "trunk/externals",
             "http://svn.example.org/repos/test",
-            ("third-party/sounds", "http://svn.example.com/repos/sounds", None, False),
+            (
+                "third-party/sounds",
+                "http://svn.example.com/repos/sounds",
+                None,
+                None,
+                False,
+            ),
         ),
         (
             "-r148 http://svn.example.com/skinproj third-party/skins",
             "trunk/externals",
             "http://svn.example.org/repos/test",
-            ("third-party/skins", "http://svn.example.com/skinproj", 148, False),
+            ("third-party/skins", "http://svn.example.com/skinproj", 148, None, False),
         ),
         (
             "-r 21 http://svn.example.com/skin-maker third-party/skins/toolkit",
@@ -261,6 +277,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
                 "third-party/skins/toolkit",
                 "http://svn.example.com/skin-maker",
                 21,
+                None,
                 False,
             ),
         ),
@@ -268,13 +285,19 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             "http://svn.example.com/repos/sounds third-party/sounds",
             "trunk/externals",
             "http://svn.example.org/repos/test",
-            ("third-party/sounds", "http://svn.example.com/repos/sounds", None, False),
+            (
+                "third-party/sounds",
+                "http://svn.example.com/repos/sounds",
+                None,
+                None,
+                False,
+            ),
         ),
         (
             "http://svn.example.com/skinproj@148 third-party/skins",
             "trunk/externals",
             "http://svn.example.org/repos/test",
-            ("third-party/skins", "http://svn.example.com/skinproj", 148, False),
+            ("third-party/skins", "http://svn.example.com/skinproj", None, 148, False),
         ),
         (
             "http://anon:anon@svn.example.com/skin-maker@21 third-party/skins/toolkit",
@@ -283,6 +306,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             (
                 "third-party/skins/toolkit",
                 "http://anon:anon@svn.example.com/skin-maker",
+                None,
                 21,
                 False,
             ),
@@ -295,6 +319,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
                 "third-party/skins/toolkit",
                 "http://anon:anon@svn.example.com/skin-maker",
                 21,
+                None,
                 False,
             ),
         ),
@@ -305,6 +330,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             (
                 "third-party/skins/toolkit",
                 "http://anon:anon@svn.example.com/skin-maker",
+                21,
                 21,
                 False,
             ),
@@ -318,6 +344,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
                 "third-party/sounds",
                 "http://svn.example.org/repos/test/sounds",
                 None,
+                None,
                 False,
             ),
         ),
@@ -325,7 +352,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             "/skinproj@148 third-party/skins",
             "trunk/externals",
             "http://svn.example.org/repos/test",
-            ("third-party/skins", "http://svn.example.org/skinproj", 148, True),
+            ("third-party/skins", "http://svn.example.org/skinproj", None, 148, True),
         ),
         (
             "//svn.example.com/skin-maker@21 third-party/skins/toolkit",
@@ -334,6 +361,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             (
                 "third-party/skins/toolkit",
                 "http://svn.example.com/skin-maker",
+                None,
                 21,
                 True,
             ),
@@ -345,6 +373,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             (
                 "third-party/skins/toolkit",
                 "http://svn.example.org/skin-maker",
+                None,
                 21,
                 True,
             ),
@@ -353,20 +382,38 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             "../skins skins",
             "trunk/externals",
             "http://svn.example.org/repos/test",
-            ("skins", "http://svn.example.org/repos/test/trunk/skins", None, False),
+            (
+                "skins",
+                "http://svn.example.org/repos/test/trunk/skins",
+                None,
+                None,
+                False,
+            ),
         ),
         (
             "../skins skins",
             "trunk/externals",
             "http://svn.example.org/repos/test",
-            ("skins", "http://svn.example.org/repos/test/trunk/skins", None, False),
+            (
+                "skins",
+                "http://svn.example.org/repos/test/trunk/skins",
+                None,
+                None,
+                False,
+            ),
         ),
         # subversion >= 1.6
         (
             'http://svn.thirdparty.com/repos/My%20Project "My Project"',
             "trunk/externals",
             "http://svn.example.org/repos/test",
-            ("My Project", "http://svn.thirdparty.com/repos/My%20Project", None, False),
+            (
+                "My Project",
+                "http://svn.thirdparty.com/repos/My%20Project",
+                None,
+                None,
+                False,
+            ),
         ),
         (
             'http://svn.thirdparty.com/repos/My%20%20%20Project "My   Project"',
@@ -375,6 +422,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             (
                 "My   Project",
                 "http://svn.thirdparty.com/repos/My%20%20%20Project",
+                None,
                 None,
                 False,
             ),
@@ -387,6 +435,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
                 '"Quotes Too"',
                 "http://svn.thirdparty.com/repos/%22Quotes%20Too%22",
                 None,
+                None,
                 False,
             ),
         ),
@@ -398,6 +447,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
                 '"Quotes   Too"',
                 "http://svn.thirdparty.com/repos/%22Quotes%20%20%20Too%22",
                 None,
+                None,
                 False,
             ),
         ),
@@ -406,49 +456,61 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             '-r1 http://svn.thirdparty.com/repos/test "trunk/PluginFramework"',
             "trunk/externals",
             "http://svn.example.org/repos/test",
-            ("trunk/PluginFramework", "http://svn.thirdparty.com/repos/test", 1, False),
+            (
+                "trunk/PluginFramework",
+                "http://svn.thirdparty.com/repos/test",
+                1,
+                None,
+                False,
+            ),
         ),
         (
             "external -r 9 http://svn.thirdparty.com/repos/test",
             "tags",
             "http://svn.example.org/repos/test",
-            ("external", "http://svn.thirdparty.com/repos/test", 9, False),
+            ("external", "http://svn.thirdparty.com/repos/test", 9, None, False),
         ),
         (
             "./external http://svn.thirdparty.com/repos/test",
             "tags",
             "http://svn.example.org/repos/test",
-            ("external", "http://svn.thirdparty.com/repos/test", None, False),
+            ("external", "http://svn.thirdparty.com/repos/test", None, None, False),
         ),
         (
             ".external http://svn.thirdparty.com/repos/test",
             "tags",
             "http://svn.example.org/repos/test",
-            (".external", "http://svn.thirdparty.com/repos/test", None, False),
+            (".external", "http://svn.thirdparty.com/repos/test", None, None, False),
         ),
         (
             "external/ http://svn.thirdparty.com/repos/test",
             "tags",
             "http://svn.example.org/repos/test",
-            ("external", "http://svn.thirdparty.com/repos/test", None, False),
+            ("external", "http://svn.thirdparty.com/repos/test", None, None, False),
         ),
         (
             "external ttp://svn.thirdparty.com/repos/test",
             "tags",
             "http://svn.example.org/repos/test",
-            ("external", "ttp://svn.thirdparty.com/repos/test", None, False),
+            ("external", "ttp://svn.thirdparty.com/repos/test", None, None, False),
         ),
         (
             "external http//svn.thirdparty.com/repos/test",
             "tags",
             "http://svn.example.org/repos/test",
-            ("external", "http//svn.thirdparty.com/repos/test", None, False),
+            ("external", "http//svn.thirdparty.com/repos/test", None, None, False),
         ),
         (
             "C:\\code\\repo\\external http://svn.thirdparty.com/repos/test",
             "tags",
             "http://svn.example.org/repos/test",
-            ("C:coderepoexternal", "http://svn.thirdparty.com/repos/test", None, False),
+            (
+                "C:coderepoexternal",
+                "http://svn.thirdparty.com/repos/test",
+                None,
+                None,
+                False,
+            ),
         ),
         (
             "C:\\\\code\\\\repo\\\\external http://svn.thirdparty.com/repos/test",
@@ -458,6 +520,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
                 "C:\\code\\repo\\external",
                 "http://svn.thirdparty.com/repos/test",
                 None,
+                None,
                 False,
             ),
         ),
@@ -465,13 +528,25 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             "-r 123 http://svn.example.com/repos/sounds@100 third-party/sounds",
             "trunk/externals",
             "http://svn.example.org/repos/test",
-            ("third-party/sounds", "http://svn.example.com/repos/sounds", 123, False),
+            (
+                "third-party/sounds",
+                "http://svn.example.com/repos/sounds",
+                123,
+                100,
+                False,
+            ),
         ),
         (
             "-r 123 http://svn.example.com/repos/sounds@150 third-party/sounds",
             "trunk/externals",
             "http://svn.example.org/repos/test",
-            ("third-party/sounds", "http://svn.example.com/repos/sounds", 123, False),
+            (
+                "third-party/sounds",
+                "http://svn.example.com/repos/sounds",
+                123,
+                150,
+                False,
+            ),
         ),
     ],
 )
@@ -492,3 +567,68 @@ def test_parse_invalid_external_definition(invalid_external):
         utils.parse_external_definition(
             invalid_external, "/trunk/externals", "http://svn.example.org/repo"
         )
+
+
+FIRST_COMMIT_DATE = datetime(year=2020, month=7, day=14, tzinfo=timezone.utc)
+SECOND_COMMIT_DATE = FIRST_COMMIT_DATE + timedelta(minutes=10)
+THIRD_COMMIT_DATE = SECOND_COMMIT_DATE + timedelta(hours=1)
+
+
+@pytest.fixture
+def repo_url(repo_url):
+    add_commit(
+        repo_url,
+        "Add trunk/foo/foo path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/foo/foo",
+                data=b"foo",
+            )
+        ],
+        FIRST_COMMIT_DATE,
+    )
+    add_commit(
+        repo_url,
+        "Add trunk/bar/bar path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/bar/bar",
+                data=b"bar",
+            )
+        ],
+        SECOND_COMMIT_DATE,
+    )
+    add_commit(
+        repo_url,
+        "Remove trunk/foo/foo path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.Delete,
+                path="trunk/foo/",
+            )
+        ],
+        THIRD_COMMIT_DATE,
+    )
+    return repo_url
+
+
+def test_get_repo_root_url(repo_url):
+    utils.get_repo_root_url(repo_url) == repo_url
+    utils.get_repo_root_url(f"{repo_url}/trunk/foo/foo") == repo_url
+    utils.get_repo_root_url(f"{repo_url}/trunk/bar/bar") == repo_url
+
+
+def test_get_head_revision_at_date(repo_url):
+    utils.get_head_revision_at_date(repo_url, FIRST_COMMIT_DATE) == 1
+    utils.get_head_revision_at_date(repo_url, SECOND_COMMIT_DATE) == 2
+    utils.get_head_revision_at_date(repo_url, THIRD_COMMIT_DATE) == 3
+
+    utils.get_head_revision_at_date(
+        repo_url, FIRST_COMMIT_DATE + (SECOND_COMMIT_DATE - FIRST_COMMIT_DATE) / 2
+    ) == 1
+
+    utils.get_head_revision_at_date(
+        repo_url, SECOND_COMMIT_DATE + (THIRD_COMMIT_DATE - SECOND_COMMIT_DATE) / 2
+    ) == 2

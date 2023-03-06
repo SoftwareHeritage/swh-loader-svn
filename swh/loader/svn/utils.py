@@ -1,9 +1,11 @@
-# Copyright (C) 2016-2022  The Software Heritage developers
+# Copyright (C) 2016-2023  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from datetime import datetime
 import errno
+from functools import lru_cache
 import logging
 import os
 import re
@@ -12,6 +14,9 @@ from subprocess import PIPE, Popen, call, run
 import tempfile
 from typing import Optional, Tuple
 from urllib.parse import quote, urlparse, urlunparse
+
+import iso8601
+from subvertpy import SubversionException
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +116,13 @@ def init_svn_repo_from_dump(
             # load dump and bypass properties validation as Unicode decoding errors
             # are already handled in loader implementation (see _ra_codecs_error_handler
             # in ra.py)
-            cmd = ["svnadmin", "load", "-q", "--bypass-prop-validation"]
+            cmd = [
+                "svnadmin",
+                "load",
+                "-q",
+                "--bypass-prop-validation",
+                "--no-flush-to-disk",  # loading is significantly faster with this option
+            ]
             if max_rev > 0:
                 cmd.append(f"-r1:{max_rev}")
             cmd.append(repo_path)
@@ -212,7 +223,7 @@ def svn_urljoin(base_url: str, *args) -> str:
 
 def parse_external_definition(
     external: str, dir_path: str, repo_url: str
-) -> Tuple[str, str, Optional[int], bool]:
+) -> Tuple[str, str, Optional[int], Optional[int], bool]:
     """Parse a subversion external definition.
 
     Args:
@@ -228,6 +239,7 @@ def parse_external_definition(
             - path relative to dir_path where the external should be exported
             - URL of the external to export
             - optional revision of the external to export
+            - optional peg revision of the external to export
             - boolean indicating if the external URL is relative to the repository
               URL and targets a path not in the repository
 
@@ -235,6 +247,7 @@ def parse_external_definition(
     path = ""
     external_url = ""
     revision = None
+    peg_revision = None
     relative_url = False
     prev_part = None
     # turn multiple spaces into a single one and split on space
@@ -303,18 +316,30 @@ def parse_external_definition(
         url, revision_s = external_url.rsplit("@", maxsplit=1)
         try:
             # ensure revision_s can be parsed to int
-            rev = int(revision_s)
-            # -r XXX takes priority over <svn_url>@XXX
-            revision = revision or rev
+            peg_revision = int(revision_s)
             external_url = url
         except ValueError:
-            # handle URL like http://user@svn.example.org/
-            pass
+            if urlparse(external_url).username is None:
+                # handle URL like http://user@svn.example.org/
+                external_url = url
+            if revision_s.startswith("{") and revision_s.endswith("}"):
+                # revision as a date special case, subvertpy does not support such revision
+                # format in its API so we need to get the HEAD revision number at that date
+                try:
+                    date = iso8601.parse_date(revision_s[1:-1])
+                    repo_root_url = get_repo_root_url(external_url)
+                    peg_revision = get_head_revision_at_date(repo_root_url, date)
+                except Exception as e:
+                    # typically when repository no longer exists or temporary network failures,
+                    # for the latter case if the loader did not export the external at the right
+                    # revision it will detect it at next origin visit and perform a full reload.
+                    logger.debug(e)
+                    pass
 
     if not external_url or not path:
         raise ValueError(f"Failed to parse external definition '{external}'")
 
-    return (path.rstrip("/"), external_url, revision, relative_url)
+    return path.rstrip("/"), external_url, revision, peg_revision, relative_url
 
 
 def is_recursive_external(
@@ -342,3 +367,65 @@ def is_recursive_external(
     return svn_urljoin(origin_url, quote(dir_path), quote(external_path)).startswith(
         external_url
     )
+
+
+@lru_cache()
+def get_head_revision_at_date(svn_url: str, date: datetime) -> int:
+    """Get HEAD revision for repository at given date.
+
+    This function wraps calls to
+    :meth:`swh.loader.svn.svn_repo.SvnRepo.get_head_revision_at_date`
+    and put result in cache.
+
+    Args:
+        svn_url: URL of subversion repository
+        date: the reference date
+
+    Returns:
+        the revision number of the HEAD revision at that date
+
+    Raises:
+        SubversionException: repository URL is not valid
+        ValueError: first revision date is greater than given date
+    """
+    from swh.loader.svn.svn_repo import SvnRepo
+
+    return SvnRepo(svn_url).get_head_revision_at_date(date)
+
+
+@lru_cache()
+def _get_repo_root_url(svn_url: str) -> str:
+
+    from swh.loader.svn.svn_repo import SvnRepo
+
+    return SvnRepo(svn_url).repos_root_url
+
+
+def get_repo_root_url(svn_url):
+    """Get root URL for a repository.
+
+    Suversion URL might target a sub-project in a repository.
+    That function computes the root URL of the repository and
+    put result in cache.
+
+    Args:
+        svn_url: URL of subversion repository
+
+    Returns:
+        the root URL of the repository
+
+    Raises:
+        SubversionException: subversion URL is not valid
+    """
+    url_splitted = svn_url.split("/")
+    urls = [svn_url] + [
+        "/".join(url_splitted[:-i]) for i in range(1, len(url_splitted))
+    ]
+    for url in urls:
+        try:
+            return _get_repo_root_url(url)
+        except SubversionException:
+            # URL no longer valid, retry by removing last sub-path in it as targeted
+            # path might no longer exists in HEAD revision
+            pass
+    return svn_url

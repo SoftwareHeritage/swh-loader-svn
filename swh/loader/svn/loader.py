@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2022  The Software Heritage developers
+# Copyright (C) 2015-2023  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -22,7 +22,7 @@ from subvertpy import SubversionException
 from swh.loader.core.loader import BaseLoader
 from swh.loader.core.utils import clean_dangling_folders
 from swh.loader.exception import NotFound
-from swh.loader.svn.svn import SvnRepo
+from swh.loader.svn.svn_repo import SvnRepo
 from swh.model import from_disk, hashutil
 from swh.model.model import (
     Content,
@@ -223,6 +223,9 @@ Local repository not cleaned up for investigation: %s""",
 
     def check_history_not_altered(self, revision_start: int, swh_rev: Revision) -> bool:
         """Given a svn repository, check if the history was modified in between visits."""
+
+        self.log.debug("Checking if history of repository got altered since last visit")
+
         revision_id = swh_rev.id
         parents = swh_rev.parents
 
@@ -458,12 +461,14 @@ Local repository not cleaned up for investigation: %s""",
             raise
 
     def prepare(self):
-        if self.incremental:
-            latest_snapshot_revision = self._latest_snapshot_revision(self.origin.url)
-            if latest_snapshot_revision:
-                self.latest_snapshot, self.latest_revision = latest_snapshot_revision
-                self._snapshot = self.latest_snapshot
+        latest_snapshot_revision = self._latest_snapshot_revision(self.origin.url)
+        if latest_snapshot_revision:
+            self.latest_snapshot, self.latest_revision = latest_snapshot_revision
+            self._snapshot = self.latest_snapshot
+            if self.incremental:
                 self._last_revision = self.latest_revision
+            else:
+                self.latest_revision = None
 
         local_dirname = self._create_tmp_dir(self.temp_directory)
 
@@ -548,6 +553,12 @@ Local repository not cleaned up for investigation: %s""",
             )
             self.flush()
             self.loaded_snapshot_id = self.snapshot.id
+            if (
+                self.latest_snapshot
+                and self.latest_snapshot.id == self.loaded_snapshot_id
+            ):
+                # no new objects to archive found during the visit
+                self._load_status = "uneventful"
 
         # reset internal state for next iteration
         self._revisions = []
@@ -845,6 +856,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             self.temp_dir,
             self.max_content_size,
             debug=self.debug,
+            from_dump=True,
         )
 
         # Ensure to use remote URL retrieved by SvnRepo as origin URL might redirect

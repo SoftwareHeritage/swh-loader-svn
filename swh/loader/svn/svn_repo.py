@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2022  The Software Heritage developers
+# Copyright (C) 2015-2023  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -8,11 +8,14 @@ representations including the hash tree/content computations per svn
 commit.
 
 """
+
+import bisect
+from datetime import datetime
 import logging
 import os
 import shutil
 import tempfile
-from typing import Dict, Iterator, List, Optional, Tuple, Union
+from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 from urllib.parse import quote, urlparse, urlunparse
 
 from subvertpy import SubversionException, client, properties, wc
@@ -24,20 +27,14 @@ from subvertpy.ra import (
 )
 
 from swh.model.from_disk import Directory as DirectoryFromDisk
-from swh.model.model import (
-    Content,
-    Directory,
-    Person,
-    SkippedContent,
-    TimestampWithTimezone,
-)
+from swh.model.model import Content, Directory, SkippedContent
 
 from . import converters, replay
 from .svn_retry import svn_retry
 from .utils import is_recursive_external, parse_external_definition
 
 # When log message contains empty data
-DEFAULT_AUTHOR_MESSAGE = ""
+DEFAULT_AUTHOR_MESSAGE = b""
 
 logger = logging.getLogger(__name__)
 
@@ -59,12 +56,21 @@ class SvnRepo:
     def __init__(
         self,
         remote_url: str,
-        origin_url: str,
-        local_dirname: str,
-        max_content_length: int,
+        origin_url: Optional[str] = None,
+        local_dirname: Optional[str] = None,
+        max_content_length: int = 100000,
         from_dump: bool = False,
         debug: bool = False,
     ):
+        if origin_url is None:
+            origin_url = remote_url
+
+        self.manage_directory = False
+        if local_dirname is None:
+            local_dirname = tempfile.mkdtemp()
+            self.manage_directory = True
+        self.local_dirname = local_dirname
+
         self.origin_url = origin_url
         self.from_dump = from_dump
 
@@ -100,29 +106,26 @@ class SvnRepo:
 
         self.remote_url = remote_url.rstrip("/")
 
-        auth = Auth(auth_providers)
+        self.auth = Auth(auth_providers)
         # one client for update operation
-        self.client = client.Client(auth=auth)
+        self.client = client.Client(auth=self.auth)
 
         if not self.remote_url.startswith("file://"):
             # use redirection URL if any for remote operations
             self.remote_url = self.info(self.remote_url).url
 
-        # one connection for log iteration
-        self.conn_log = self.remote_access(auth)
-        # another for replay
-        self.conn = self.remote_access(auth)
+        self.remote_access_url = self.remote_url
 
         if not self.from_dump:
             self.remote_url = self.info(self.remote_url).repos_root_url
 
-        self.local_dirname = local_dirname
         local_name = os.path.basename(self.remote_url)
         self.local_url = os.path.join(self.local_dirname, local_name).encode("utf-8")
 
-        self.uuid = self.conn.get_uuid().encode("utf-8")
+        conn = self.remote_access()
+        self.uuid = conn.get_uuid().encode("utf-8")
         self.swhreplay = replay.Replay(
-            conn=self.conn,
+            conn=conn,
             rootpath=self.local_url,
             svnrepo=self,
             temp_dir=local_dirname,
@@ -135,8 +138,15 @@ class SvnRepo:
 
         # compute root directory path from the remote repository URL, required to
         # properly load the sub-tree of a repository mounted from a dump file
-        repos_root_url = self.info(self.origin_url).repos_root_url
-        self.root_directory = self.origin_url.rstrip("/").replace(repos_root_url, "", 1)
+        self.repos_root_url = self.info(self.origin_url).repos_root_url
+        self.root_directory = self.origin_url.rstrip("/").replace(
+            self.repos_root_url, "", 1
+        )
+
+    def __del__(self):
+        # ensure temporary directory is removed when created by constructor
+        if self.manage_directory:
+            self.clean_fs()
 
     def __str__(self):
         return str(
@@ -150,65 +160,24 @@ class SvnRepo:
 
     def head_revision(self) -> int:
         """Retrieve current head revision."""
-        return self.conn.get_latest_revnum()
+        return self.remote_access().get_latest_revnum()
 
     def initial_revision(self) -> int:
         """Retrieve the initial revision from which the remote url appeared."""
         return 1
 
-    def convert_commit_message(self, msg: Union[str, bytes]) -> bytes:
-        """Simply encode the commit message.
+    def _revision_data(self, log_entry: Tuple) -> Dict:
+        changed_paths, rev, revprops, _ = log_entry
 
-        Args:
-            msg: the commit message to convert.
-
-        Returns:
-            The transformed message as bytes.
-
-        """
-        if isinstance(msg, bytes):
-            return msg
-        return msg.encode("utf-8")
-
-    def convert_commit_date(self, date: bytes) -> TimestampWithTimezone:
-        """Convert the message commit date into a timestamp in swh format.
-        The precision is kept.
-
-        Args:
-            date: the commit date to convert.
-
-        Returns:
-            The transformed date.
-
-        """
-        return converters.svn_date_to_swh_date(date)
-
-    def convert_commit_author(self, author: Optional[bytes]) -> Person:
-        """Convert the commit author into an swh person.
-
-        Args:
-            author: the commit author to convert.
-
-        Returns:
-            Person as model object
-
-        """
-        return converters.svn_author_to_swh_person(author)
-
-    def __to_entry(self, log_entry: Tuple) -> Dict:
-        changed_paths, rev, revprops, has_children = log_entry
-
-        author_date = self.convert_commit_date(
+        author_date = converters.svn_date_to_swh_date(
             revprops.get(properties.PROP_REVISION_DATE)
         )
 
-        author = self.convert_commit_author(
+        author = converters.svn_author_to_swh_person(
             revprops.get(properties.PROP_REVISION_AUTHOR)
         )
 
-        message = self.convert_commit_message(
-            revprops.get(properties.PROP_REVISION_LOG, DEFAULT_AUTHOR_MESSAGE)
-        )
+        message = revprops.get(properties.PROP_REVISION_LOG, DEFAULT_AUTHOR_MESSAGE)
 
         has_changes = (
             not self.from_dump
@@ -228,36 +197,38 @@ class SvnRepo:
             "changed_paths": changed_paths,
         }
 
-    def logs(self, revision_start: int, revision_end: int) -> Iterator[Dict]:
-        """Stream svn logs between revision_start and revision_end by chunks of
-        block_size logs.
+    def logs(
+        self,
+        revision_start: int,
+        revision_end: int,
+    ) -> Iterator[Dict]:
+        """Stream svn logs between revision_start and revision_end.
 
-        Yields revision and associated revision information between the
-        revision start and revision_end.
+        Yields revision information between revision_start and revision_end.
 
         Args:
             revision_start: the svn revision starting bound
             revision_end: the svn revision ending bound
 
         Yields:
-            tuple: tuple of revisions and logs:
+            dictionaries of revision data with the following keys:
 
-                - revisions: list of revisions in order
-                - logs: Dictionary with key revision number and value the log
-                  entry. The log entry is a dictionary with the following keys:
-
-                    - author_date: date of the commit
-                    - author_name: name of the author
-                    - message: commit message
+                - rev: revision number
+                - author_date: date of the commit
+                - author_name: name of the author of the commit
+                - message: commit message
+                - has_changes: whether the commit has changes
+                (can be False when loading subprojects)
+                - changed_paths: list of paths changed by the commit
 
         """
-        for log_entry in self.conn_log.iter_log(
+        for log_entry in self.remote_access().iter_log(
             paths=None,
             start=revision_start,
             end=revision_end,
             discover_changed_paths=True,
         ):
-            yield self.__to_entry(log_entry)
+            yield self._revision_data(log_entry)
 
     @svn_retry()
     def commit_info(self, revision: int) -> Optional[Dict]:
@@ -267,22 +238,36 @@ class SvnRepo:
             revision: svn revision to return commit info
 
         Returns:
-            A dictionary filled with commit info, see :meth:`swh.loader.svn.svn.logs`
+            A dictionary filled with commit info, see :meth:`swh.loader.svn.svn_repo.logs`
             for details about its content.
         """
         return next(self.logs(revision, revision), None)
 
     @svn_retry()
-    def remote_access(self, auth: Auth) -> RemoteAccess:
+    def remote_access(self) -> RemoteAccess:
         """Simple wrapper around subvertpy.ra.RemoteAccess creation
         enabling to retry the operation if a network error occurs."""
-        return RemoteAccess(self.remote_url, auth=auth)
+        return RemoteAccess(self.remote_access_url, auth=self.auth)
 
     @svn_retry()
-    def info(self, origin_url: str):
+    def info(
+        self,
+        origin_url: Optional[str] = None,
+        peg_revision: Optional[int] = None,
+        revision: Optional[int] = None,
+    ):
         """Simple wrapper around subvertpy.client.Client.info enabling to retry
-        the command if a network error occurs."""
-        info = self.client.info(quote_svn_url(origin_url).rstrip("/"))
+        the command if a network error occurs.
+
+        Args:
+            origin_url: If provided, query info about a specific repository,
+                currently set origin URL will be used otherwise
+        """
+        info = self.client.info(
+            quote_svn_url(origin_url or self.origin_url).rstrip("/"),
+            peg_revision=peg_revision,
+            revision=revision,
+        )
         return next(iter(info.values()))
 
     @svn_retry()
@@ -296,6 +281,7 @@ class SvnRepo:
         ignore_externals: bool = False,
         overwrite: bool = False,
         ignore_keywords: bool = False,
+        remove_dest_path: bool = True,
     ) -> int:
         """Simple wrapper around subvertpy.client.Client.export enabling to retry
         the command if a network error occurs.
@@ -303,11 +289,12 @@ class SvnRepo:
         See documentation of svn_client_export5 function from subversion C API
         to get details about parameters.
         """
-        # remove export path as command can be retried
-        if os.path.isfile(to) or os.path.islink(to):
-            os.remove(to)
-        elif os.path.isdir(to):
-            shutil.rmtree(to)
+        if remove_dest_path:
+            # remove export path as command can be retried
+            if os.path.isfile(to) or os.path.islink(to):
+                os.remove(to)
+            elif os.path.isdir(to):
+                shutil.rmtree(to)
         options = []
         if rev is not None:
             options.append(f"-r {rev}")
@@ -400,6 +387,13 @@ class SvnRepo:
         See documentation of svn_client_propget5 function from subversion C API
         to get details about parameters.
         """
+        logger.debug(
+            "svn propget %s%s %s%s",
+            "--recursive " if recurse else "",
+            name,
+            quote_svn_url(target),
+            f"@{peg_rev}" if peg_rev else "",
+        )
         target_is_url = urlparse(target).scheme != ""
         if target_is_url:
             # subvertpy 0.11 has a buggy implementation of propget bindings when
@@ -450,9 +444,25 @@ class SvnRepo:
             # the right export URL,recursive externals are also checked
 
             # get all svn:externals properties recursively
-            externals = self.propget(
-                "svn:externals", self.remote_url, revision, revision, True
-            )
+            if self.remote_url.startswith("file://"):
+                externals = self.propget(
+                    "svn:externals", self.remote_url, revision, revision, True
+                )
+            else:
+                # recursive propget operation is terribly slow over the network,
+                # better doing it from a freshly checked out working copy as it is faster
+                with tempfile.TemporaryDirectory(
+                    dir=self.local_dirname, prefix=f"checkout-revision-{revision}."
+                ) as co_dirname:
+
+                    self.checkout(
+                        self.remote_url, co_dirname, revision, ignore_externals=True
+                    )
+                    # get all svn:externals properties recursively
+                    externals = self.propget(
+                        "svn:externals", co_dirname, None, None, True
+                    )
+
             self.has_relative_externals = False
             self.has_recursive_externals = False
             for path, external_defs in externals.items():
@@ -466,6 +476,7 @@ class SvnRepo:
                     (
                         external_path,
                         external_url,
+                        _,
                         _,
                         relative_url,
                     ) = parse_external_definition(
@@ -621,3 +632,33 @@ class SvnRepo:
         if os.path.exists(dirname):
             logger.debug("cleanup %s", dirname)
             shutil.rmtree(dirname)
+
+    def get_head_revision_at_date(self, date: datetime) -> int:
+        """Get HEAD revision number for a given date.
+
+        Args:
+            date: the reference date
+
+        Returns:
+            the revision number of the HEAD revision at that date
+
+        Raises:
+            ValueError: first revision date is greater than given date
+        """
+
+        class RevisionList(Sequence[datetime]):
+            def __init__(self, svn_repo):
+                self.svn_repo = svn_repo
+                self.rev_ids = list(range(1, self.svn_repo.head_revision() + 1))
+
+            def __len__(self):
+                return len(self.rev_ids)
+
+            def __getitem__(self, i):
+                commit_info = self.svn_repo.commit_info(self.rev_ids[i])
+                return commit_info["author_date"].to_datetime()
+
+        if self.commit_info(1)["author_date"].to_datetime() > date:
+            raise ValueError("First revision date is greater than reference date")
+
+        return bisect.bisect_right(RevisionList(self), date)

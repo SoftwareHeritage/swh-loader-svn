@@ -45,7 +45,7 @@ swh/loader/svn/exception.py
 swh/loader/svn/loader.py
 swh/loader/svn/py.typed
 swh/loader/svn/replay.py
-swh/loader/svn/svn.py
+swh/loader/svn/svn_repo.py
 swh/loader/svn/svn_retry.py
 swh/loader/svn/tasks.py
 swh/loader/svn/utils.py
@@ -55,6 +55,7 @@ swh/loader/svn/tests/test_converters.py
 swh/loader/svn/tests/test_externals.py
 swh/loader/svn/tests/test_loader.org
 swh/loader/svn/tests/test_loader.py
+swh/loader/svn/tests/test_svn_repo.py
 swh/loader/svn/tests/test_svn_retry.py
 swh/loader/svn/tests/test_task.py
 swh/loader/svn/tests/test_utils.py

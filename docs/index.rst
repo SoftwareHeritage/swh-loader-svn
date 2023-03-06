@@ -12,4 +12,11 @@ Reference Documentation
 .. toctree::
    :maxdepth: 2
 
-   /apidoc/swh.loader.svn
+.. only:: standalone_package_doc
+
+   Indices and tables
+   ------------------
+
+   * :ref:`genindex`
+   * :ref:`modindex`
+   * :ref:`search`

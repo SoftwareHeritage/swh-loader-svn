@@ -27,6 +27,7 @@ def is_retryable_svn_exception(exception):
                 "Unable to connect to a repository at URL",
                 "Error running context: The server unexpectedly closed the connection",
                 "ra_serf: The server sent a truncated HTTP response body",
+                "Unexpected HTTP status 504 'Gateway Time-out'",
             )
         )
     return isinstance(exception, (ConnectionResetError, TimeoutError))

@@ -2043,3 +2043,69 @@ def test_loader_with_missing_peg_rev_in_external(
         type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_add_dir_with_externals_then_remove_then_readd_without_externals(
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
+):
+
+    add_commit(
+        external_repo_url,
+        "Add foo/bar path in external",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="foo/bar",
+                data=b"bar",
+            )
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Add directory with externals",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="externals/",
+                properties={"svn:externals": f"{external_repo_url}/foo foo"},
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Remove directory with externals",
+        [
+            CommitChange(
+                change_type=CommitChangeType.Delete,
+                path="externals/",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Re-add same directory without externals",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="externals/",
+            ),
+        ],
+    )
+
+    loader = svn_loader_cls(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)

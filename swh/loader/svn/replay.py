@@ -199,6 +199,7 @@ class DirEditor:
         if path in self.directory:
             entry_removed = self.directory[path]
             del self.directory[path]
+            self.dir_states.pop(path, None)
             fpath = os.path.join(self.rootpath, path)
             if isinstance(entry_removed, from_disk.Directory):
                 shutil.rmtree(fpath)

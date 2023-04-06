@@ -719,6 +719,7 @@ def test_loader_externals_cache(
         None,
         None,
         False,
+        2,
     ) in loader.svnrepo.swhreplay.editor.externals_cache
 
 
@@ -1691,15 +1692,11 @@ def test_loader_copyfrom_rev_with_externals(
 
     add_commit(
         repo_url,
-        "Create repository structure, one externals directory with svn:externals"
-        "property set and one trunk directory",
+        "Create repository structure, one externals directory and one trunk directory",
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
                 path="externals/",
-                properties={
-                    "svn:externals": f'{svn_urljoin(external_repo_url, "code/hello/")} hello'  # noqa
-                },
             ),
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
@@ -1710,13 +1707,53 @@ def test_loader_copyfrom_rev_with_externals(
 
     add_commit(
         repo_url,
-        "Add copy of externals directory to trunk from revision 1.",
+        "Set svn:externals property on externals directory",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="externals/",
+                properties={
+                    "svn:externals": f'{svn_urljoin(external_repo_url, "code/hello/")} hello'  # noqa
+                },
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Add copy of externals directory to trunk from revision 1, svn:externals property"
+        "is not set at that revision so no externals should be exported from the copied path",
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
                 path="trunk/externals/",
                 copyfrom_path=repo_url + "/externals",
                 copyfrom_rev=1,
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Remove trunk/externals directory.",
+        [
+            CommitChange(
+                change_type=CommitChangeType.Delete,
+                path="trunk/externals/",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Add copy of externals directory to trunk from revision 2 svn:externals property"
+        "is set at that revision so externals should be exported from the copy path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/externals/",
+                copyfrom_path=repo_url + "/externals",
+                copyfrom_rev=2,
             ),
         ],
     )

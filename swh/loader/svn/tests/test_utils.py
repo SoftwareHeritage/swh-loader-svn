@@ -416,6 +416,18 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             ),
         ),
         (
+            "http://svn.thirdparty.com/repos/My%20Project 'My Project'",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                "My Project",
+                "http://svn.thirdparty.com/repos/My Project",
+                None,
+                None,
+                False,
+            ),
+        ),
+        (
             'http://svn.thirdparty.com/repos/My%20%20%20Project "My   Project"',
             "trunk/externals",
             "http://svn.example.org/repos/test",

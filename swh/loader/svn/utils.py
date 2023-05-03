@@ -296,11 +296,11 @@ def parse_external_definition(
             path = f'"{path}"'
         elif external_part.endswith('\\"'):
             continue
-        elif external_part.startswith('"'):
-            external_split = external.split('"')
-            path_prefix = external_part.strip('"')
+        elif external_part.startswith(('"', "'")):
+            external_split = external.split(external_part[0])
+            path_prefix = external_part.strip(external_part[0])
             path = next(iter([e for e in external_split if e.startswith(path_prefix)]))
-        elif external_part.endswith('"'):
+        elif external_part.endswith(('"', "'")):
             continue
         elif not external_part.startswith("\\") and external_part != "-r":
             # path of the external relative to dir_path

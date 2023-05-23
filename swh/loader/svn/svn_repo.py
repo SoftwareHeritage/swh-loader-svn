@@ -470,6 +470,7 @@ class SvnRepo:
                     break
                 path = path.replace(self.remote_url.rstrip("/") + "/", "")
                 for external_def in os.fsdecode(external_defs).split("\n"):
+                    external_def = external_def.strip(" \t\r")
                     # skip empty line or comment
                     if not external_def or external_def.startswith("#"):
                         continue

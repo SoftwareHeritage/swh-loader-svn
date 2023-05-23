@@ -365,7 +365,7 @@ class DirEditor:
                     # externals are set on that directory path, parse and store them
                     # for later processing in the close method
                     for external in value.split("\n"):
-                        external = external.rstrip("\r")
+                        external = external.strip(" \t\r")
                         # skip empty line or comment
                         if not external or external.startswith("#"):
                             continue

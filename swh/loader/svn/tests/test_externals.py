@@ -2189,3 +2189,58 @@ def test_loader_quoted_external_definition(
         type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_with_externals_to_strip(
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
+):
+    # first commit on external
+    add_commit(
+        external_repo_url,
+        "Create some directories and files in an external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/hello/hello-world",
+                properties={"svn:executable": "*"},
+                data=b"#!/bin/bash\necho Hello World !",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/bar/bar.sh",
+                properties={"svn:executable": "*"},
+                data=b"#!/bin/bash\necho bar",
+            ),
+        ],
+    )
+
+    # first commit
+    add_commit(
+        repo_url,
+        ("Set svn:externals property on trunk/externals path of repository to load."),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/externals/",
+                properties={
+                    "svn:externals": (
+                        f"  {svn_urljoin(external_repo_url, 'code/hello')} src/code/hello\t\n"
+                        f"\t{svn_urljoin(external_repo_url, 'code/bar')} src/code/bar   \n"
+                        "\t   \n"
+                    )
+                },
+            ),
+        ],
+    )
+
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1, debug=True
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)

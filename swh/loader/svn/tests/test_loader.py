@@ -80,7 +80,7 @@ def test_loader_svn_not_found(
     svn_loader_cls, swh_storage, tmp_path, exception_msg, mocker
 ):
     """Given unknown repository issues, the loader visit ends up in status not_found"""
-    mock = mocker.patch("swh.loader.svn.loader.SvnRepo")
+    mock = mocker.patch("swh.loader.svn.svn_repo.SvnRepo")
     mock.side_effect = SubversionException(exception_msg, 0)
 
     unknown_repo_url = "unknown-repository"
@@ -106,7 +106,7 @@ def test_loader_svn_not_found(
 )
 def test_loader_svn_failures(svn_loader_cls, swh_storage, tmp_path, exception, mocker):
     """Given any errors raised, the loader visit ends up in status failed"""
-    mock = mocker.patch("swh.loader.svn.loader.SvnRepo")
+    mock = mocker.patch("swh.loader.svn.svn_repo.SvnRepo")
     mock.side_effect = exception
 
     existing_repo_url = "existing-repo-url"
@@ -1306,9 +1306,7 @@ def test_loader_first_revision_is_not_number_one(
             """Overrides logs method to skip revision number one in yielded revisions"""
             yield from super().logs(revision_start + 1, revision_end)
 
-    from swh.loader.svn import loader
-
-    mocker.patch.object(loader, "SvnRepo", SvnRepoSkipFirstRevision)
+    mocker.patch("swh.loader.svn.svn_repo.SvnRepo", SvnRepoSkipFirstRevision)
 
     for filename in ("foo", "bar", "baz"):
         add_commit(
@@ -1651,7 +1649,9 @@ def test_svn_loader_incremental_replay_start_with_empty_directory(
 
     from swh.loader.svn import loader
 
-    mocker.patch.object(loader, "SvnRepo", SvnRepoCheckReplayStartWithEmptyDirectory)
+    mocker.patch(
+        "swh.loader.svn.svn_repo.SvnRepo", SvnRepoCheckReplayStartWithEmptyDirectory
+    )
 
     # second load, incremental
     loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)

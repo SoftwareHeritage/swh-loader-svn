@@ -26,6 +26,7 @@ from subvertpy.ra import (
     get_username_provider,
 )
 
+from swh.loader.exception import NotFound
 from swh.model.from_disk import Directory as DirectoryFromDisk
 from swh.model.model import Content, Directory, SkippedContent
 
@@ -656,3 +657,24 @@ class SvnRepo:
             raise ValueError("First revision date is greater than reference date")
 
         return bisect.bisect_right(RevisionList(self), date)
+
+
+def get_svn_repo(*args, **kwargs):
+    """Instantiate an SvnRepo class able to trap SubversionException if any raises.
+
+    Raises:
+        NotFound: if the repository is not found
+        SubversionException: if any other kind of subversion problems arise
+    """
+    try:
+        return SvnRepo(*args, **kwargs)
+    except SubversionException as e:
+        error_msgs = [
+            "Unable to connect to a repository at URL",
+            "Unknown URL type",
+            "is not a working copy",
+        ]
+        for msg in error_msgs:
+            if msg in e.args[0]:
+                raise NotFound(e)
+        raise

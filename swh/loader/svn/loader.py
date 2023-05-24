@@ -17,12 +17,10 @@ from subprocess import PIPE, Popen
 import tempfile
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
-from subvertpy import SubversionException
-
 from swh.loader.core.loader import BaseLoader
 from swh.loader.core.utils import clean_dangling_folders
 from swh.loader.exception import NotFound
-from swh.loader.svn.svn_repo import SvnRepo
+from swh.loader.svn.svn_repo import get_svn_repo
 from swh.model import from_disk, hashutil
 from swh.model.model import (
     Content,
@@ -443,23 +441,6 @@ Local repository not cleaned up for investigation: %s""",
             # before the post_load operation
             self.svnrepo.clean_fs(self.svnrepo.local_url)
 
-    def svn_repo(self, *args, **kwargs):
-        """Wraps the creation of SvnRepo object and handles not found repository
-        errors."""
-        try:
-            return SvnRepo(*args, **kwargs)
-        except SubversionException as e:
-            error_msgs = [
-                "Unable to connect to a repository at URL",
-                "Unknown URL type",
-                "is not a working copy",
-            ]
-            for msg in error_msgs:
-                if msg in e.args[0]:
-                    self._load_status = "uneventful"
-                    raise NotFound(e)
-            raise
-
     def prepare(self):
         latest_snapshot_revision = self._latest_snapshot_revision(self.origin.url)
         if latest_snapshot_revision:
@@ -472,7 +453,7 @@ Local repository not cleaned up for investigation: %s""",
 
         local_dirname = self._create_tmp_dir(self.temp_directory)
 
-        self.svnrepo = self.svn_repo(
+        self.svnrepo = get_svn_repo(
             self.svn_url,
             self.origin.url,
             local_dirname,
@@ -850,7 +831,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         # subversion origin and get the number of the last one
         last_loaded_svn_rev = self.get_last_loaded_svn_rev(self.origin.url)
 
-        self.svnrepo = self.svn_repo(
+        self.svnrepo = get_svn_repo(
             self.origin.url,
             self.origin.url,
             self.temp_dir,

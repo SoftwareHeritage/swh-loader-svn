@@ -29,7 +29,7 @@ from subvertpy.ra import (
 from swh.model.from_disk import Directory as DirectoryFromDisk
 from swh.model.model import Content, Directory, SkippedContent
 
-from . import converters, replay
+from . import converters, fast_crawler, replay
 from .svn_retry import svn_retry
 from .utils import is_recursive_external, parse_external_definition
 
@@ -441,35 +441,28 @@ class SvnRepo:
         elif not self.replay_started:
             # revisions replay has not started, we need to check if svn:externals
             # properties are set and if some external URLs are relative to pick
-            # the right export URL,recursive externals are also checked
+            # the right export URL, recursive externals are also checked
 
-            # get all svn:externals properties recursively
-            if self.remote_url.startswith("file://"):
-                externals = self.propget(
-                    "svn:externals", self.remote_url, revision, revision, True
-                )
-            else:
-                # recursive propget operation is terribly slow over the network,
-                # better doing it from a freshly checked out working copy as it is faster
-                with tempfile.TemporaryDirectory(
-                    dir=self.local_dirname, prefix=f"checkout-revision-{revision}."
-                ) as co_dirname:
-
-                    self.checkout(
-                        self.remote_url, co_dirname, revision, ignore_externals=True
-                    )
-                    # get all svn:externals properties recursively
-                    externals = self.propget(
-                        "svn:externals", co_dirname, None, None, True
-                    )
+            # recursive propget operation is terribly slow over the network,
+            # so we use a much faster approach relying on a C++ extension module
+            paths = fast_crawler.crawl_repository(
+                self.remote_url,
+                revnum=revision,
+                username=self.username,
+                password=self.password,
+            )
+            externals = {
+                path: path_info["props"]["svn:externals"]
+                for path, path_info in paths.items()
+                if path_info["type"] == "dir" and "svn:externals" in path_info["props"]
+            }
 
             self.has_relative_externals = False
             self.has_recursive_externals = False
             for path, external_defs in externals.items():
                 if self.has_relative_externals or self.has_recursive_externals:
                     break
-                path = path.replace(self.remote_url.rstrip("/") + "/", "")
-                for external_def in os.fsdecode(external_defs).split("\n"):
+                for external_def in external_defs.split("\n"):
                     external_def = external_def.strip(" \t\r")
                     # skip empty line or comment
                     if not external_def or external_def.startswith("#"):

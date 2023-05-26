@@ -1,3 +1,11 @@
+swh-loader-svn (1.7.0-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 1.7.0     - (tagged by Antoine Lambert
+    <anlambert@softwareheritage.org> on 2023-05-26 16:33:45 +0200)
+  * Upstream changes:     - version 1.7.0
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 26 May 2023 14:57:31 +0000
+
 swh-loader-svn (1.6.0-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 1.6.0     - (tagged by Antoine Lambert

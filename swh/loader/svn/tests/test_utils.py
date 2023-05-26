@@ -409,7 +409,19 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             "http://svn.example.org/repos/test",
             (
                 "My Project",
-                "http://svn.thirdparty.com/repos/My%20Project",
+                "http://svn.thirdparty.com/repos/My Project",
+                None,
+                None,
+                False,
+            ),
+        ),
+        (
+            "http://svn.thirdparty.com/repos/My%20Project 'My Project'",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                "My Project",
+                "http://svn.thirdparty.com/repos/My Project",
                 None,
                 None,
                 False,
@@ -421,7 +433,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             "http://svn.example.org/repos/test",
             (
                 "My   Project",
-                "http://svn.thirdparty.com/repos/My%20%20%20Project",
+                "http://svn.thirdparty.com/repos/My   Project",
                 None,
                 None,
                 False,
@@ -433,7 +445,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             "http://svn.example.org/repos/test",
             (
                 '"Quotes Too"',
-                "http://svn.thirdparty.com/repos/%22Quotes%20Too%22",
+                'http://svn.thirdparty.com/repos/"Quotes Too"',
                 None,
                 None,
                 False,
@@ -445,7 +457,7 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             "http://svn.example.org/repos/test",
             (
                 '"Quotes   Too"',
-                "http://svn.thirdparty.com/repos/%22Quotes%20%20%20Too%22",
+                'http://svn.thirdparty.com/repos/"Quotes   Too"',
                 None,
                 None,
                 False,
@@ -543,6 +555,18 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
             (
                 "third-party/sounds",
                 "http://svn.example.com/repos/sounds",
+                123,
+                150,
+                False,
+            ),
+        ),
+        (
+            "-r 123 http://svn.example.com/repos/some%20sounds@150 third-party/sounds",
+            "trunk/externals",
+            "http://svn.example.org/repos/test",
+            (
+                "third-party/sounds",
+                "http://svn.example.com/repos/some sounds",
                 123,
                 150,
                 False,

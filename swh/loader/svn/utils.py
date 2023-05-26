@@ -13,7 +13,7 @@ import shutil
 from subprocess import PIPE, Popen, call, run
 import tempfile
 from typing import Optional, Tuple
-from urllib.parse import quote, urlparse, urlunparse
+from urllib.parse import quote, unquote, urlparse, urlunparse
 
 import iso8601
 from subvertpy import SubversionException
@@ -296,11 +296,11 @@ def parse_external_definition(
             path = f'"{path}"'
         elif external_part.endswith('\\"'):
             continue
-        elif external_part.startswith('"'):
-            external_split = external.split('"')
-            path_prefix = external_part.strip('"')
+        elif external_part.startswith(('"', "'")):
+            external_split = external.split(external_part[0])
+            path_prefix = external_part.strip(external_part[0])
             path = next(iter([e for e in external_split if e.startswith(path_prefix)]))
-        elif external_part.endswith('"'):
+        elif external_part.endswith(('"', "'")):
             continue
         elif not external_part.startswith("\\") and external_part != "-r":
             # path of the external relative to dir_path
@@ -339,7 +339,7 @@ def parse_external_definition(
     if not external_url or not path:
         raise ValueError(f"Failed to parse external definition '{external}'")
 
-    return path.rstrip("/"), external_url, revision, peg_revision, relative_url
+    return path.rstrip("/"), unquote(external_url), revision, peg_revision, relative_url
 
 
 def is_recursive_external(

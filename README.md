@@ -1,26 +1,26 @@
-swh-loader-svn
-==============
+# swh-loader-svn [![Build Status](https://jenkins.softwareheritage.org/job/DLDSVN/job/master/badge/icon)](https://jenkins.softwareheritage.org/job/DLDSVN/job/master/)
 
-The Software Heritage SVN Loader is a tool and a library to walk a remote svn repository
-and inject into the SWH dataset all contained files that weren't known before.
+The Software Heritage Subversion loader is a tool and a library to walk a remote svn
+repository and inject into the Software Heritage archive all contained files, directories
+and commits that weren't known before.
 
 The main entry points are
 
-- :class:`swh.loader.svn.loader.SvnLoader` for the main svn loader which ingests content out of
+- `swh.loader.svn.loader.SvnLoader` for the main svn loader which ingests content out of
   a remote svn repository
 
-- :class:`swh.loader.svn.loader.SvnLoaderFromDumpArchive` which mounts a repository out of a
+- `swh.loader.svn.loader.SvnLoaderFromDumpArchive` which mounts a repository out of a
   svn dump prior to ingest it.
 
-- :class:`swh.loader.svn.loader.SvnLoaderFromRemoteDump` which mounts a repository with
+- `swh.loader.svn.loader.SvnLoaderFromRemoteDump` which mounts a repository with
   svnrdump prior to ingest its content.
 
-# CLI run
+## CLI run
 
 With the configuration:
 
 /tmp/loader_svn.yml:
-```
+```yml
 storage:
   cls: remote
   args:
@@ -29,7 +29,6 @@ storage:
 
 Run:
 
-```
-swh loader --config-file /tmp/loader_svn.yml \
-    run svn <svn-repository-url>
+```shell
+$ swh loader --config-file /tmp/loader_svn.yml run svn <svn-repository-url>
 ```

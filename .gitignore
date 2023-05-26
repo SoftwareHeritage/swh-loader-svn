@@ -13,3 +13,4 @@ build/
 dist/
 .tox/
 .mypy_cache/
+*.so

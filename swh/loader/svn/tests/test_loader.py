@@ -2240,6 +2240,9 @@ def test_loader_basic_authentication_required(
 
     check_snapshot(loader.snapshot, loader.storage)
 
+    loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
+    assert loader.load() == {"status": "uneventful"}
+
 
 def test_loader_with_special_chars_in_svn_url(repo_url, tmp_path):
     content = b"foo"

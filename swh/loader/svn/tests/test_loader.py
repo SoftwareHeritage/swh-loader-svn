@@ -1942,7 +1942,7 @@ def test_loader_with_subprojects(
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
-                path="project1/foo.sh",
+                path="projects/project1/foo.sh",
                 data=b"#!/bin/bash\necho foo",
             ),
         ],
@@ -1955,7 +1955,7 @@ def test_loader_with_subprojects(
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
-                path="project2/bar.sh",
+                path="projects/project2/bar.sh",
                 data=b"#!/bin/bash\necho bar",
             ),
         ],
@@ -1968,7 +1968,7 @@ def test_loader_with_subprojects(
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
-                path="project3/baz.sh",
+                path="projects/project3/baz.sh",
                 data=b"#!/bin/bash\necho baz",
             ),
         ],
@@ -1977,7 +1977,7 @@ def test_loader_with_subprojects(
     for i in range(1, 4):
         # load each project in the repository separately and check behavior
         # is the same if origin URL has a trailing slash or not
-        origin_url = f"{repo_url}/project{i}{'/' if i%2 else ''}"
+        origin_url = f"{repo_url}/projects/project{i}{'/' if i%2 else ''}"
 
         loader_params = {
             "storage": swh_storage,
@@ -2005,6 +2005,12 @@ def test_loader_with_subprojects(
         )
         check_snapshot(loader.snapshot, loader.storage)
 
+        # check that head revision targets a directory with a single file
+        head_rev_id = loader.snapshot.branches[b"HEAD"].target
+        head_rev = swh_storage.revision_get([head_rev_id])[0]
+        root_dir = list(swh_storage.directory_ls(head_rev.directory))
+        assert len(root_dir) == 1 and root_dir[0]["type"] == "file"
+
         if svn_loader_cls == SvnLoaderFromRemoteDump:
             dump_revisions.assert_called_once_with(origin_url.rstrip("/"), -1)
 
@@ -2018,7 +2024,9 @@ def test_loader_with_subprojects(
         # each project origin must have
         assert get_stats(loader.storage) == {
             "content": i,  # one content
-            "directory": 2 * i,  # two directories
+            # three directories (we load them all but head revision is rooted to
+            # the subproject directory)
+            "directory": 3 * i,
             "origin": i,
             "origin_visit": 2 * i,  # two visits
             "release": 0,

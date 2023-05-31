@@ -114,7 +114,6 @@ class SvnLoader(BaseLoader):
         # state from previous visit
         self.latest_snapshot = None
         self.latest_revision: Optional[Revision] = None
-        self.from_dump = False
 
     def pre_cleanup(self):
         """Cleanup potential dangling files from prior runs (e.g. OOM killed
@@ -458,7 +457,6 @@ Local repository not cleaned up for investigation: %s""",
             self.origin.url,
             local_dirname,
             self.max_content_size,
-            self.from_dump,
             debug=self.debug,
         )
 
@@ -641,7 +639,6 @@ class SvnLoaderFromDumpArchive(SvnLoader):
         self.archive_path = archive_path
         self.temp_dir = None
         self.repo_path = None
-        self.from_dump = True
 
     def prepare(self):
         self.log.info("Archive to mount and load %s", self.archive_path)
@@ -695,7 +692,6 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             check_revision=check_revision,
             **kwargs,
         )
-        self.from_dump = True
         self.temp_dir = self._create_tmp_dir(self.temp_directory)
         self.repo_path = None
         self.truncated_dump = False
@@ -837,7 +833,6 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             self.temp_dir,
             self.max_content_size,
             debug=self.debug,
-            from_dump=True,
         )
 
         # Ensure to use remote URL retrieved by SvnRepo as origin URL might redirect

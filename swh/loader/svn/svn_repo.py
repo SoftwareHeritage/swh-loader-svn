@@ -60,7 +60,6 @@ class SvnRepo:
         origin_url: Optional[str] = None,
         local_dirname: Optional[str] = None,
         max_content_length: int = 100000,
-        from_dump: bool = False,
         debug: bool = False,
     ):
         if origin_url is None:
@@ -73,7 +72,6 @@ class SvnRepo:
         self.local_dirname = local_dirname
 
         self.origin_url = origin_url
-        self.from_dump = from_dump
 
         # default auth provider for anonymous access
         auth_providers = [get_username_provider()]
@@ -117,9 +115,6 @@ class SvnRepo:
 
         self.remote_access_url = self.remote_url
 
-        if not self.from_dump:
-            self.remote_url = self.info(self.remote_url).repos_root_url
-
         local_name = os.path.basename(self.remote_url)
         self.local_url = os.path.join(self.local_dirname, local_name).encode("utf-8")
 
@@ -137,12 +132,12 @@ class SvnRepo:
         self.has_recursive_externals = False
         self.replay_started = False
 
-        # compute root directory path from the remote repository URL, required to
+        # compute root directory path from the origin URL, required to
         # properly load the sub-tree of a repository mounted from a dump file
-        self.repos_root_url = self.info(self.origin_url).repos_root_url
-        self.root_directory = self.origin_url.rstrip("/").replace(
-            self.repos_root_url, "", 1
-        )
+        repos_root_url = self.info(self.origin_url).repos_root_url
+        self.root_directory = self.origin_url.rstrip("/").replace(repos_root_url, "", 1)
+        # get root repository URL from the remote URL
+        self.repos_root_url = self.info(self.remote_url).repos_root_url
 
     def __del__(self):
         # ensure temporary directory is removed when created by constructor
@@ -180,13 +175,9 @@ class SvnRepo:
 
         message = revprops.get(properties.PROP_REVISION_LOG, DEFAULT_AUTHOR_MESSAGE)
 
-        has_changes = (
-            not self.from_dump
-            or changed_paths is not None
-            and any(
-                changed_path.startswith(self.root_directory)
-                for changed_path in changed_paths.keys()
-            )
+        has_changes = changed_paths is not None and any(
+            changed_path.startswith(self.root_directory)
+            for changed_path in changed_paths.keys()
         )
 
         return {

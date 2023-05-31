@@ -2178,8 +2178,11 @@ def test_loader_svn_from_remote_dump_url_redirect(swh_storage, tmp_path, mocker)
     assert loader.dump_svn_revisions.call_args_list[0][0][0] == repo_redirect_url
 
 
+@pytest.mark.parametrize(
+    "credentials", [("johndoe", "toto"), ("anonymous", "anonymous")]
+)
 def test_loader_basic_authentication_required(
-    swh_storage, repo_url, tmp_path, svn_loader_cls, svnserve
+    swh_storage, repo_url, tmp_path, svn_loader_cls, svnserve, credentials
 ):
 
     # add file to empty test repo
@@ -2199,8 +2202,7 @@ def test_loader_basic_authentication_required(
     repo_path = repo_url.replace("file://", "")
     repo_root = os.path.dirname(repo_path)
     repo_name = os.path.basename(repo_path)
-    username = "anonymous"
-    password = "anonymous"
+    username, password = credentials
     port = 12000
     repo_url_no_auth = f"svn://localhost:{port}/{repo_name}"
     repo_url = f"svn://{username}:{password}@localhost:{port}/{repo_name}"
@@ -2232,9 +2234,13 @@ def test_loader_basic_authentication_required(
     # execute svnserve
     svnserve(repo_root, port)
 
-    # check loading failed with no authentication
+    # check loading failed with no authentication in URL apart for anonymous credentials
     loader = svn_loader_cls(swh_storage, repo_url_no_auth, temp_directory=tmp_path)
-    assert loader.load() == {"status": "uneventful"}
+    assert (
+        loader.load() == {"status": "uneventful"}
+        if username != "anonymous"
+        else {"status": "eventful"}
+    )
 
     # check loading succeeded with authentication
     loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)

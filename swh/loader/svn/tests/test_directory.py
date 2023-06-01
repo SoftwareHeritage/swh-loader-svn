@@ -4,36 +4,16 @@
 # See top-level LICENSE file for more information
 
 import os
-from typing import Dict, List
 
 from swh.loader.core.nar import Nar
 from swh.loader.svn.directory import SvnDirectoryLoader
 from swh.loader.svn.svn_repo import get_svn_repo
 from swh.loader.tests import (
     assert_last_visit_matches,
+    fetch_nar_extids_from_checksums,
     get_stats,
     prepare_repository_from_archive,
 )
-from swh.model.model import ExtID
-from swh.storage.interface import StorageInterface
-
-
-def fetch_extids_from_checksums(
-    storage: StorageInterface, checksums: Dict[str, str]
-) -> List[ExtID]:
-    from swh.model.hashutil import hash_to_bytes
-
-    EXTID_TYPE_NAR = "nar-%s-raw-validated"
-    EXTID_TYPE_NAR_VERSION = 0
-
-    extids = []
-    for hash_algo, checksum in checksums.items():
-        id_type = EXTID_TYPE_NAR % hash_algo
-        ids = [hash_to_bytes(checksum)]
-        extid = storage.extid_get_from_extid(id_type, ids, EXTID_TYPE_NAR_VERSION)
-        extids.extend(extid)
-
-    return extids
 
 
 def compute_nar_hash_for_rev(repo_url: str, rev: int, hash_name: str = "sha256") -> str:
@@ -87,7 +67,7 @@ def test_loader_svn_directory(swh_storage, datadir, tmp_path):
     }
 
     # Ensure the extids got stored as well
-    extids = fetch_extids_from_checksums(loader.storage, checksums)
+    extids = fetch_nar_extids_from_checksums(loader.storage, checksums)
     assert len(extids) == len(checksums)
 
     # Another run on the same svn directory should be uneventful
@@ -136,7 +116,7 @@ def test_loader_svn_directory_hash_mismatch(swh_storage, datadir, tmp_path):
     }
 
     # Ensure no extids got stored
-    extids = fetch_extids_from_checksums(loader.storage, faulty_checksums)
+    extids = fetch_nar_extids_from_checksums(loader.storage, faulty_checksums)
     assert len(extids) == 0
 
 

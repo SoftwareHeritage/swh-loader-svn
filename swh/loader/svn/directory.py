@@ -12,6 +12,7 @@ from typing import Iterator, Optional
 
 from swh.loader.core.loader import BaseDirectoryLoader
 from swh.loader.svn.svn_repo import SvnRepo, get_svn_repo
+from swh.model.model import Snapshot, SnapshotBranch, TargetType
 
 
 class SvnDirectoryLoader(BaseDirectoryLoader):
@@ -25,6 +26,9 @@ class SvnDirectoryLoader(BaseDirectoryLoader):
        id: <bytes>
        branches:
          HEAD:
+           target_type: alias
+           target: rev_<svn-revision>
+         rev_<svn-revision>:
            target_type: directory
            target: <directory-id>
 
@@ -51,3 +55,20 @@ class SvnDirectoryLoader(BaseDirectoryLoader):
         assert self.svnrepo is not None
         _, local_url = self.svnrepo.export_temporary(self.svn_revision)
         yield Path(local_url.decode())
+
+    def build_snapshot(self) -> Snapshot:
+        """Build snapshot without losing the svn revision context."""
+        assert self.directory is not None
+        branch_name = f"rev_{self.svn_revision}".encode()
+        return Snapshot(
+            branches={
+                b"HEAD": SnapshotBranch(
+                    target_type=TargetType.ALIAS,
+                    target=branch_name,
+                ),
+                branch_name: SnapshotBranch(
+                    target_type=TargetType.DIRECTORY,
+                    target=self.directory.hash,
+                ),
+            }
+        )

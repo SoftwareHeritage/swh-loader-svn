@@ -48,12 +48,19 @@ def test_loader_svn_directory(swh_storage, datadir, tmp_path):
 
     assert actual_result == {"status": "eventful"}
 
-    assert_last_visit_matches(
+    actual_visit = assert_last_visit_matches(
         swh_storage,
         repo_url,
         status="full",
         type="svn-export",
     )
+
+    snapshot = swh_storage.snapshot_get(actual_visit.snapshot)
+    assert snapshot is not None
+
+    branches = snapshot["branches"].keys()
+    expected_branch = f"rev_{svn_revision}".encode()
+    assert set(branches) == {b"HEAD", expected_branch}
 
     assert get_stats(swh_storage) == {
         "content": 18,

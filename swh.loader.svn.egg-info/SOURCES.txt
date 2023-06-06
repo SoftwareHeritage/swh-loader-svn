@@ -41,6 +41,7 @@ swh.loader.svn.egg-info/top_level.txt
 swh/loader/__init__.py
 swh/loader/svn/__init__.py
 swh/loader/svn/converters.py
+swh/loader/svn/directory.py
 swh/loader/svn/exception.py
 swh/loader/svn/fast_crawler.cpp
 swh/loader/svn/fast_crawler.pyi
@@ -54,6 +55,7 @@ swh/loader/svn/utils.py
 swh/loader/svn/tests/__init__.py
 swh/loader/svn/tests/conftest.py
 swh/loader/svn/tests/test_converters.py
+swh/loader/svn/tests/test_directory.py
 swh/loader/svn/tests/test_externals.py
 swh/loader/svn/tests/test_fast_crawler.py
 swh/loader/svn/tests/test_loader.org
@@ -61,6 +63,7 @@ swh/loader/svn/tests/test_loader.py
 swh/loader/svn/tests/test_svn_repo.py
 swh/loader/svn/tests/test_svn_retry.py
 swh/loader/svn/tests/test_task.py
+swh/loader/svn/tests/test_task_directory.py
 swh/loader/svn/tests/test_utils.py
 swh/loader/svn/tests/utils.py
 swh/loader/svn/tests/data/httthttt.tgz

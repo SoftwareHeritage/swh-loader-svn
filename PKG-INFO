@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: swh.loader.svn
-Version: 1.7.0
+Version: 1.8.0
 Summary: Software Heritage Loader SVN
 Home-page: https://forge.softwareheritage.org/diffusion/DLDSVN
 Author: Software Heritage developers
@@ -36,6 +36,9 @@ The main entry points are
 
 - `swh.loader.svn.loader.SvnLoaderFromRemoteDump` which mounts a repository with
   svnrdump prior to ingest its content.
+
+- `swh.loader.svn.directory.SvnDirectoryLoader` which ingests an svn tree at a specific
+  revision.
 
 ## CLI run
 

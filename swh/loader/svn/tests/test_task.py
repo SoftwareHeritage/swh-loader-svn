@@ -1,20 +1,13 @@
-# Copyright (C) 2019-2022  The Software Heritage developers
+# Copyright (C) 2019-2023  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-import uuid
-
 import pytest
 
-from swh.scheduler.model import ListedOrigin, Lister
+from swh.scheduler.model import ListedOrigin
 
-NAMESPACE = "swh.loader.svn"
-
-
-@pytest.fixture
-def svn_lister():
-    return Lister(name="svn-lister", instance_name="example", id=uuid.uuid4())
+from .conftest import NAMESPACE
 
 
 @pytest.fixture

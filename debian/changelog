@@ -1,3 +1,15 @@
+swh-loader-svn (1.8.0-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 1.8.0     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2023-06-06 14:44:04
+    +0200)
+  * Upstream changes:     - v1.8.0     - Add svn directory loader in
+    charge of ingesting specific svn tree     - svn_repo: Handle
+    anonymous credentials in get_svn_repo     - svn_repo: Optimize
+    export of a remote subversion sub-path
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Tue, 06 Jun 2023 12:50:47 +0000
+
 swh-loader-svn (1.7.0-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 1.7.0     - (tagged by Antoine Lambert

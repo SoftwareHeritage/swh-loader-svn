@@ -26,6 +26,7 @@ from subvertpy.ra import (
     get_username_provider,
 )
 
+from swh.loader.exception import NotFound
 from swh.model.from_disk import Directory as DirectoryFromDisk
 from swh.model.model import Content, Directory, SkippedContent
 
@@ -59,8 +60,9 @@ class SvnRepo:
         origin_url: Optional[str] = None,
         local_dirname: Optional[str] = None,
         max_content_length: int = 100000,
-        from_dump: bool = False,
         debug: bool = False,
+        username: str = "",
+        password: str = "",
     ):
         if origin_url is None:
             origin_url = remote_url
@@ -72,15 +74,15 @@ class SvnRepo:
         self.local_dirname = local_dirname
 
         self.origin_url = origin_url
-        self.from_dump = from_dump
 
         # default auth provider for anonymous access
         auth_providers = [get_username_provider()]
 
         # check if basic auth is required
         parsed_origin_url = urlparse(origin_url)
-        self.username = parsed_origin_url.username or ""
-        self.password = parsed_origin_url.password or ""
+        self.username = parsed_origin_url.username or username
+        self.password = parsed_origin_url.password or password
+
         if self.username:
             # add basic auth provider for username/password
             auth_providers.append(
@@ -94,15 +96,16 @@ class SvnRepo:
                 )
             )
 
-            # we need to remove the authentication part in the origin URL to avoid
-            # errors when calling subversion API through subvertpy
-            self.origin_url = urlunparse(
-                parsed_origin_url._replace(
-                    netloc=parsed_origin_url.netloc.split("@", 1)[1]
+            if "@" in origin_url:
+                # we need to remove the authentication part in the origin URL to avoid
+                # errors when calling subversion API through subvertpy
+                self.origin_url = urlunparse(
+                    parsed_origin_url._replace(
+                        netloc=parsed_origin_url.netloc.split("@", 1)[1]
+                    )
                 )
-            )
-            if origin_url == remote_url:
-                remote_url = self.origin_url
+                if origin_url == remote_url:
+                    remote_url = self.origin_url
 
         self.remote_url = remote_url.rstrip("/")
 
@@ -115,9 +118,6 @@ class SvnRepo:
             self.remote_url = self.info(self.remote_url).url
 
         self.remote_access_url = self.remote_url
-
-        if not self.from_dump:
-            self.remote_url = self.info(self.remote_url).repos_root_url
 
         local_name = os.path.basename(self.remote_url)
         self.local_url = os.path.join(self.local_dirname, local_name).encode("utf-8")
@@ -136,12 +136,12 @@ class SvnRepo:
         self.has_recursive_externals = False
         self.replay_started = False
 
-        # compute root directory path from the remote repository URL, required to
+        # compute root directory path from the origin URL, required to
         # properly load the sub-tree of a repository mounted from a dump file
-        self.repos_root_url = self.info(self.origin_url).repos_root_url
-        self.root_directory = self.origin_url.rstrip("/").replace(
-            self.repos_root_url, "", 1
-        )
+        repos_root_url = self.info(self.origin_url).repos_root_url
+        self.root_directory = self.origin_url.rstrip("/").replace(repos_root_url, "", 1)
+        # get root repository URL from the remote URL
+        self.repos_root_url = self.info(self.remote_url).repos_root_url
 
     def __del__(self):
         # ensure temporary directory is removed when created by constructor
@@ -179,13 +179,9 @@ class SvnRepo:
 
         message = revprops.get(properties.PROP_REVISION_LOG, DEFAULT_AUTHOR_MESSAGE)
 
-        has_changes = (
-            not self.from_dump
-            or changed_paths is not None
-            and any(
-                changed_path.startswith(self.root_directory)
-                for changed_path in changed_paths.keys()
-            )
+        has_changes = changed_paths is not None and any(
+            changed_path.startswith(self.root_directory)
+            for changed_path in changed_paths.keys()
         )
 
         return {
@@ -656,3 +652,46 @@ class SvnRepo:
             raise ValueError("First revision date is greater than reference date")
 
         return bisect.bisect_right(RevisionList(self), date)
+
+
+def get_svn_repo(*args, **kwargs):
+    """Instantiate an SvnRepo class and trap SubversionException if any raises.
+    In case of connection error to the repository, its read access using anonymous
+    credentials is also attempted.
+
+    Raises:
+        NotFound: if the repository is not found
+        SubversionException: if any other kind of subversion problems arise
+    """
+    credentials = [(None, None), ("anonymous", ""), ("anonymous", "anonymous")]
+    for i, (username, password) in enumerate(credentials):
+        try:
+            if username is not None:
+                logger.debug(
+                    "Retrying to connect to %s with username '%s' and password '%s'",
+                    args[0],
+                    username,
+                    password,
+                )
+                kwargs["username"] = username
+                kwargs["password"] = password
+            return SvnRepo(*args, **kwargs)
+        except SubversionException as e:
+            connection_error_message = "Unable to connect to a repository at URL"
+            error_msgs = [
+                "Unknown URL type",
+                "is not a working copy",
+            ]
+            # no more credentials to test, raise NotFound
+            if i == len(credentials) - 1:
+                error_msgs.append(connection_error_message)
+            for msg in error_msgs:
+                if msg in e.args[0]:
+                    raise NotFound(e)
+
+            if connection_error_message in e.args[0]:
+                # still some credentials to test, continue attempting to connect
+                # to the repository
+                continue
+            else:
+                raise

@@ -388,17 +388,17 @@ def get_head_revision_at_date(svn_url: str, date: datetime) -> int:
         SubversionException: repository URL is not valid
         ValueError: first revision date is greater than given date
     """
-    from swh.loader.svn.svn_repo import SvnRepo
+    from swh.loader.svn.svn_repo import get_svn_repo
 
-    return SvnRepo(svn_url).get_head_revision_at_date(date)
+    return get_svn_repo(svn_url).get_head_revision_at_date(date)
 
 
 @lru_cache()
 def _get_repo_root_url(svn_url: str) -> str:
 
-    from swh.loader.svn.svn_repo import SvnRepo
+    from swh.loader.svn.svn_repo import get_svn_repo
 
-    return SvnRepo(svn_url).repos_root_url
+    return get_svn_repo(svn_url).repos_root_url
 
 
 def get_repo_root_url(svn_url):

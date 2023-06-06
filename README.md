@@ -15,6 +15,9 @@ The main entry points are
 - `swh.loader.svn.loader.SvnLoaderFromRemoteDump` which mounts a repository with
   svnrdump prior to ingest its content.
 
+- `swh.loader.svn.directory.SvnDirectoryLoader` which ingests an svn tree at a specific
+  revision.
+
 ## CLI run
 
 With the configuration:

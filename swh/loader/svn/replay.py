@@ -121,8 +121,9 @@ class FileEditor:
 
         if self.path not in self.editor.external_paths:
             # export file to disk if its path does not match an external
+            url = svn_urljoin(self.svnrepo.repos_root_url, os.fsdecode(self.path))
             self.svnrepo.export(
-                os.path.join(self.svnrepo.remote_url, os.fsdecode(self.path)),
+                url,
                 to=self.fullpath,
                 rev=self.editor.revnum,
                 peg_rev=self.editor.revnum,
@@ -180,6 +181,8 @@ class DirEditor:
         self.path = path
         # build directory on init
         os.makedirs(rootpath, exist_ok=True)
+        if path and path not in self.directory:
+            self.directory[path] = from_disk.Directory()
         self.dir_states = dir_states
         self.svnrepo = svnrepo
         self.editor = svnrepo.swhreplay.editor
@@ -239,7 +242,7 @@ class DirEditor:
             if path_bytes and path_bytes not in self.directory:
                 self.directory[path_bytes] = from_disk.Directory()
         else:
-            url = svn_urljoin(self.svnrepo.remote_url, copyfrom_path)
+            url = svn_urljoin(self.svnrepo.repos_root_url, copyfrom_path)
             self.remove_child(path_bytes)
             self.svnrepo.export(
                 url,
@@ -332,7 +335,7 @@ class DirEditor:
         if copyfrom_rev == -1:
             self.directory[path_bytes] = from_disk.Content()
         else:
-            url = svn_urljoin(self.svnrepo.remote_url, copyfrom_path)
+            url = svn_urljoin(self.svnrepo.repos_root_url, copyfrom_path)
             self.remove_child(path_bytes)
             self.svnrepo.export(
                 url,
@@ -711,7 +714,7 @@ class DirEditor:
                 subpath = b"/".join(subpath_split[0:i])
                 try:
                     self.svnrepo.info(
-                        svn_urljoin(self.svnrepo.remote_url, os.fsdecode(subpath)),
+                        svn_urljoin(self.svnrepo.repos_root_url, os.fsdecode(subpath)),
                         peg_revision=self.editor.revnum,
                         revision=self.editor.revnum,
                     )
@@ -724,8 +727,9 @@ class DirEditor:
             # externals can overlap with versioned files so we must restore
             # them after removing the path above
             dest_path = os.path.join(self.rootpath, fullpath)
+            url = svn_urljoin(self.svnrepo.repos_root_url, os.fsdecode(fullpath))
             self.svnrepo.export(
-                svn_urljoin(self.svnrepo.remote_url, os.fsdecode(fullpath)),
+                url,
                 to=dest_path,
                 peg_rev=self.editor.revnum,
                 ignore_keywords=True,

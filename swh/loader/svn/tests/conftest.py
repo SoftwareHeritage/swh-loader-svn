@@ -5,12 +5,17 @@
 
 import subprocess
 from typing import Any, Dict
+import uuid
 
 import pytest
 
-from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump, SvnRepo
+from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
+from swh.loader.svn.svn_repo import SvnRepo
+from swh.scheduler.model import Lister
 
 from .utils import create_repo
+
+NAMESPACE = "swh.loader.svn"
 
 
 @pytest.fixture(params=[SvnLoader, SvnLoaderFromRemoteDump])
@@ -88,3 +93,8 @@ def svnserve():
     yield run_svnserve
 
     svnserve_proc.terminate()
+
+
+@pytest.fixture
+def svn_lister():
+    return Lister(name="svn-lister", instance_name="example", id=uuid.uuid4())

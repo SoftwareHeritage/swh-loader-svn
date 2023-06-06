@@ -17,12 +17,10 @@ from subprocess import PIPE, Popen
 import tempfile
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
-from subvertpy import SubversionException
-
 from swh.loader.core.loader import BaseLoader
 from swh.loader.core.utils import clean_dangling_folders
 from swh.loader.exception import NotFound
-from swh.loader.svn.svn_repo import SvnRepo
+from swh.loader.svn.svn_repo import get_svn_repo
 from swh.model import from_disk, hashutil
 from swh.model.model import (
     Content,
@@ -116,7 +114,6 @@ class SvnLoader(BaseLoader):
         # state from previous visit
         self.latest_snapshot = None
         self.latest_revision: Optional[Revision] = None
-        self.from_dump = False
 
     def pre_cleanup(self):
         """Cleanup potential dangling files from prior runs (e.g. OOM killed
@@ -443,23 +440,6 @@ Local repository not cleaned up for investigation: %s""",
             # before the post_load operation
             self.svnrepo.clean_fs(self.svnrepo.local_url)
 
-    def svn_repo(self, *args, **kwargs):
-        """Wraps the creation of SvnRepo object and handles not found repository
-        errors."""
-        try:
-            return SvnRepo(*args, **kwargs)
-        except SubversionException as e:
-            error_msgs = [
-                "Unable to connect to a repository at URL",
-                "Unknown URL type",
-                "is not a working copy",
-            ]
-            for msg in error_msgs:
-                if msg in e.args[0]:
-                    self._load_status = "uneventful"
-                    raise NotFound(e)
-            raise
-
     def prepare(self):
         latest_snapshot_revision = self._latest_snapshot_revision(self.origin.url)
         if latest_snapshot_revision:
@@ -472,12 +452,11 @@ Local repository not cleaned up for investigation: %s""",
 
         local_dirname = self._create_tmp_dir(self.temp_directory)
 
-        self.svnrepo = self.svn_repo(
+        self.svnrepo = get_svn_repo(
             self.svn_url,
             self.origin.url,
             local_dirname,
             self.max_content_size,
-            self.from_dump,
             debug=self.debug,
         )
 
@@ -660,7 +639,6 @@ class SvnLoaderFromDumpArchive(SvnLoader):
         self.archive_path = archive_path
         self.temp_dir = None
         self.repo_path = None
-        self.from_dump = True
 
     def prepare(self):
         self.log.info("Archive to mount and load %s", self.archive_path)
@@ -714,7 +692,6 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             check_revision=check_revision,
             **kwargs,
         )
-        self.from_dump = True
         self.temp_dir = self._create_tmp_dir(self.temp_directory)
         self.repo_path = None
         self.truncated_dump = False
@@ -850,13 +827,12 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         # subversion origin and get the number of the last one
         last_loaded_svn_rev = self.get_last_loaded_svn_rev(self.origin.url)
 
-        self.svnrepo = self.svn_repo(
+        self.svnrepo = get_svn_repo(
             self.origin.url,
             self.origin.url,
             self.temp_dir,
             self.max_content_size,
             debug=self.debug,
-            from_dump=True,
         )
 
         # Ensure to use remote URL retrieved by SvnRepo as origin URL might redirect

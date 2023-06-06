@@ -15,9 +15,10 @@ from .utils import CommitChange, CommitChangeType, add_commit
 
 FIRST_COMMIT_DATE = datetime(year=2019, month=1, day=1, tzinfo=timezone.utc)
 NB_DAYS_BETWEEN_COMMITS = 2
+FILENAMES = ("foo", "bar", "baz")
 COMMITS = [
     {
-        "message": f"Create trunk/{file} file",
+        "message": f"Create trunk/{file} file and tags/1.0/{file}",
         "date": FIRST_COMMIT_DATE + i * timedelta(days=NB_DAYS_BETWEEN_COMMITS),
         "changes": [
             CommitChange(
@@ -25,9 +26,14 @@ COMMITS = [
                 path=f"trunk/{file}",
                 data=file.encode(),
             ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path=f"tags/1.0/{file}",
+                data=file.encode(),
+            ),
         ],
     }
-    for i, file in enumerate(("foo", "bar", "baz"))
+    for i, file in enumerate(FILENAMES)
 ]
 
 
@@ -55,6 +61,11 @@ def test_svn_repo_temp_dir_cleanup(repo_url):
 @pytest.fixture
 def svn_repo(repo_url):
     return SvnRepo(repo_url)
+
+
+@pytest.fixture
+def svn_repo_first_tag(repo_url):
+    return SvnRepo(repo_url + "/tags/1.0")
 
 
 def test_svn_repo_head_revision(svn_repo):
@@ -110,3 +121,21 @@ def test_svn_repo_get_head_revision_at_date(svn_repo):
                 )
                 == i + 1
             )
+
+
+def test_svn_repo_export_temporary_subproject(svn_repo_first_tag, mocker):
+    svn_repo_export = mocker.spy(svn_repo_first_tag, "export")
+    # export tags/1.0/ directory of the repository at HEAD revision
+    _, local_url = svn_repo_first_tag.export_temporary(len(COMMITS))
+    # check first tag URL was used as export URL
+    assert svn_repo_export.call_args_list[0][0][0].endswith("tags/1.0")
+    # get exported filesystem
+    export_content = list(os.walk(local_url))
+    # should be a single directory containing only files
+    assert len(export_content) == 1
+    _, subdirs, files = export_content[0]
+    assert len(subdirs) == 0
+    assert len(files) == len(FILENAMES)
+    # check that paths outside the export path were not exported
+    trunk_path = os.path.join(local_url, b"../../trunk")
+    assert not os.path.exists(trunk_path)

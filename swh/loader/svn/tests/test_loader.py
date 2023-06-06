@@ -80,7 +80,7 @@ def test_loader_svn_not_found(
     svn_loader_cls, swh_storage, tmp_path, exception_msg, mocker
 ):
     """Given unknown repository issues, the loader visit ends up in status not_found"""
-    mock = mocker.patch("swh.loader.svn.loader.SvnRepo")
+    mock = mocker.patch("swh.loader.svn.svn_repo.SvnRepo")
     mock.side_effect = SubversionException(exception_msg, 0)
 
     unknown_repo_url = "unknown-repository"
@@ -106,7 +106,7 @@ def test_loader_svn_not_found(
 )
 def test_loader_svn_failures(svn_loader_cls, swh_storage, tmp_path, exception, mocker):
     """Given any errors raised, the loader visit ends up in status failed"""
-    mock = mocker.patch("swh.loader.svn.loader.SvnRepo")
+    mock = mocker.patch("swh.loader.svn.svn_repo.SvnRepo")
     mock.side_effect = exception
 
     existing_repo_url = "existing-repo-url"
@@ -1306,9 +1306,7 @@ def test_loader_first_revision_is_not_number_one(
             """Overrides logs method to skip revision number one in yielded revisions"""
             yield from super().logs(revision_start + 1, revision_end)
 
-    from swh.loader.svn import loader
-
-    mocker.patch.object(loader, "SvnRepo", SvnRepoSkipFirstRevision)
+    mocker.patch("swh.loader.svn.svn_repo.SvnRepo", SvnRepoSkipFirstRevision)
 
     for filename in ("foo", "bar", "baz"):
         add_commit(
@@ -1651,7 +1649,9 @@ def test_svn_loader_incremental_replay_start_with_empty_directory(
 
     from swh.loader.svn import loader
 
-    mocker.patch.object(loader, "SvnRepo", SvnRepoCheckReplayStartWithEmptyDirectory)
+    mocker.patch(
+        "swh.loader.svn.svn_repo.SvnRepo", SvnRepoCheckReplayStartWithEmptyDirectory
+    )
 
     # second load, incremental
     loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
@@ -1942,7 +1942,7 @@ def test_loader_with_subprojects(
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
-                path="project1/foo.sh",
+                path="projects/project1/foo.sh",
                 data=b"#!/bin/bash\necho foo",
             ),
         ],
@@ -1955,7 +1955,7 @@ def test_loader_with_subprojects(
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
-                path="project2/bar.sh",
+                path="projects/project2/bar.sh",
                 data=b"#!/bin/bash\necho bar",
             ),
         ],
@@ -1968,7 +1968,7 @@ def test_loader_with_subprojects(
         [
             CommitChange(
                 change_type=CommitChangeType.AddOrUpdate,
-                path="project3/baz.sh",
+                path="projects/project3/baz.sh",
                 data=b"#!/bin/bash\necho baz",
             ),
         ],
@@ -1977,7 +1977,7 @@ def test_loader_with_subprojects(
     for i in range(1, 4):
         # load each project in the repository separately and check behavior
         # is the same if origin URL has a trailing slash or not
-        origin_url = f"{repo_url}/project{i}{'/' if i%2 else ''}"
+        origin_url = f"{repo_url}/projects/project{i}{'/' if i%2 else ''}"
 
         loader_params = {
             "storage": swh_storage,
@@ -2005,6 +2005,12 @@ def test_loader_with_subprojects(
         )
         check_snapshot(loader.snapshot, loader.storage)
 
+        # check that head revision targets a directory with a single file
+        head_rev_id = loader.snapshot.branches[b"HEAD"].target
+        head_rev = swh_storage.revision_get([head_rev_id])[0]
+        root_dir = list(swh_storage.directory_ls(head_rev.directory))
+        assert len(root_dir) == 1 and root_dir[0]["type"] == "file"
+
         if svn_loader_cls == SvnLoaderFromRemoteDump:
             dump_revisions.assert_called_once_with(origin_url.rstrip("/"), -1)
 
@@ -2018,7 +2024,9 @@ def test_loader_with_subprojects(
         # each project origin must have
         assert get_stats(loader.storage) == {
             "content": i,  # one content
-            "directory": 2 * i,  # two directories
+            # three directories (we load them all but head revision is rooted to
+            # the subproject directory)
+            "directory": 3 * i,
             "origin": i,
             "origin_visit": 2 * i,  # two visits
             "release": 0,
@@ -2170,8 +2178,11 @@ def test_loader_svn_from_remote_dump_url_redirect(swh_storage, tmp_path, mocker)
     assert loader.dump_svn_revisions.call_args_list[0][0][0] == repo_redirect_url
 
 
+@pytest.mark.parametrize(
+    "credentials", [("johndoe", "toto"), ("anonymous", "anonymous")]
+)
 def test_loader_basic_authentication_required(
-    swh_storage, repo_url, tmp_path, svn_loader_cls, svnserve
+    swh_storage, repo_url, tmp_path, svn_loader_cls, svnserve, credentials
 ):
 
     # add file to empty test repo
@@ -2191,8 +2202,7 @@ def test_loader_basic_authentication_required(
     repo_path = repo_url.replace("file://", "")
     repo_root = os.path.dirname(repo_path)
     repo_name = os.path.basename(repo_path)
-    username = "anonymous"
-    password = "anonymous"
+    username, password = credentials
     port = 12000
     repo_url_no_auth = f"svn://localhost:{port}/{repo_name}"
     repo_url = f"svn://{username}:{password}@localhost:{port}/{repo_name}"
@@ -2224,9 +2234,13 @@ def test_loader_basic_authentication_required(
     # execute svnserve
     svnserve(repo_root, port)
 
-    # check loading failed with no authentication
+    # check loading failed with no authentication in URL apart for anonymous credentials
     loader = svn_loader_cls(swh_storage, repo_url_no_auth, temp_directory=tmp_path)
-    assert loader.load() == {"status": "uneventful"}
+    assert (
+        loader.load() == {"status": "uneventful"}
+        if username != "anonymous"
+        else {"status": "eventful"}
+    )
 
     # check loading succeeded with authentication
     loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)

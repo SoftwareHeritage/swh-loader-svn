@@ -8,7 +8,7 @@ from celery import shared_task
 
 from swh.loader.core.utils import parse_visit_date
 
-from .directory import SvnDirectoryLoader
+from .directory import SvnExportLoader
 from .loader import SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump
 
 
@@ -47,8 +47,8 @@ def load_svn_from_remote_dump(**kwargs):
     return loader.load()
 
 
-@shared_task(name=f"{__name__}.LoadSvnDirectory")
-def load_svn_directory(**kwargs):
+@shared_task(name=f"{__name__}.LoadSvnExport")
+def load_svn_export(**kwargs):
     """Load svn tree into the swh archive."""
-    loader = SvnDirectoryLoader.from_configfile(**_process_kwargs(kwargs))
+    loader = SvnExportLoader.from_configfile(**_process_kwargs(kwargs))
     return loader.load()

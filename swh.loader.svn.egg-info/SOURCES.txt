@@ -64,6 +64,7 @@ swh/loader/svn/tests/test_svn_repo.py
 swh/loader/svn/tests/test_svn_retry.py
 swh/loader/svn/tests/test_task.py
 swh/loader/svn/tests/test_task_directory.py
+swh/loader/svn/tests/test_tasks.py
 swh/loader/svn/tests/test_utils.py
 swh/loader/svn/tests/utils.py
 swh/loader/svn/tests/data/httthttt.tgz

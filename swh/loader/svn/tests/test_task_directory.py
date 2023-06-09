@@ -44,8 +44,8 @@ def test_svn_directory_loader_for_listed_origin(
     svn_listed_svn_directory_origin.extra_loader_arguments = extra_loader_arguments
 
     loading_task_creation_for_listed_origin_test(
-        loader_class_name=f"{NAMESPACE}.directory.SvnDirectoryLoader",
-        task_function_name=f"{NAMESPACE}.tasks.LoadSvnDirectory",
+        loader_class_name=f"{NAMESPACE}.directory.SvnExportLoader",
+        task_function_name=f"{NAMESPACE}.tasks.LoadSvnExport",
         lister=svn_lister,
         listed_origin=svn_listed_svn_directory_origin,
     )

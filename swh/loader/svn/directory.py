@@ -15,8 +15,8 @@ from swh.loader.svn.svn_repo import SvnRepo, get_svn_repo
 from swh.model.model import Snapshot, SnapshotBranch, TargetType
 
 
-class SvnDirectoryLoader(BaseDirectoryLoader):
-    """Svn tree (directory) loader at a specific commit (revision) or tag (release) into
+class SvnExportLoader(BaseDirectoryLoader):
+    """Svn export (of a tree) loader at a specific svn revision or tag (release) into
     the swh archive.
 
     The output snapshot is of the form:

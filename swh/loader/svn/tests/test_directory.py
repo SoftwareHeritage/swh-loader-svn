@@ -6,7 +6,7 @@
 import os
 
 from swh.loader.core.nar import Nar
-from swh.loader.svn.directory import SvnDirectoryLoader
+from swh.loader.svn.directory import SvnExportLoader
 from swh.loader.svn.svn_repo import get_svn_repo
 from swh.loader.tests import (
     assert_last_visit_matches,
@@ -36,7 +36,7 @@ def test_loader_svn_directory(swh_storage, datadir, tmp_path):
     svn_revision = 5
     checksums = {"sha256": compute_nar_hash_for_rev(repo_url, svn_revision)}
 
-    loader = SvnDirectoryLoader(
+    loader = SvnExportLoader(
         swh_storage,
         repo_url,
         ref=svn_revision,
@@ -78,7 +78,7 @@ def test_loader_svn_directory(swh_storage, datadir, tmp_path):
     assert len(extids) == len(checksums)
 
     # Another run on the same svn directory should be uneventful
-    loader2 = SvnDirectoryLoader(
+    loader2 = SvnExportLoader(
         swh_storage,
         repo_url,
         ref=svn_revision,
@@ -99,7 +99,7 @@ def test_loader_svn_directory_hash_mismatch(swh_storage, datadir, tmp_path):
     faulty_checksums = {
         "sha256": "00000ed1855beadfa9c00f730242f5efe3e4612e76f0dcc45215c4a3234c7466"
     }
-    loader = SvnDirectoryLoader(
+    loader = SvnExportLoader(
         swh_storage,
         repo_url,
         ref=5,
@@ -129,7 +129,7 @@ def test_loader_svn_directory_hash_mismatch(swh_storage, datadir, tmp_path):
 
 def test_loader_svn_directory_not_found(swh_storage, datadir, tmp_path):
     """Loading a svn tree from an unknown origin should fail"""
-    loader = SvnDirectoryLoader(
+    loader = SvnExportLoader(
         swh_storage,
         "file:///home/origin/does/not/exist",
         ref=5,

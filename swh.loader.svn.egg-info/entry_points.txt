@@ -1,2 +1,3 @@
 [swh.workers]
 loader.svn = swh.loader.svn:register
+loader.svn-export = swh.loader.svn:register_export

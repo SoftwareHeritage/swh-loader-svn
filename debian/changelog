@@ -1,3 +1,14 @@
+swh-loader-svn (1.8.1-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 1.8.1     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2023-06-09 14:22:23
+    +0200)
+  * Upstream changes:     - v1.8.1     - setup.py: Register svn_export
+    loader to use through CLI     - Add test to check tasks are
+    scheduler ready
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 09 Jun 2023 12:26:53 +0000
+
 swh-loader-svn (1.8.0-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 1.8.0     - (tagged by Antoine R. Dumont

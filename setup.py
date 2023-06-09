@@ -139,6 +139,7 @@ setup(
     entry_points="""
         [swh.workers]
         loader.svn=swh.loader.svn:register
+        loader.svn-export=swh.loader.svn:register_export
     """,
     classifiers=[
         "Programming Language :: Python :: 3",

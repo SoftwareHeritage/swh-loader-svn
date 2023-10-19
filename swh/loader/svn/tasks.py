@@ -8,7 +8,7 @@ from celery import shared_task
 from swh.loader.core.utils import parse_visit_date
 
 from .directory import SvnExportLoader
-from .loader import SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump
+from .loader import SvnLoaderFromRemoteDump
 
 
 def _process_kwargs(kwargs):
@@ -17,26 +17,8 @@ def _process_kwargs(kwargs):
     return kwargs
 
 
-@shared_task(name=__name__ + ".LoadSvnRepository")
+@shared_task(name=__name__ + ".SvnLoaderFromRemoteDump")
 def load_svn(**kwargs):
-    """Import a svn repository"""
-    loader = SvnLoader.from_configfile(**_process_kwargs(kwargs))
-    return loader.load()
-
-
-@shared_task(name=__name__ + ".MountAndLoadSvnRepository")
-def load_svn_from_archive(**kwargs):
-    """
-    1. Mount an svn dump from archive as a local svn repository
-    2. Load it through the svn loader
-    3. Clean up mounted svn repository archive
-    """
-    loader = SvnLoaderFromDumpArchive.from_configfile(**_process_kwargs(kwargs))
-    return loader.load()
-
-
-@shared_task(name=__name__ + ".DumpMountAndLoadSvnRepository")
-def load_svn_from_remote_dump(**kwargs):
     """
     1. Mount a remote svn dump as a local svn repository.
     2. Load it through the svn loader.

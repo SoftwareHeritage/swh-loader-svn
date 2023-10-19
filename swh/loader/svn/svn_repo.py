@@ -25,7 +25,6 @@ from subvertpy.ra import (
     get_simple_prompt_provider,
     get_username_provider,
 )
-
 from swh.loader.exception import NotFound
 from swh.model.from_disk import Directory as DirectoryFromDisk
 from swh.model.model import Content, Directory, SkippedContent

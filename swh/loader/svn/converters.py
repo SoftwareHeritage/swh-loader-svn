@@ -7,7 +7,6 @@ import datetime
 from typing import Dict, Optional, Sequence, Tuple
 
 import iso8601
-
 from swh.model.model import Person, Revision, RevisionType, TimestampWithTimezone
 
 

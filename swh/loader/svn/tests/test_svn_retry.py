@@ -8,10 +8,10 @@ import os
 import pytest
 from subvertpy import SubversionException
 from subvertpy.ra import Auth, RemoteAccess, get_username_provider
+from swh.loader.tests import prepare_repository_from_archive
 
 from swh.loader.svn.svn_repo import SvnRepo
 from swh.loader.svn.svn_retry import SVN_RETRY_MAX_ATTEMPTS, SVN_RETRY_WAIT_EXP_BASE
-from swh.loader.tests import prepare_repository_from_archive
 
 
 def _get_repo_url(archive_name, datadir, tmp_path):

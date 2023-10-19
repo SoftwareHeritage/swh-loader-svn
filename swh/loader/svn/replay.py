@@ -36,7 +36,6 @@ from typing import (
 import click
 from subvertpy import SubversionException, properties
 from subvertpy.ra import Auth, RemoteAccess, get_username_provider
-
 from swh.model import from_disk, hashutil
 from swh.model.from_disk import DiskBackedContent
 from swh.model.model import Content, Directory, SkippedContent

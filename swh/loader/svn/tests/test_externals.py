@@ -6,10 +6,10 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from swh.loader.tests import assert_last_visit_matches, check_snapshot
 
 from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
 from swh.loader.svn.utils import svn_urljoin
-from swh.loader.tests import assert_last_visit_matches, check_snapshot
 
 from .utils import CommitChange, CommitChangeType, add_commit, create_repo
 

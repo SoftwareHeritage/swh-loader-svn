@@ -4,7 +4,6 @@
 # See top-level LICENSE file for more information
 
 import pytest
-
 from swh.scheduler.model import ListedOrigin
 
 from .conftest import NAMESPACE

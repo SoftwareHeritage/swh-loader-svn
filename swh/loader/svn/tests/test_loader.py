@@ -13,14 +13,6 @@ from typing import Any, Dict
 
 import pytest
 from subvertpy import SubversionException
-
-from swh.loader.svn.loader import (
-    SvnLoader,
-    SvnLoaderFromDumpArchive,
-    SvnLoaderFromRemoteDump,
-)
-from swh.loader.svn.svn_repo import SvnRepo
-from swh.loader.svn.utils import init_svn_repo_from_dump
 from swh.loader.tests import (
     assert_last_visit_matches,
     check_snapshot,
@@ -30,6 +22,14 @@ from swh.loader.tests import (
 from swh.model.from_disk import DentryPerms, Directory
 from swh.model.hashutil import hash_to_bytes
 from swh.model.model import Snapshot, SnapshotBranch, TargetType
+
+from swh.loader.svn.loader import (
+    SvnLoader,
+    SvnLoaderFromDumpArchive,
+    SvnLoaderFromRemoteDump,
+)
+from swh.loader.svn.svn_repo import SvnRepo
+from swh.loader.svn.utils import init_svn_repo_from_dump
 
 from .utils import CommitChange, CommitChangeType, add_commit
 

@@ -11,8 +11,9 @@ from pathlib import Path
 from typing import Iterator, Optional
 
 from swh.loader.core.loader import BaseDirectoryLoader
-from swh.loader.svn.svn_repo import SvnRepo, get_svn_repo
 from swh.model.model import Snapshot, SnapshotBranch, TargetType
+
+from swh.loader.svn.svn_repo import SvnRepo, get_svn_repo
 
 
 class SvnExportLoader(BaseDirectoryLoader):

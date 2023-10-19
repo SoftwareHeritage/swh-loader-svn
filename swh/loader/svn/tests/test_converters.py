@@ -3,9 +3,10 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from swh.loader.svn import converters
 from swh.model.hashutil import hash_to_bytes
 from swh.model.model import Person, Revision, Timestamp, TimestampWithTimezone
+
+from swh.loader.svn import converters
 
 
 def test_svn_author_to_swh_person():

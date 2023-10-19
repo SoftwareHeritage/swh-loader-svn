@@ -5,7 +5,6 @@
 
 
 from celery import shared_task
-
 from swh.loader.core.utils import parse_visit_date
 
 from .directory import SvnExportLoader

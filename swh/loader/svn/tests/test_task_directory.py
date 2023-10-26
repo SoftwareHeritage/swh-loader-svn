@@ -6,6 +6,7 @@
 from typing import Any, Dict
 
 import pytest
+
 from swh.scheduler.model import ListedOrigin
 
 from .conftest import NAMESPACE

@@ -13,9 +13,9 @@ import shutil
 from subprocess import Popen, run
 
 import pytest
-from swh.loader.tests import prepare_repository_from_archive
 
 from swh.loader.svn import utils
+from swh.loader.tests import prepare_repository_from_archive
 
 from .utils import CommitChange, CommitChangeType, add_commit
 

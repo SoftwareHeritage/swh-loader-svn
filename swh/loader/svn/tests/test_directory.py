@@ -6,15 +6,14 @@
 import os
 
 from swh.loader.core.nar import Nar
+from swh.loader.svn.directory import SvnExportLoader
+from swh.loader.svn.svn_repo import get_svn_repo
 from swh.loader.tests import (
     assert_last_visit_matches,
     fetch_nar_extids_from_checksums,
     get_stats,
     prepare_repository_from_archive,
 )
-
-from swh.loader.svn.directory import SvnExportLoader
-from swh.loader.svn.svn_repo import get_svn_repo
 
 
 def compute_nar_hash_for_rev(repo_url: str, rev: int, hash_name: str = "sha256") -> str:

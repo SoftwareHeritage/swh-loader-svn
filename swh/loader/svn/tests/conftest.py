@@ -8,10 +8,10 @@ from typing import Any, Dict
 import uuid
 
 import pytest
-from swh.scheduler.model import Lister
 
 from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
 from swh.loader.svn.svn_repo import SvnRepo
+from swh.scheduler.model import Lister
 
 from .utils import create_repo
 

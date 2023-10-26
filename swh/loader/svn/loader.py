@@ -20,6 +20,7 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 from swh.loader.core.loader import BaseLoader
 from swh.loader.core.utils import clean_dangling_folders
 from swh.loader.exception import NotFound
+from swh.loader.svn.svn_repo import get_svn_repo
 from swh.model import from_disk, hashutil
 from swh.model.model import (
     Content,
@@ -32,8 +33,6 @@ from swh.model.model import (
 )
 from swh.storage.algos.snapshot import snapshot_get_latest
 from swh.storage.interface import StorageInterface
-
-from swh.loader.svn.svn_repo import get_svn_repo
 
 from . import converters
 from .exception import SvnLoaderHistoryAltered, SvnLoaderUneventful

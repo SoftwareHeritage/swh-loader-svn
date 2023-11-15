@@ -23,7 +23,7 @@ The main entry points are
 With the configuration:
 
 /tmp/loader_svn.yml:
-```yml
+```yaml
 storage:
   cls: remote
   args:

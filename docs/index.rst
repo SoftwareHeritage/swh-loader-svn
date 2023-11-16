@@ -1,10 +1,6 @@
 .. _swh-loader-svn:
 
-Software Heritage - Subversion loader
-=====================================
-
-Loader for `Subversion <https://subversion.apache.org/>`_ repositories.
-
+.. include:: README.rst
 
 Reference Documentation
 -----------------------

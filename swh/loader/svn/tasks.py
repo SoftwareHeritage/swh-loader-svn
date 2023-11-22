@@ -18,7 +18,7 @@ def _process_kwargs(kwargs):
     return kwargs
 
 
-@shared_task(name=__name__ + ".SvnLoaderFromRemoteDump")
+@shared_task(name=__name__ + ".DumpMountAndLoadSvnRepository")
 def load_svn(**kwargs):
     """
     1. Mount a remote svn dump as a local svn repository.

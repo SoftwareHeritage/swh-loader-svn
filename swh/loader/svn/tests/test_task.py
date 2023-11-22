@@ -28,7 +28,7 @@ def test_svn_loader_from_remote_dump_for_listed_origin(
 
     loading_task_creation_for_listed_origin_test(
         loader_class_name=f"{NAMESPACE}.loader.SvnLoaderFromRemoteDump",
-        task_function_name=f"{NAMESPACE}.tasks.SvnLoaderFromRemoteDump",
+        task_function_name=f"{NAMESPACE}.tasks.DumpMountAndLoadSvnRepository",
         lister=svn_lister,
         listed_origin=svn_listed_origin,
     )

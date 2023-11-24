@@ -1,6 +1,0 @@
-include Makefile
-include requirements*.txt
-include version.txt
-include conftest.py
-recursive-include swh/loader/svn/tests/data *
-recursive-include swh py.typed

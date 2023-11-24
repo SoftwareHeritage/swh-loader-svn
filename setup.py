@@ -5,39 +5,11 @@
 # See top-level LICENSE file for more information
 
 import errno
-from io import open
 import os
 import shlex
 import subprocess
 
-from setuptools import find_packages, setup
-from setuptools.extension import Extension
-
-here = os.path.abspath(os.path.dirname(__file__))
-
-# Get the long description from the README file
-with open(os.path.join(here, "README.rst"), encoding="utf-8") as f:
-    long_description = f.read()
-
-
-def parse_requirements(name=None):
-    if name:
-        reqf = "requirements-%s.txt" % name
-    else:
-        reqf = "requirements.txt"
-
-    requirements = []
-    if not os.path.exists(reqf):
-        return requirements
-
-    with open(reqf) as f:
-        for line in f.readlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            requirements.append(line)
-    return requirements
-
+from setuptools import Extension, setup
 
 ##############################################################################################
 # The code below is taken from the setup.py file of the subvertpy project by Jelmer Vernooij
@@ -121,39 +93,6 @@ class SvnExtension(Extension):
 ##############################################################################################
 
 setup(
-    name="swh.loader.svn",
-    description="Software Heritage Loader SVN",
-    long_description=long_description,
-    long_description_content_type="text/x-rst",
-    python_requires=">=3.7",
-    author="Software Heritage developers",
-    author_email="swh-devel@inria.fr",
-    url="https://forge.softwareheritage.org/diffusion/DLDSVN",
-    packages=find_packages(),
-    scripts=[],
-    install_requires=parse_requirements() + parse_requirements("swh"),
-    setup_requires=["setuptools-scm"],
-    use_scm_version=True,
-    extras_require={"testing": parse_requirements("test")},
-    include_package_data=True,
-    entry_points="""
-        [swh.workers]
-        loader.svn=swh.loader.svn:register
-        loader.svn-export=swh.loader.svn:register_export
-    """,
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
-        "Operating System :: OS Independent",
-        "Development Status :: 5 - Production/Stable",
-    ],
-    project_urls={
-        "Bug Reports": "https://forge.softwareheritage.org/maniphest",
-        "Funding": "https://www.softwareheritage.org/donate",
-        "Source": "https://forge.softwareheritage.org/source/swh-loader-svn",
-        "Documentation": "https://docs.softwareheritage.org/devel/swh-loader-svn/",
-    },
     ext_modules=[
         SvnExtension(
             "swh.loader.svn.fast_crawler",

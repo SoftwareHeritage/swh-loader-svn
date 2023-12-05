@@ -272,7 +272,6 @@ def test_svn_propget_retry_failure(
 def test_remote_access_retry_success(
     mocker, tmp_path, sample_repo_url, exception_to_retry
 ):
-
     nb_failed_calls = 2
     mock_ra = mocker.patch("swh.loader.svn.svn_repo.RemoteAccess")
     remote_access = RemoteAccess(sample_repo_url, auth=Auth([get_username_provider()]))
@@ -299,7 +298,6 @@ def test_remote_access_retry_success(
 def test_remote_access_retry_failure(
     mocker, tmp_path, sample_repo_url, exception_to_retry
 ):
-
     nb_failed_calls = SVN_RETRY_MAX_ATTEMPTS
     mock_ra = mocker.patch("swh.loader.svn.svn_repo.RemoteAccess")
     remote_access = RemoteAccess(sample_repo_url, auth=Auth([get_username_provider()]))

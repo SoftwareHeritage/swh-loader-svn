@@ -395,7 +395,6 @@ def get_head_revision_at_date(svn_url: str, date: datetime) -> int:
 
 @lru_cache()
 def _get_repo_root_url(svn_url: str) -> str:
-
     from swh.loader.svn.svn_repo import get_svn_repo
 
     return get_svn_repo(svn_url).repos_root_url

@@ -28,7 +28,6 @@ def test_crawl_repository_runtime_error():
 
 
 def test_crawl_repository(repo_url):
-
     commits = [
         {
             "message": "Initial commit",

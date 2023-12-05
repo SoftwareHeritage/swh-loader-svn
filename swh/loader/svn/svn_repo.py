@@ -528,7 +528,6 @@ class SvnRepo:
             DirectoryFromDisk,
         ],
     ]:
-
         """Compute swh hash data per each revision between start_revision and
         end_revision.
 

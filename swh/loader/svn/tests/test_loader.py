@@ -997,7 +997,6 @@ def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
 def test_loader_eol_style_file_property_handling_edge_case(
     svn_loader_cls, swh_storage, repo_url, tmp_path
 ):
-
     # # first commit
     add_commit(
         repo_url,
@@ -1088,7 +1087,6 @@ def get_head_revision_paths_info(loader: SvnLoader) -> Dict[bytes, Dict[str, Any
 def test_loader_eol_style_on_svn_link_handling(
     svn_loader_cls, swh_storage, repo_url, tmp_path
 ):
-
     # first commit
     add_commit(
         repo_url,
@@ -1160,7 +1158,6 @@ def test_loader_eol_style_on_svn_link_handling(
 def test_loader_svn_special_property_unset(
     svn_loader_cls, swh_storage, repo_url, tmp_path
 ):
-
     # first commit
     add_commit(
         repo_url,
@@ -1253,7 +1250,6 @@ def test_loader_svn_special_property_unset(
 def test_loader_invalid_svn_eol_style_property_value(
     svn_loader_cls, swh_storage, repo_url, tmp_path
 ):
-
     filename = "file_with_crlf_eol.txt"
     file_content = b"Hello world!\r\n"
 
@@ -1458,7 +1454,6 @@ def test_loader_last_revision_divergence(
 def test_loader_delete_directory_while_file_has_same_prefix(
     svn_loader_cls, swh_storage, repo_url, tmp_path
 ):
-
     # first commit
     add_commit(
         repo_url,
@@ -1509,7 +1504,6 @@ def test_loader_delete_directory_while_file_has_same_prefix(
 
 
 def test_svn_loader_incremental(svn_loader_cls, swh_storage, repo_url, tmp_path):
-
     # first commit
     add_commit(
         repo_url,
@@ -1597,7 +1591,6 @@ def test_svn_loader_incremental(svn_loader_cls, swh_storage, repo_url, tmp_path)
 def test_svn_loader_incremental_replay_start_with_empty_directory(
     svn_loader_cls, swh_storage, mocker, repo_url, tmp_path
 ):
-
     # first commit
     add_commit(
         repo_url,
@@ -1664,7 +1657,6 @@ def test_svn_loader_incremental_replay_start_with_empty_directory(
 def test_loader_svn_executable_property_on_svn_link_handling(
     svn_loader_cls, swh_storage, repo_url, tmp_path
 ):
-
     # first commit
     add_commit(
         repo_url,
@@ -1727,7 +1719,6 @@ def test_loader_svn_executable_property_on_svn_link_handling(
 def test_loader_svn_add_property_on_link(
     svn_loader_cls, swh_storage, repo_url, tmp_path
 ):
-
     # first commit
     add_commit(
         repo_url,
@@ -1779,7 +1770,6 @@ def test_loader_svn_add_property_on_link(
 
 
 def test_loader_svn_link_parsing(svn_loader_cls, swh_storage, repo_url, tmp_path):
-
     # first commit
     add_commit(
         repo_url,
@@ -1877,7 +1867,6 @@ def _dump_project(tmp_path, origin_url):
 def test_loader_svn_add_property_on_directory_link(
     svn_loader_cls, swh_storage, repo_url, tmp_path
 ):
-
     # first commit
     add_commit(
         repo_url,
@@ -1934,7 +1923,6 @@ def test_loader_svn_add_property_on_directory_link(
 def test_loader_with_subprojects(
     swh_storage, repo_url, tmp_path, svn_loader_cls, mocker
 ):
-
     # first commit
     add_commit(
         repo_url,
@@ -2042,7 +2030,6 @@ def test_loader_with_subprojects(
 def test_loader_subproject_root_dir_removal(
     swh_storage, repo_url, tmp_path, svn_loader_cls
 ):
-
     # first commit
     add_commit(
         repo_url,
@@ -2184,7 +2171,6 @@ def test_loader_svn_from_remote_dump_url_redirect(swh_storage, tmp_path, mocker)
 def test_loader_basic_authentication_required(
     swh_storage, repo_url, tmp_path, svn_loader_cls, svnserve, credentials
 ):
-
     # add file to empty test repo
     add_commit(
         repo_url,

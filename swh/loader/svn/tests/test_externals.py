@@ -714,7 +714,6 @@ def test_loader_externals_cache(
         None,
         None,
         False,
-        2,
     ) in loader.svnrepo.swhreplay.editor.externals_cache
 
 
@@ -1686,6 +1685,18 @@ def test_loader_copyfrom_rev_with_externals(
     )
 
     add_commit(
+        external_repo_url,
+        "Update hello-world script",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/hello/hello-world",
+                data=b"#!/bin/bash\necho Hello World !!!",
+            ),
+        ],
+    )
+
+    add_commit(
         repo_url,
         "Create repository structure, one externals directory and one trunk directory",
         [
@@ -1708,7 +1719,21 @@ def test_loader_copyfrom_rev_with_externals(
                 change_type=CommitChangeType.AddOrUpdate,
                 path="externals/",
                 properties={
-                    "svn:externals": f'{svn_urljoin(external_repo_url, "code/hello/")} hello'  # noqa
+                    "svn:externals": f'-r1 {svn_urljoin(external_repo_url, "code/hello/")} hello'  # noqa
+                },
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Update svn:externals property on externals directory",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="externals/",
+                properties={
+                    "svn:externals": f'-r2 {svn_urljoin(external_repo_url, "code/hello/")} hello'  # noqa
                 },
             ),
         ],

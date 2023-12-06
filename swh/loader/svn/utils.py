@@ -428,3 +428,10 @@ def get_repo_root_url(svn_url):
             # path might no longer exists in HEAD revision
             pass
     return svn_url
+
+
+def quote_svn_url(url: str) -> str:
+    """Quote Subversion URL with special characters in it for subversion operations
+    involving URLs (export for instance) to succeed.
+    """
+    return quote(url, safe="/:!$&'()*+,=@")

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import codecs
 from collections import defaultdict
-from copy import copy, deepcopy
 from dataclasses import dataclass, field
 from distutils.dir_util import copy_tree
 from itertools import chain
@@ -47,6 +46,7 @@ if TYPE_CHECKING:
 from swh.loader.svn.utils import (
     is_recursive_external,
     parse_external_definition,
+    quote_svn_url,
     svn_urljoin,
 )
 
@@ -135,8 +135,8 @@ class FileEditor:
         self.directory[self.path] = from_disk.Content.from_file(path=self.fullpath)
 
 
-# Tuple[external_url, revision, peg_revision, relative_url, set_at_revision]
-ExternalDefinition = Tuple[str, Optional[int], Optional[int], bool, int]
+# Tuple[external_url, revision, peg_revision, relative_url]
+ExternalDefinition = Tuple[str, Optional[int], Optional[int], bool]
 
 
 @dataclass
@@ -250,40 +250,41 @@ class DirEditor:
                 peg_rev=copyfrom_rev,
                 ignore_keywords=True,
                 overwrite=True,
+                ignore_externals=True,
             )
             self.directory[path_bytes] = from_disk.Directory.from_disk(path=fullpath)
+
+            # get externals for the copied paths possibly set in copyfrom_rev
+            externals = self.svnrepo.propget(
+                "svn:externals",
+                url,
+                peg_rev=copyfrom_rev,
+                rev=copyfrom_rev,
+                recurse=True,
+            )
 
             assert copyfrom_path is not None
             copyfrom_path_bytes = os.fsencode(copyfrom_path).lstrip(b"/")
             copyfrom_fullpath = os.path.join(self.rootpath, copyfrom_path_bytes)
 
-            def _copy_dir_state(path: bytes, copied_path: bytes):
-                copied_dir_state = self.dir_states[copied_path]
-                dir_state = self.dir_states[path] = deepcopy(copied_dir_state)
-                for ext_path, external_defs in copy(dir_state.externals).items():
-                    external_defs_copied = [
-                        copy(external_def)
-                        for external_def in external_defs
-                        # copy external definition only if copyfrom_rev is greater or equal
-                        # to the revision it was set
-                        if copyfrom_rev >= external_def[4]
-                    ]
-                    if external_defs_copied:
-                        dir_state.externals[ext_path] = external_defs_copied
-                    else:
-                        dir_state.externals.pop(ext_path)
-                        external_path_bytes = os.fsencode(ext_path)
-                        for external_path in copy(dir_state.externals_paths):
-                            if (
-                                external_path == external_path_bytes
-                                or external_path.startswith(external_path_bytes + b"/")
-                            ):
-                                dir_state.externals_paths.remove(external_path)
+            def _set_dir_state(path: bytes, copied_path: bytes):
+                url = svn_urljoin(self.svnrepo.repos_root_url, os.fsdecode(copied_path))
+                if quote_svn_url(url) in externals:
+                    # set externals state for copied directory
+                    dir_editor = DirEditor(
+                        self.directory,
+                        self.rootpath,
+                        path,
+                        self.dir_states,
+                        svnrepo=self.svnrepo,
+                    )
+                    dir_editor.change_prop(
+                        properties.PROP_EXTERNALS,
+                        os.fsdecode(externals[quote_svn_url(url)]),
+                    )
+                    dir_editor.close()
 
-                for external_path in dir_state.externals_paths:
-                    self.editor.external_paths[os.path.join(path, external_path)] += 1
-
-            _copy_dir_state(path_bytes, copyfrom_path_bytes)
+            _set_dir_state(path_bytes, copyfrom_path_bytes)
 
             for root, dirs, _ in os.walk(fullpath):
                 for dir in dirs:
@@ -293,7 +294,7 @@ class DirEditor:
                     )
                     dir_path = dir_fullpath.replace(self.rootpath, b"").lstrip(b"/")
                     copied_dir_path = copied_dir_fullpath.replace(self.rootpath, b"")
-                    _copy_dir_state(dir_path, copied_dir_path.lstrip(b"/"))
+                    _set_dir_state(dir_path, copied_dir_path.lstrip(b"/"))
 
         return DirEditor(
             self.directory,
@@ -387,7 +388,6 @@ class DirEditor:
                                 revision,
                                 peg_revision,
                                 relative_url,
-                                self.editor.revnum,
                             )
                         )
                 except ValueError:
@@ -460,12 +460,12 @@ class DirEditor:
             prev_externals_set = {
                 (path, url, rev, peg_rev)
                 for path in prev_externals.keys()
-                for (url, rev, peg_rev, _, _) in prev_externals[path]
+                for (url, rev, peg_rev, _) in prev_externals[path]
             }
             externals_set = {
                 (path, url, rev, peg_rev)
                 for path in externals.keys()
-                for (url, rev, peg_rev, _, _) in externals[path]
+                for (url, rev, peg_rev, _) in externals[path]
             }
             old_externals = prev_externals_set - externals_set
             for path, _, _, _ in old_externals:
@@ -505,7 +505,7 @@ class DirEditor:
                 )
                 for path, dir_state in self.dir_states.items()
                 for external_path in dir_state.externals.keys()
-                for (external_url, _, _, _, _) in dir_state.externals[external_path]
+                for (external_url, _, _, _) in dir_state.externals[external_path]
             )
             if self.svnrepo.has_recursive_externals:
                 # If the repository has recursive externals, we stop processing
@@ -521,10 +521,11 @@ class DirEditor:
         external: ExternalDefinition,
         remove_target_path: bool = True,
     ) -> None:
-        external_url, revision, peg_revision, relative_url, _ = external
+        external_url, revision, peg_revision, relative_url = external
         dest_path = os.fsencode(path)
         dest_fullpath = os.path.join(self.path, dest_path)
         prev_externals = self.dir_states[self.path].externals
+
         if (
             path in prev_externals
             and external in prev_externals[path]

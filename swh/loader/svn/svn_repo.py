@@ -16,7 +16,7 @@ import os
 import shutil
 import tempfile
 from typing import Dict, Iterator, List, Optional, Sequence, Tuple
-from urllib.parse import quote, urlparse, urlunparse
+from urllib.parse import urlparse, urlunparse
 
 from subvertpy import SubversionException, client, properties, wc
 from subvertpy.ra import (
@@ -32,16 +32,12 @@ from swh.model.model import Content, Directory, SkippedContent
 
 from . import converters, fast_crawler, replay
 from .svn_retry import svn_retry
-from .utils import is_recursive_external, parse_external_definition
+from .utils import is_recursive_external, parse_external_definition, quote_svn_url
 
 # When log message contains empty data
 DEFAULT_AUTHOR_MESSAGE = b""
 
 logger = logging.getLogger(__name__)
-
-
-def quote_svn_url(url: str) -> str:
-    return quote(url, safe="/:!$&'()*+,=@")
 
 
 class SvnRepo:

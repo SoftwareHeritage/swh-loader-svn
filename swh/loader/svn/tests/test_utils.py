@@ -575,9 +575,9 @@ def test_svn_urljoin(base_url, paths_to_join, expected_result):
     ],
 )
 def test_parse_external_definition(external, dir_path, repo_url, expected_result):
-    assert (
-        utils.parse_external_definition(external, dir_path, repo_url) == expected_result
-    )
+    assert utils.parse_external_definition(
+        external, dir_path, repo_url
+    ) == utils.ExternalDefinition(*expected_result)
 
 
 @pytest.mark.parametrize(

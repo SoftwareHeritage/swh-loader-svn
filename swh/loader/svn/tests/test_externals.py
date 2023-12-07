@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
-from swh.loader.svn.utils import svn_urljoin
+from swh.loader.svn.utils import ExternalDefinition, svn_urljoin
 from swh.loader.tests import assert_last_visit_matches, check_snapshot
 
 from .utils import CommitChange, CommitChangeType, add_commit, create_repo
@@ -710,11 +710,15 @@ def test_loader_externals_cache(
     check_snapshot(loader.snapshot, loader.storage)
 
     assert (
-        external_url,
-        None,
-        None,
-        False,
-    ) in loader.svnrepo.swhreplay.editor.externals_cache
+        ExternalDefinition(
+            path="hello",
+            url=external_url,
+            revision=None,
+            peg_revision=None,
+            relative_url=False,
+        )
+        in loader.svnrepo.swhreplay.editor.externals_cache
+    )
 
 
 def test_loader_remove_versioned_path_with_external_overlap(

@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from dataclasses import dataclass
 from datetime import datetime
 import errno
 from functools import lru_cache
@@ -221,9 +222,18 @@ def svn_urljoin(base_url: str, *args) -> str:
     return f"{parsed_url.scheme}://{parsed_url.netloc}{path}"
 
 
+@dataclass(frozen=True)
+class ExternalDefinition:
+    path: str
+    url: str
+    revision: Optional[int]
+    peg_revision: Optional[int]
+    relative_url: bool
+
+
 def parse_external_definition(
     external: str, dir_path: str, repo_url: str
-) -> Tuple[str, str, Optional[int], Optional[int], bool]:
+) -> ExternalDefinition:
     """Parse a subversion external definition.
 
     Args:
@@ -339,7 +349,13 @@ def parse_external_definition(
     if not external_url or not path:
         raise ValueError(f"Failed to parse external definition '{external}'")
 
-    return path.rstrip("/"), unquote(external_url), revision, peg_revision, relative_url
+    return ExternalDefinition(
+        path=path.rstrip("/"),
+        url=unquote(external_url),
+        revision=revision,
+        peg_revision=peg_revision,
+        relative_url=relative_url,
+    )
 
 
 def is_recursive_external(

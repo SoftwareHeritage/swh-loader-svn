@@ -459,27 +459,21 @@ class SvnRepo:
                     # skip empty line or comment
                     if not external_def or external_def.startswith("#"):
                         continue
-                    (
-                        external_path,
-                        external_url,
-                        _,
-                        _,
-                        relative_url,
-                    ) = parse_external_definition(
+                    external = parse_external_definition(
                         external_def.rstrip("\r"), path, self.origin_url
                     )
 
                     if is_recursive_external(
                         self.origin_url,
                         path,
-                        external_path,
-                        external_url,
+                        external.path,
+                        external.url,
                     ):
                         self.has_recursive_externals = True
                         url = self.remote_url
                         break
 
-                    if relative_url:
+                    if external.relative_url:
                         self.has_relative_externals = True
                         url = self.origin_url
                         break

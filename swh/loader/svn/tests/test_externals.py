@@ -716,6 +716,7 @@ def test_loader_externals_cache(
             revision=None,
             peg_revision=None,
             relative_url=False,
+            legacy_format=False,
         )
         in loader.svnrepo.swhreplay.editor.externals_cache
     )
@@ -2252,6 +2253,86 @@ def test_loader_with_externals_to_strip(
                         "\t   \n"
                     )
                 },
+            ),
+        ],
+    )
+
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1, debug=True
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_fix_external_export_with_legacy_format(
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
+):
+    """When an external definition is defined using legacy format (svn < 1.5),
+    the official subversion client automatically uses the peg_rev parameter of
+    the export operation so ensure to have the same behavior in the loader."""
+    add_commit(
+        external_repo_url,
+        "Add foo/bar path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="foo/bar",
+                data=b"bar",
+            )
+        ],
+    )
+
+    add_commit(
+        external_repo_url,
+        "Add bar/baz path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="bar/baz",
+                data=b"baz",
+            )
+        ],
+    )
+
+    add_commit(
+        external_repo_url,
+        "Delete foo directory",
+        [
+            CommitChange(
+                change_type=CommitChangeType.Delete,
+                path="foo",
+            )
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Add external with recent format, its export should fail as peg_rev "
+        "parameter is not used",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="externals/",
+                properties={"svn:externals": f"-r1 {external_repo_url}/foo foo"},
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Add external with legacy format, its export should succeed as peg_rev "
+        "parameter is used",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="externals/",
+                properties={"svn:externals": f"foo -r1 {external_repo_url}/foo"},
             ),
         ],
     )

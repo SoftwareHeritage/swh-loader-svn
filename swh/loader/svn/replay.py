@@ -547,6 +547,7 @@ class DirEditor:
                     external.url,
                     external.revision,
                     external.peg_revision,
+                    external.legacy_format,
                 ) not in self.editor.dead_externals:
                     url = external.url.rstrip("/")
                     origin_url = self.svnrepo.origin_url.rstrip("/")
@@ -555,11 +556,16 @@ class DirEditor:
                         and not self.svnrepo.has_relative_externals
                     ):
                         url = url.replace(origin_url, self.svnrepo.remote_url)
+
+                    peg_revision = external.peg_revision
+                    if external.legacy_format and peg_revision is None:
+                        peg_revision = external.revision
+
                     self.svnrepo.export(
                         url,
                         to=temp_path,
                         rev=external.revision,
-                        peg_rev=external.peg_revision,
+                        peg_rev=peg_revision,
                         ignore_keywords=True,
                     )
                     self.editor.externals_cache[external] = temp_path
@@ -568,7 +574,12 @@ class DirEditor:
                 # external no longer available (404)
                 logger.debug(se)
                 self.editor.dead_externals.add(
-                    (external.url, external.revision, external.peg_revision)
+                    (
+                        external.url,
+                        external.revision,
+                        external.peg_revision,
+                        external.legacy_format,
+                    )
                 )
 
         else:
@@ -753,7 +764,7 @@ class Editor:
         self.dir_states: Dict[bytes, DirState] = defaultdict(DirState)
         self.external_paths: Dict[bytes, int] = defaultdict(int)
         self.valid_externals: Dict[bytes, Tuple[str, bool]] = {}
-        self.dead_externals: Set[Tuple[str, Optional[int], Optional[int]]] = set()
+        self.dead_externals: Set[Tuple[str, Optional[int], Optional[int], bool]] = set()
         self.externals_cache_dir = tempfile.mkdtemp(dir=temp_dir)
         self.externals_cache: Dict[ExternalDefinition, bytes] = {}
         self.svnrepo = svnrepo

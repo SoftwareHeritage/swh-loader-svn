@@ -229,6 +229,7 @@ class ExternalDefinition:
     revision: Optional[int]
     peg_revision: Optional[int]
     relative_url: bool
+    legacy_format: bool
 
 
 def parse_external_definition(
@@ -320,6 +321,7 @@ def parse_external_definition(
             if path.startswith("./"):
                 path = path.replace("./", "", 1)
         prev_part = external_part
+    parsed_external_url = urlparse(external_url)
     if "@" in external_url:
         # try to extract revision number if external URL is in the form
         # http://svn.example.org/repos/test/path@XXX
@@ -329,7 +331,7 @@ def parse_external_definition(
             peg_revision = int(revision_s)
             external_url = url
         except ValueError:
-            if urlparse(external_url).username is None:
+            if parsed_external_url.username is None:
                 # handle URL like http://user@svn.example.org/
                 external_url = url
             if revision_s.startswith("{") and revision_s.endswith("}"):
@@ -355,6 +357,11 @@ def parse_external_definition(
         revision=revision,
         peg_revision=peg_revision,
         relative_url=relative_url,
+        legacy_format=(
+            external.strip().startswith(path)
+            and external.strip().endswith(external_url)
+            and parsed_external_url.scheme is not None
+        ),
     )
 
 

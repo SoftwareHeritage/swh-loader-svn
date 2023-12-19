@@ -12,7 +12,6 @@ from __future__ import annotations
 import codecs
 from collections import defaultdict
 from dataclasses import dataclass, field
-from distutils.dir_util import copy_tree
 from itertools import chain
 import logging
 import os
@@ -621,26 +620,12 @@ class DirEditor:
             else:
                 self.add_directory(os.fsdecode(dest_fullpath))
 
-                # copy_tree needs sub-directories to exist in destination
-                for root, dirs, files in os.walk(temp_path):
-                    for dir in dirs:
-                        temp_dir_fullpath = os.path.join(root, dir)
-                        if os.path.islink(temp_dir_fullpath):
-                            # do not create folder if it's a link or copy_tree will fail
-                            continue
-                        subdir = temp_dir_fullpath.replace(temp_path + b"/", b"")
-                        self.add_directory(
-                            os.fsdecode(os.path.join(dest_fullpath, subdir))
-                        )
-
-                copy_tree(
+                shutil.copytree(
                     os.fsdecode(temp_path),
                     os.fsdecode(fullpath),
-                    preserve_symlinks=True,
+                    symlinks=True,
+                    dirs_exist_ok=True,
                 )
-
-                # TODO: replace code above by the line below once we use Python >= 3.8 in production # noqa
-                # shutil.copytree(temp_path, fullpath, symlinks=True, dirs_exist_ok=True) # noqa
 
                 self.directory[dest_fullpath] = from_disk.Directory.from_disk(
                     path=fullpath

@@ -31,11 +31,10 @@ from typing import (
     cast,
 )
 
-import click
 from subvertpy import SubversionException, properties
-from subvertpy.ra import Auth, RemoteAccess, get_username_provider
+from subvertpy.ra import RemoteAccess
 
-from swh.model import from_disk, hashutil
+from swh.model import from_disk
 from swh.model.from_disk import DiskBackedContent
 from swh.model.model import Content, Directory, SkippedContent
 
@@ -854,78 +853,3 @@ class Replay:
                 assert False, obj_type
 
         return contents, skipped_contents, directories
-
-
-@click.command()
-@click.option("--local-url", default="/tmp", help="local svn working copy")
-@click.option(
-    "--svn-url",
-    default="file:///home/storage/svn/repos/pkg-fox",
-    help="svn repository's url.",
-)
-@click.option(
-    "--revision-start",
-    default=1,
-    type=click.INT,
-    help="svn repository's starting revision.",
-)
-@click.option(
-    "--revision-end",
-    default=-1,
-    type=click.INT,
-    help="svn repository's ending revision.",
-)
-@click.option(
-    "--debug/--nodebug",
-    default=True,
-    help="Indicates if the server should run in debug mode.",
-)
-@click.option(
-    "--cleanup/--nocleanup",
-    default=True,
-    help="Indicates whether to cleanup disk when done or not.",
-)
-def main(local_url, svn_url, revision_start, revision_end, debug, cleanup):
-    """Script to present how to use Replay class."""
-    conn = RemoteAccess(svn_url.encode("utf-8"), auth=Auth([get_username_provider()]))
-
-    os.makedirs(local_url, exist_ok=True)
-
-    rootpath = tempfile.mkdtemp(
-        prefix=local_url, suffix="-" + os.path.basename(svn_url)
-    )
-
-    rootpath = os.fsencode(rootpath)
-
-    # Do not go beyond the repository's latest revision
-    revision_end_max = conn.get_latest_revnum()
-    if revision_end == -1:
-        revision_end = revision_end_max
-
-    revision_end = min(revision_end, revision_end_max)
-
-    try:
-        replay = Replay(conn, rootpath)
-
-        for rev in range(revision_start, revision_end + 1):
-            contents, skipped_contents, directories = replay.compute_objects(rev)
-            print(
-                "r%s %s (%s new contents, %s new directories)"
-                % (
-                    rev,
-                    hashutil.hash_to_hex(replay.directory.hash),
-                    len(contents) + len(skipped_contents),
-                    len(directories),
-                )
-            )
-
-        if debug:
-            print("%s" % rootpath.decode("utf-8"))
-    finally:
-        if cleanup:
-            if os.path.exists(rootpath):
-                shutil.rmtree(rootpath)
-
-
-if __name__ == "__main__":
-    main()

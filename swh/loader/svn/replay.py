@@ -631,27 +631,33 @@ class DirEditor:
                     path=fullpath
                 )
 
-            # update set of external paths reachable from the directory
-            external_paths = set()
-            dest_path_part = dest_path.split(b"/")
-            for i in range(1, len(dest_path_part) + 1):
-                external_paths.add(b"/".join(dest_path_part[:i]))
+            # ensure to not count same external paths multiple times
+            if path not in prev_externals or external not in prev_externals[path]:
+                # update set of external paths reachable from the directory
+                external_paths = set()
+                dest_path_part = dest_path.split(b"/")
+                for i in range(1, len(dest_path_part) + 1):
+                    external_paths.add(b"/".join(dest_path_part[:i]))
 
-            for root, dirs, files in os.walk(temp_path):
-                external_paths.update(
-                    [
-                        os.path.join(
-                            dest_path,
-                            os.path.join(root, p).replace(temp_path, b"").strip(b"/"),
-                        )
-                        for p in chain(dirs, files)
-                    ]
-                )
+                for root, dirs, files in os.walk(temp_path):
+                    external_paths.update(
+                        [
+                            os.path.join(
+                                dest_path,
+                                os.path.join(root, p)
+                                .replace(temp_path, b"")
+                                .strip(b"/"),
+                            )
+                            for p in chain(dirs, files)
+                        ]
+                    )
 
-            self.dir_states[self.path].externals_paths.update(external_paths)
+                self.dir_states[self.path].externals_paths.update(external_paths)
 
-            for external_path in external_paths:
-                self.editor.external_paths[os.path.join(self.path, external_path)] += 1
+                for external_path in external_paths:
+                    self.editor.external_paths[
+                        os.path.join(self.path, external_path)
+                    ] += 1
 
             # ensure hash update for the directory with externals set
             self.directory[self.path].update_hash(force=True)

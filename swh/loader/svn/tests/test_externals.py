@@ -2348,3 +2348,79 @@ def test_loader_fix_external_export_with_legacy_format(
         type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_fix_external_removal_edge_case(
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
+):
+    add_commit(
+        external_repo_url,
+        "Add foo/bar path in external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="foo/bar",
+                data=b"bar",
+            )
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Add trunk/externals path with a foo external directory",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/externals/",
+                properties={"svn:externals": f"{external_repo_url}/foo foo"},
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Remove trunk path recursively",
+        [
+            CommitChange(
+                change_type=CommitChangeType.Delete,
+                path="trunk/",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Add trunk again by copying it from revision 1",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                copyfrom_path=f"{repo_url}/trunk",
+                copyfrom_rev=1,
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Unset external on trunk/externals path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/externals/",
+                properties={"svn:externals": None},
+            ),
+        ],
+    )
+
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, check_revision=1, debug=True
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)

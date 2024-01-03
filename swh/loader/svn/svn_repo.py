@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2023  The Software Heritage developers
+# Copyright (C) 2015-2024  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -15,7 +15,7 @@ import logging
 import os
 import shutil
 import tempfile
-from typing import Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 from urllib.parse import urlparse, urlunparse
 
 from subvertpy import SubversionException, client, properties, wc
@@ -625,22 +625,14 @@ class SvnRepo:
             ValueError: first revision date is greater than given date
         """
 
-        class RevisionList(Sequence[datetime]):
-            def __init__(self, svn_repo):
-                self.svn_repo = svn_repo
-                self.rev_ids = list(range(1, self.svn_repo.head_revision() + 1))
-
-            def __len__(self):
-                return len(self.rev_ids)
-
-            def __getitem__(self, i):
-                commit_info = self.svn_repo.commit_info(self.rev_ids[i])
-                return commit_info["author_date"].to_datetime()
-
         if self.commit_info(1)["author_date"].to_datetime() > date:
             raise ValueError("First revision date is greater than reference date")
 
-        return bisect.bisect_right(RevisionList(self), date)
+        return bisect.bisect_right(
+            list(range(1, self.head_revision() + 1)),
+            date,
+            key=lambda rev_id: self.commit_info(rev_id)["author_date"].to_datetime(),
+        )
 
 
 def get_svn_repo(*args, **kwargs):

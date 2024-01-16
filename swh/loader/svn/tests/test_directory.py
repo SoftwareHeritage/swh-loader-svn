@@ -10,7 +10,7 @@ from swh.loader.svn.directory import SvnExportLoader
 from swh.loader.svn.svn_repo import get_svn_repo
 from swh.loader.tests import (
     assert_last_visit_matches,
-    fetch_nar_extids_from_checksums,
+    fetch_extids_from_checksums,
     get_stats,
     prepare_repository_from_archive,
 )
@@ -74,7 +74,9 @@ def test_loader_svn_directory(swh_storage, datadir, tmp_path):
     }
 
     # Ensure the extids got stored as well
-    extids = fetch_nar_extids_from_checksums(loader.storage, checksums)
+    extids = fetch_extids_from_checksums(
+        loader.storage, checksum_layout="nar", checksums=checksums
+    )
     assert len(extids) == len(checksums)
 
     # Another run on the same svn directory should be uneventful
@@ -123,7 +125,9 @@ def test_loader_svn_directory_hash_mismatch(swh_storage, datadir, tmp_path):
     }
 
     # Ensure no extids got stored
-    extids = fetch_nar_extids_from_checksums(loader.storage, faulty_checksums)
+    extids = fetch_extids_from_checksums(
+        loader.storage, checksum_layout="nar", checksums=faulty_checksums
+    )
     assert len(extids) == 0
 
 

@@ -75,7 +75,10 @@ def test_loader_svn_directory(swh_storage, datadir, tmp_path):
 
     # Ensure the extids got stored as well
     extids = fetch_extids_from_checksums(
-        loader.storage, checksum_layout="nar", checksums=checksums
+        loader.storage,
+        checksum_layout="nar",
+        checksums=checksums,
+        extid_version=loader.extid_version,
     )
     assert len(extids) == len(checksums)
 
@@ -126,7 +129,10 @@ def test_loader_svn_directory_hash_mismatch(swh_storage, datadir, tmp_path):
 
     # Ensure no extids got stored
     extids = fetch_extids_from_checksums(
-        loader.storage, checksum_layout="nar", checksums=faulty_checksums
+        loader.storage,
+        checksum_layout="nar",
+        checksums=faulty_checksums,
+        extid_version=loader.extid_version,
     )
     assert len(extids) == 0
 

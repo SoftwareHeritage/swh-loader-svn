@@ -135,6 +135,13 @@ class SvnRepo:
         # compute root directory path from the origin URL, required to
         # properly load the sub-tree of a repository mounted from a dump file
         repos_root_url = self.info(self.origin_url).repos_root_url
+        origin_url_parsed = urlparse(self.origin_url)
+        repos_root_url_parsed = urlparse(repos_root_url)
+        if origin_url_parsed.scheme != repos_root_url_parsed.scheme:
+            # update repos_root_url scheme in case of redirection
+            repos_root_url = urlunparse(
+                repos_root_url_parsed._replace(scheme=origin_url_parsed.scheme)
+            )
         self.root_directory = self.origin_url.rstrip("/").replace(repos_root_url, "", 1)
         # get root repository URL from the remote URL
         self.repos_root_url = self.info(self.remote_url).repos_root_url

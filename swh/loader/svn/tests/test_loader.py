@@ -2163,6 +2163,7 @@ def test_loader_svn_from_remote_dump_url_redirect(swh_storage, tmp_path, mocker)
 
     # check redirection URL has been used to dump repository
     assert loader.dump_svn_revisions.call_args_list[0][0][0] == repo_redirect_url
+    assert loader.svnrepo.root_directory == ""
 
 
 @pytest.mark.parametrize(

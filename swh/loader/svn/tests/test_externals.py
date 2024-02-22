@@ -2424,3 +2424,63 @@ def test_loader_fix_external_removal_edge_case(
         type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_externals_same_target_path(
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
+):
+    add_commit(
+        repo_url,
+        "Add common files",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="common/foo",
+                data=b"foo",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="common/bar",
+                data=b"bar",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Add local externals targeting the same path",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={"svn:externals": "../common/foo foo\n../common/bar foo\n"},
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Fix path of bar external",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={"svn:externals": "../common/foo foo\n../common/bar bar\n"},
+            ),
+        ],
+    )
+
+    loader = svn_loader_cls(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)

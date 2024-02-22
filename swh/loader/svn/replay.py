@@ -452,6 +452,11 @@ class DirEditor:
             old_externals = prev_externals_set - externals_set
             for path, _, _, _ in old_externals:
                 self.remove_external_path(os.fsencode(path))
+                if path in externals and externals[path]:
+                    # case where two externals were previously targeting the same path
+                    # and one was removed, export again the remaining one in case its
+                    # content changed
+                    self.process_external(path, externals[path][0], force=True)
         else:
             # some external paths might have been removed in the current replayed
             # revision by a delete operation on an overlapping versioned path so we
@@ -502,6 +507,7 @@ class DirEditor:
         path: str,
         external: ExternalDefinition,
         remove_target_path: bool = True,
+        force: bool = False,
     ) -> None:
         dest_path = os.fsencode(path)
         dest_fullpath = os.path.join(self.path, dest_path)
@@ -511,6 +517,7 @@ class DirEditor:
             path in prev_externals
             and external in prev_externals[path]
             and dest_fullpath in self.directory
+            and not force
         ):
             # external already exported, nothing to do
             return
@@ -525,13 +532,15 @@ class DirEditor:
             "Exporting external %s%s%s to path %s",
             external.url,
             f" at revision {external.revision}" if external.revision else "",
-            f" and peg revision {external.peg_revision}"
-            if external.peg_revision
-            else "",
+            (
+                f" and peg revision {external.peg_revision}"
+                if external.peg_revision
+                else ""
+            ),
             dest_fullpath,
         )
 
-        if external not in self.editor.externals_cache:
+        if external not in self.editor.externals_cache or force:
             try:
                 # try to export external in a temporary path, destination path could
                 # be versioned and must be overridden only if the external URL is

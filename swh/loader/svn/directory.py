@@ -1,4 +1,4 @@
-# Copyright (C) 2023  The Software Heritage developers
+# Copyright (C) 2023-2024  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -7,8 +7,11 @@
 
 """
 
+from datetime import datetime
+import os
 from pathlib import Path
-from typing import Iterator, Optional
+import tempfile
+from typing import Iterator, List, Optional
 
 from swh.loader.core.loader import BaseDirectoryLoader
 from swh.loader.svn.svn_repo import SvnRepo, get_svn_repo
@@ -16,8 +19,10 @@ from swh.model.model import Snapshot, SnapshotBranch, TargetType
 
 
 class SvnExportLoader(BaseDirectoryLoader):
-    """Svn export (of a tree) loader at a specific svn revision or tag (release) into
-    the swh archive.
+    """Load a svn tree at a specific svn revision into the swh archive.
+
+    It is also possible to load a subset of the source tree by explicitly
+    specifying the sub-paths to export in the ``svn_paths`` optional parameter.
 
     The output snapshot is of the form:
 
@@ -36,8 +41,9 @@ class SvnExportLoader(BaseDirectoryLoader):
 
     visit_type = "svn-export"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, svn_paths: Optional[List[str]] = None, **kwargs):
         self.svn_revision = kwargs.pop("ref")
+        self.svn_paths = svn_paths
         super().__init__(*args, **kwargs)
         self.svnrepo: Optional[SvnRepo] = None
 
@@ -53,8 +59,33 @@ class SvnExportLoader(BaseDirectoryLoader):
     def fetch_artifact(self) -> Iterator[Path]:
         """Prepare the svn local repository checkout at a given commit/tag."""
         assert self.svnrepo is not None
-        _, local_url = self.svnrepo.export_temporary(self.svn_revision)
-        yield Path(local_url.decode())
+        if self.svn_paths is None:
+            _, local_url = self.svnrepo.export_temporary(self.svn_revision)
+            yield Path(local_url.decode())
+        else:
+            self.log.debug(
+                "Exporting from the svn source tree rooted at %s@%s the sub-paths: %s",
+                self.origin.url,
+                self.svn_revision,
+                ", ".join(self.svn_paths),
+            )
+            with tempfile.TemporaryDirectory(
+                suffix="-" + datetime.now().isoformat()
+            ) as tmp_dir:
+                for svn_path in self.svn_paths:
+                    svn_url = os.path.join(self.origin.url, svn_path.strip("/"))
+                    export_path = os.path.join(tmp_dir, svn_path.strip("/"))
+                    os.makedirs("/".join(export_path.split("/")[:-1]), exist_ok=True)
+                    self.svnrepo.export(
+                        svn_url,
+                        export_path,
+                        rev=int(self.svn_revision),
+                        remove_dest_path=False,
+                        overwrite=True,
+                        ignore_externals=True,
+                        ignore_keywords=True,
+                    )
+                yield Path(tmp_dir)
 
     def build_snapshot(self) -> Snapshot:
         """Build snapshot without losing the svn revision context."""

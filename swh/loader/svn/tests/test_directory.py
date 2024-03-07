@@ -1,4 +1,4 @@
-# Copyright (C) 2023  The Software Heritage developers
+# Copyright (C) 2023-2024  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -88,6 +88,80 @@ def test_loader_svn_directory(swh_storage, datadir, tmp_path):
         repo_url,
         ref=svn_revision,
         checksum_layout="nar",
+        checksums=checksums,
+    )
+    actual_result2 = loader2.load()
+    assert actual_result2 == {"status": "uneventful"}
+
+
+def test_loader_svn_directory_sub_paths(swh_storage, datadir, tmp_path):
+    """Loading a subset of a svn tree with proper nar checksums should be eventful"""
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(
+        archive_path, archive_name, tmp_path=tmp_path
+    )
+    svn_paths = ["gourmet/trunk/debian/gourmet.1", "gourmet/trunk/debian/patches"]
+    svn_revision = 5
+    checksum_layout = "nar"
+    checksums = {
+        "sha256": "21e9553da2f8ae27d6b9ae87f509b0233fc6edbabc1099c31b90e1dec2cbb618"
+    }
+
+    loader = SvnExportLoader(
+        swh_storage,
+        repo_url,
+        ref=svn_revision,
+        svn_paths=svn_paths,
+        checksum_layout=checksum_layout,
+        checksums=checksums,
+    )
+
+    actual_result = loader.load()
+
+    assert actual_result == {"status": "eventful"}
+
+    actual_visit = assert_last_visit_matches(
+        swh_storage,
+        repo_url,
+        status="full",
+        type="svn-export",
+    )
+
+    snapshot = swh_storage.snapshot_get(actual_visit.snapshot)
+    assert snapshot is not None
+
+    branches = snapshot["branches"].keys()
+    expected_branch = f"rev_{svn_revision}".encode()
+    assert set(branches) == {b"HEAD", expected_branch}
+
+    assert get_stats(swh_storage) == {
+        "content": 3,
+        "directory": 5,
+        "origin": 1,
+        "origin_visit": 1,
+        "release": 0,
+        "revision": 0,
+        "skipped_content": 0,
+        "snapshot": 1,
+    }
+
+    # Ensure the extids got stored as well
+    extids = fetch_extids_from_checksums(
+        loader.storage,
+        checksum_layout=checksum_layout,
+        checksums=checksums,
+        extid_version=loader.extid_version,
+    )
+    assert extids[0].extid.hex() == checksums["sha256"]
+
+    # Another run should be uneventful
+    loader2 = SvnExportLoader(
+        swh_storage,
+        repo_url,
+        ref=svn_revision,
+        svn_paths=svn_paths,
+        checksum_layout=checksum_layout,
         checksums=checksums,
     )
     actual_result2 = loader2.load()

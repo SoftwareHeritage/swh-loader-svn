@@ -1,4 +1,4 @@
-pytest
+pytest >= 8.1
 pytest-mock
 pytest-postgresql
 swh.core[http] >= 0.0.61

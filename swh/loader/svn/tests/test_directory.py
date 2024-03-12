@@ -5,6 +5,8 @@
 
 import os
 
+import pytest
+
 from swh.loader.core.nar import Nar
 from swh.loader.svn.directory import SvnExportLoader
 from swh.loader.svn.svn_repo import get_svn_repo
@@ -94,7 +96,14 @@ def test_loader_svn_directory(swh_storage, datadir, tmp_path):
     assert actual_result2 == {"status": "uneventful"}
 
 
-def test_loader_svn_directory_sub_paths(swh_storage, datadir, tmp_path):
+@pytest.mark.parametrize(
+    "use_custom_origin_url",
+    [False, True],
+    ids=["origin_url == svn_url", "origin_url != svn_url"],
+)
+def test_loader_svn_directory_sub_paths(
+    swh_storage, datadir, tmp_path, use_custom_origin_url
+):
     """Loading a subset of a svn tree with proper nar checksums should be eventful"""
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
@@ -108,9 +117,17 @@ def test_loader_svn_directory_sub_paths(swh_storage, datadir, tmp_path):
         "sha256": "21e9553da2f8ae27d6b9ae87f509b0233fc6edbabc1099c31b90e1dec2cbb618"
     }
 
+    origin_url = (
+        f"{repo_url}?nar=sha256-{checksums['sha256']}"
+        if use_custom_origin_url
+        else repo_url
+    )
+    svn_url = repo_url if use_custom_origin_url else None
+
     loader = SvnExportLoader(
         swh_storage,
-        repo_url,
+        origin_url,
+        svn_url=svn_url,
         ref=svn_revision,
         svn_paths=svn_paths,
         checksum_layout=checksum_layout,
@@ -123,7 +140,7 @@ def test_loader_svn_directory_sub_paths(swh_storage, datadir, tmp_path):
 
     actual_visit = assert_last_visit_matches(
         swh_storage,
-        repo_url,
+        origin_url,
         status="full",
         type="svn-export",
     )
@@ -158,7 +175,8 @@ def test_loader_svn_directory_sub_paths(swh_storage, datadir, tmp_path):
     # Another run should be uneventful
     loader2 = SvnExportLoader(
         swh_storage,
-        repo_url,
+        origin_url,
+        svn_url=svn_url,
         ref=svn_revision,
         svn_paths=svn_paths,
         checksum_layout=checksum_layout,

@@ -24,6 +24,9 @@ class SvnExportLoader(BaseDirectoryLoader):
     It is also possible to load a subset of the source tree by explicitly
     specifying the sub-paths to export in the ``svn_paths`` optional parameter.
 
+    If the origin URL should be different from the subversion URL, the latter
+    can be provided using the optional ``svn_url`` parameter.
+
     The output snapshot is of the form:
 
     .. code::
@@ -41,14 +44,23 @@ class SvnExportLoader(BaseDirectoryLoader):
 
     visit_type = "svn-export"
 
-    def __init__(self, *args, svn_paths: Optional[List[str]] = None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        svn_paths: Optional[List[str]] = None,
+        svn_url: Optional[str] = None,
+        **kwargs,
+    ):
         self.svn_revision = kwargs.pop("ref")
         self.svn_paths = svn_paths
         super().__init__(*args, **kwargs)
+        self.svn_url = svn_url
+        if self.svn_url is None:
+            self.svn_url = self.origin.url
         self.svnrepo: Optional[SvnRepo] = None
 
     def prepare(self) -> None:
-        self.svnrepo = get_svn_repo(self.origin.url)
+        self.svnrepo = get_svn_repo(self.svn_url)
         super().prepare()
 
     def cleanup(self) -> None:
@@ -63,9 +75,10 @@ class SvnExportLoader(BaseDirectoryLoader):
             _, local_url = self.svnrepo.export_temporary(self.svn_revision)
             yield Path(local_url.decode())
         else:
+            assert self.svn_url is not None
             self.log.debug(
                 "Exporting from the svn source tree rooted at %s@%s the sub-paths: %s",
-                self.origin.url,
+                self.svn_url,
                 self.svn_revision,
                 ", ".join(self.svn_paths),
             )
@@ -73,7 +86,7 @@ class SvnExportLoader(BaseDirectoryLoader):
                 suffix="-" + datetime.now().isoformat()
             ) as tmp_dir:
                 for svn_path in self.svn_paths:
-                    svn_url = os.path.join(self.origin.url, svn_path.strip("/"))
+                    svn_url = os.path.join(self.svn_url, svn_path.strip("/"))
                     export_path = os.path.join(tmp_dir, svn_path.strip("/"))
                     os.makedirs("/".join(export_path.split("/")[:-1]), exist_ok=True)
                     self.svnrepo.export(

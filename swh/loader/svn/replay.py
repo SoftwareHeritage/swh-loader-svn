@@ -35,7 +35,6 @@ from subvertpy import SubversionException, properties
 from subvertpy.ra import RemoteAccess
 
 from swh.model import from_disk
-from swh.model.from_disk import DiskBackedContent
 from swh.model.model import Content, Directory, SkippedContent
 
 if TYPE_CHECKING:
@@ -852,7 +851,7 @@ class Replay:
         for obj_node in self.directory.collect():
             obj = obj_node.to_model()  # type: ignore
             obj_type = obj.object_type
-            if obj_type in (Content.object_type, DiskBackedContent.object_type):
+            if obj_type == Content.object_type:
                 contents.append(obj.with_data())
             elif obj_type == SkippedContent.object_type:
                 skipped_contents.append(obj)

@@ -29,7 +29,7 @@ from swh.model.model import (
     SkippedContent,
     Snapshot,
     SnapshotBranch,
-    TargetType,
+    SnapshotTargetType,
 )
 from swh.storage.algos.snapshot import snapshot_get_latest
 from swh.storage.interface import StorageInterface
@@ -183,7 +183,7 @@ Local repository not cleaned up for investigation: %s""",
         branch = branches.get(DEFAULT_BRANCH)
         if not branch:
             return None
-        if branch.target_type != TargetType.REVISION:
+        if branch.target_type != SnapshotTargetType.REVISION:
             return None
         swh_id = branch.target
 
@@ -562,7 +562,7 @@ Local repository not cleaned up for investigation: %s""",
             snap = Snapshot(
                 branches={
                     DEFAULT_BRANCH: SnapshotBranch(
-                        target=revision.id, target_type=TargetType.REVISION
+                        target=revision.id, target_type=SnapshotTargetType.REVISION
                     )
                 }
             )

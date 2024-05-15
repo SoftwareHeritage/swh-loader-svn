@@ -29,7 +29,7 @@ from swh.loader.tests import (
 )
 from swh.model.from_disk import DentryPerms, Directory
 from swh.model.hashutil import hash_to_bytes
-from swh.model.model import Snapshot, SnapshotBranch, TargetType
+from swh.model.model import Snapshot, SnapshotBranch, SnapshotTargetType
 
 from .utils import CommitChange, CommitChangeType, add_commit
 
@@ -38,7 +38,7 @@ GOURMET_SNAPSHOT = Snapshot(
     branches={
         b"HEAD": SnapshotBranch(
             target=hash_to_bytes("4876cb10aec6f708f7466dddf547567b65f6c39c"),
-            target_type=TargetType.REVISION,
+            target_type=SnapshotTargetType.REVISION,
         )
     },
 )
@@ -48,7 +48,7 @@ GOURMET_UPDATES_SNAPSHOT = Snapshot(
     branches={
         b"HEAD": SnapshotBranch(
             target=hash_to_bytes("171dc35522bfd17dda4e90a542a0377fb2fc707a"),
-            target_type=TargetType.REVISION,
+            target_type=SnapshotTargetType.REVISION,
         )
     },
 )
@@ -525,7 +525,7 @@ def test_loader_svn_visit_with_eol_style(
         branches={
             b"HEAD": SnapshotBranch(
                 target=hash_to_bytes("7da4975c363101b819756d33459f30a866d01b1b"),
-                target_type=TargetType.REVISION,
+                target_type=SnapshotTargetType.REVISION,
             )
         },
     )
@@ -567,7 +567,7 @@ def test_loader_svn_visit_with_mixed_crlf_lf(
         branches={
             b"HEAD": SnapshotBranch(
                 target=hash_to_bytes("9c6962eeb9164a636c374be700672355e34a98a7"),
-                target_type=TargetType.REVISION,
+                target_type=SnapshotTargetType.REVISION,
             )
         },
     )
@@ -610,7 +610,7 @@ def test_loader_svn_with_symlink(svn_loader_cls, swh_storage, datadir, tmp_path)
         branches={
             b"HEAD": SnapshotBranch(
                 target=hash_to_bytes("3f43af2578fccf18b0d4198e48563da7929dc608"),
-                target_type=TargetType.REVISION,
+                target_type=SnapshotTargetType.REVISION,
             )
         },
     )
@@ -651,7 +651,7 @@ def test_loader_svn_with_wrong_symlinks(svn_loader_cls, swh_storage, datadir, tm
         branches={
             b"HEAD": SnapshotBranch(
                 target=hash_to_bytes("cf30d3bb9d5967d0a2bbeacc405f10a5dd9b138a"),
-                target_type=TargetType.REVISION,
+                target_type=SnapshotTargetType.REVISION,
             )
         },
     )
@@ -910,7 +910,7 @@ def test_loader_user_defined_svn_properties(
         branches={
             b"HEAD": SnapshotBranch(
                 target=hash_to_bytes("604a17dbb15e8d7ecb3e9f3768d09bf493667a93"),
-                target_type=TargetType.REVISION,
+                target_type=SnapshotTargetType.REVISION,
             )
         },
     )

@@ -15,7 +15,7 @@ from typing import Iterator, List, Optional
 
 from swh.loader.core.loader import BaseDirectoryLoader
 from swh.loader.svn.svn_repo import SvnRepo, get_svn_repo
-from swh.model.model import Snapshot, SnapshotBranch, TargetType
+from swh.model.model import Snapshot, SnapshotBranch, SnapshotTargetType
 
 
 class SvnExportLoader(BaseDirectoryLoader):
@@ -107,11 +107,11 @@ class SvnExportLoader(BaseDirectoryLoader):
         return Snapshot(
             branches={
                 b"HEAD": SnapshotBranch(
-                    target_type=TargetType.ALIAS,
+                    target_type=SnapshotTargetType.ALIAS,
                     target=branch_name,
                 ),
                 branch_name: SnapshotBranch(
-                    target_type=TargetType.DIRECTORY,
+                    target_type=SnapshotTargetType.DIRECTORY,
                     target=self.directory.hash,
                 ),
             }

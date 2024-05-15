@@ -324,16 +324,16 @@ Local repository not cleaned up for investigation: %s""",
                     if path not in dir:
                         self.log.debug(
                             "%s with path %s is missing in reconstructed repository filesystem",
-                            obj.object_type,  # type: ignore
+                            obj.object_type,
                             path,
                         )
                     elif dir[path].hash != checked_dir[path].hash:
                         self.log.debug(
                             "%s with path %s has different hash in reconstructed repository filesystem",  # noqa
-                            obj.object_type,  # type: ignore
+                            obj.object_type,
                             path,
                         )
-                        if obj.object_type == "content":  # type: ignore
+                        if obj.object_type == "content":
                             self.log.debug(
                                 "expected sha1: %s, actual sha1: %s",
                                 hashutil.hash_to_hex(checked_dir[path].data["sha1"]),

@@ -411,17 +411,19 @@ class DirEditor:
                     force=True,
                 )
 
-        if path_bytes not in self.editor.external_paths:
-            self.remove_child(path_bytes)
-        elif os.path.isdir(fullpath):
+        if os.path.isdir(fullpath):
             # versioned and external paths can overlap so we need to iterate on
-            # all subpaths to check which ones to remove
-            for root, dirs, files in os.walk(fullpath):
+            # all subpaths to check which ones to remove, paths are iterated in
+            # a bottom-up manner to ensure all related dir states are removed
+            for root, dirs, files in os.walk(fullpath, topdown=False):
                 for p in chain(dirs, files):
                     full_repo_path = os.path.join(root, p)
                     repo_path = full_repo_path.replace(self.rootpath + b"/", b"")
                     if repo_path not in self.editor.external_paths:
                         self.remove_child(repo_path)
+
+        if path_bytes not in self.editor.external_paths:
+            self.remove_child(path_bytes)
 
     def close(self):
         """Function called when we finish processing a repository.
@@ -662,9 +664,9 @@ class DirEditor:
                 self.dir_states[self.path].externals_paths.update(external_paths)
 
                 for external_path in external_paths:
-                    self.editor.external_paths[
+                    self.editor.external_paths.add(
                         os.path.join(self.path, external_path)
-                    ] += 1
+                    )
 
             # ensure hash update for the directory with externals set
             self.directory[self.path].update_hash(force=True)
@@ -685,27 +687,29 @@ class DirEditor:
         if self.editor.debug:
             logger.debug("Removing external path %s", fullpath)
 
-        # decrement number of references for external path when we really remove it
-        # (when remove_subpaths is False, we just cleanup the external path before
-        # copying exported paths in it)
-        if force or (fullpath in self.editor.external_paths and remove_subpaths):
-            self.editor.external_paths[fullpath] -= 1
+        can_remove_external = True
+        subpath_split = fullpath.split(b"/")[:-1]
+        # check there is no overlapping external set in ancestor directories
+        # and mark current external not to be removed if it is the case
+        for i in reversed(range(1, len(subpath_split))):
+            subpath = b"/".join(subpath_split[0:i])
+            subdir_state = self.editor.dir_states.get(subpath)
+            if subdir_state and fullpath in {
+                os.path.join(subpath, ext_path)
+                for ext_path in subdir_state.externals_paths
+            }:
+                can_remove_external = False
+                break
 
-        if (
-            fullpath in self.editor.external_paths
-            and self.editor.external_paths[fullpath] == 0
-        ):
+        if force or can_remove_external:
             self.remove_child(fullpath)
-            self.editor.external_paths.pop(fullpath, None)
+            self.editor.external_paths.discard(fullpath)
             self.editor.valid_externals.pop(fullpath, None)
             for path in list(self.editor.external_paths):
                 if path.startswith(fullpath + b"/"):
-                    self.editor.external_paths[path] -= 1
-                    if self.editor.external_paths[path] == 0:
-                        self.editor.external_paths.pop(path)
+                    self.editor.external_paths.remove(path)
 
         if remove_subpaths:
-            subpath_split = fullpath.split(b"/")[:-1]
             for i in reversed(range(1, len(subpath_split) + 1)):
                 # delete external sub-directory only if it is not versioned
                 subpath = b"/".join(subpath_split[0:i])
@@ -760,7 +764,7 @@ class Editor:
         self.rootpath = rootpath
         self.directory = directory
         self.dir_states: Dict[bytes, DirState] = defaultdict(DirState)
-        self.external_paths: Dict[bytes, int] = defaultdict(int)
+        self.external_paths: Set[bytes] = set()
         self.valid_externals: Dict[bytes, Tuple[str, bool]] = {}
         self.dead_externals: Set[Tuple[str, Optional[int], Optional[int], bool]] = set()
         self.externals_cache_dir = tempfile.mkdtemp(dir=temp_dir)

@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2023  The Software Heritage developers
+# Copyright (C) 2016-2024  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -2190,9 +2190,6 @@ def test_loader_basic_authentication_required(
     repo_root = os.path.dirname(repo_path)
     repo_name = os.path.basename(repo_path)
     username, password = credentials
-    port = 12000
-    repo_url_no_auth = f"svn://localhost:{port}/{repo_name}"
-    repo_url = f"svn://{username}:{password}@localhost:{port}/{repo_name}"
 
     # disable anonymous access and require authentication on test repo
     with open(os.path.join(repo_path, "conf", "svnserve.conf"), "w") as svnserve_conf:
@@ -2219,7 +2216,9 @@ def test_loader_basic_authentication_required(
         passwd.write(f"[users]\n{username} = {password}")
 
     # execute svnserve
-    svnserve(repo_root, port)
+    port = svnserve(repo_root)
+    repo_url_no_auth = f"svn://localhost:{port}/{repo_name}"
+    repo_url = f"svn://{username}:{password}@localhost:{port}/{repo_name}"
 
     # check loading failed with no authentication in URL apart for anonymous credentials
     loader = svn_loader_cls(swh_storage, repo_url_no_auth, temp_directory=tmp_path)

@@ -22,3 +22,12 @@ def register_export() -> Dict[str, Any]:
         "task_modules": [],
         "loader": SvnExportLoader,
     }
+
+
+def register_no_dump() -> Dict[str, Any]:
+    from swh.loader.svn.loader import SvnLoader
+
+    return {
+        "task_modules": [f"{__name__}.tasks"],
+        "loader": SvnLoader,
+    }

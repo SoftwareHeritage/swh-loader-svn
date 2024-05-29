@@ -20,6 +20,7 @@ import tempfile
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 from urllib.parse import urlparse, urlunparse
 
+import requests
 from subvertpy import SubversionException
 
 from swh.loader.core.loader import BaseLoader
@@ -699,13 +700,23 @@ class SvnLoaderFromDump(SvnLoader):
         self.repo_path = None
 
     def prepare(self):
+        cleanup_dump = False
+        if self.dump_path.startswith("http"):
+            self.log.debug("Downloading dump file from URL %s", self.dump_path)
+            dump_path = os.path.join(tempfile.mkdtemp(), "repo_dump")
+            response = requests.get(self.dump_path, stream=True)
+            with open(dump_path, "wb") as dump:
+                for chunk in response.iter_content(chunk_size=hashutil.HASH_BLOCK_SIZE):
+                    dump.write(chunk)
+            self.dump_path = dump_path
+            cleanup_dump = True
         self.log.info("Archive to mount and load %s", self.dump_path)
         self.temp_dir, self.repo_path = init_svn_repo_from_dump(
             self.dump_path,
             prefix=TEMPORARY_DIR_PREFIX_PATTERN,
             suffix="-%s" % os.getpid(),
             root_dir=self.temp_directory,
-            cleanup_dump=False,
+            cleanup_dump=cleanup_dump,
             gzip=self.gzip_dump,
         )
         self.svn_url = f"file://{self.repo_path}"

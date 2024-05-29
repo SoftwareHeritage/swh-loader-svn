@@ -3,6 +3,7 @@
 # dependency lines, see https://pip.readthedocs.org/en/1.1/requirements.html
 click
 iso8601
+requests
 subvertpy >= 0.9.4
 tenacity >= 8.4.2
 typing-extensions

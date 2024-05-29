@@ -14,11 +14,7 @@ from typing import Any, Dict
 import pytest
 from subvertpy import SubversionException
 
-from swh.loader.svn.loader import (
-    SvnLoader,
-    SvnLoaderFromDump,
-    SvnLoaderFromRemoteDump,
-)
+from swh.loader.svn.loader import SvnLoader, SvnLoaderFromDump, SvnLoaderFromRemoteDump
 from swh.loader.svn.svn_repo import SvnRepo
 from swh.loader.svn.utils import init_svn_repo_from_dump
 from swh.loader.tests import (
@@ -951,7 +947,19 @@ def test_loader_svn_dir_added_then_removed(
     check_snapshot(loader.snapshot, loader.storage)
 
 
-def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
+@pytest.mark.parametrize(
+    "download_dump, gzip_dump",
+    [(False, False), (False, True), (True, False), (True, True)],
+    ids=[
+        "no download / no gzip",
+        "no download / gzip",
+        "download / no gzip",
+        "download / gzip",
+    ],
+)
+def test_loader_svn_loader_from_dump(
+    swh_storage, datadir, tmp_path, requests_mock, download_dump, gzip_dump
+):
     archive_name = "pkg-gourmet"
     archive_path = os.path.join(datadir, f"{archive_name}.tgz")
     repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
@@ -960,15 +968,28 @@ def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
     with open(os.path.join(tmp_path, dump_filename), "wb") as dump_file:
         # create compressed dump file of pkg-gourmet repo
         subprocess.run(["svnrdump", "dump", repo_url], stdout=dump_file)
-        subprocess.run(["gzip", dump_filename], cwd=tmp_path)
+        if gzip_dump:
+            subprocess.run(["gzip", dump_filename], cwd=tmp_path)
+            dump_path = os.path.join(tmp_path, f"{dump_filename}.gz")
+        else:
+            dump_path = os.path.join(tmp_path, dump_filename)
+
+        dump = open(dump_path, "rb")
+
+        if download_dump:
+            dump_path = f"https://example.org/downloads/{os.path.basename(dump_path)}"
+            requests_mock.get(dump_path, content=dump.read())
 
         # load svn repo from that compressed dump file
         loader = SvnLoaderFromDump(
             swh_storage,
             url=repo_url,
-            dump_path=os.path.join(tmp_path, f"{dump_filename}.gz"),
+            dump_path=dump_path,
             temp_directory=tmp_path,
+            gzip_dump=gzip_dump,
         )
+
+        dump.close()
 
         assert loader.load() == {"status": "eventful"}
 

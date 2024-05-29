@@ -2,6 +2,7 @@ celery-types
 pytest >= 8.1
 pytest-mock
 pytest-postgresql
+requests_mock
 swh.core[http] >= 4.5.0
 swh.loader.core[testing] >= 5.18.1
 types-python-dateutil

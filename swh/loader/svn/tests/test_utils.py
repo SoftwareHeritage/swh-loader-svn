@@ -150,20 +150,23 @@ def test_init_svn_repo_from_truncated_dump(datadir, tmp_path):
     assert f"Revisions: {max_rev}\n" in svnadmin_info.stdout
 
 
-def test_init_svn_repo_from_archive_dump(datadir, tmp_path):
+def test_init_svn_repo_from_gzip_dump(datadir, tmp_path):
     """Mounting svn repository out of an archive dump is ok"""
     dump_name = "penguinsdbtools2018.dump.gz"
     dump_path = os.path.join(datadir, dump_name)
 
-    tmp_repo, repo_path = utils.init_svn_repo_from_archive_dump(
-        dump_path, cleanup_dump=False, root_dir=tmp_path
+    tmp_repo, repo_path = utils.init_svn_repo_from_dump(
+        dump_path,
+        cleanup_dump=False,
+        root_dir=tmp_path,
+        gzip=True,
     )
 
     assert os.path.exists(dump_path), "Dump path should still exists"
     assert os.path.exists(repo_path), "Repository should exists"
 
 
-def test_init_svn_repo_from_archive_dump_and_cleanup(datadir, tmp_path):
+def test_init_svn_repo_from_gzip_dump_and_cleanup(datadir, tmp_path):
     """Mounting svn repository out of a dump is ok"""
     dump_name = "penguinsdbtools2018.dump.gz"
     dump_ori_path = os.path.join(datadir, dump_name)
@@ -174,8 +177,10 @@ def test_init_svn_repo_from_archive_dump_and_cleanup(datadir, tmp_path):
     assert os.path.exists(dump_path)
     assert os.path.exists(dump_ori_path)
 
-    tmp_repo, repo_path = utils.init_svn_repo_from_archive_dump(
-        dump_path, root_dir=tmp_path
+    tmp_repo, repo_path = utils.init_svn_repo_from_dump(
+        dump_path,
+        root_dir=tmp_path,
+        gzip=True,
     )
 
     assert not os.path.exists(dump_path), "Dump path should no longer exists"

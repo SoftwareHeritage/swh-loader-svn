@@ -13,11 +13,11 @@ The main entry points are
 - ``swh.loader.svn.loader.SvnLoader`` for the main svn loader which ingests
   content out of a remote svn repository
 
-- ``swh.loader.svn.loader.SvnLoaderFromDumpArchive`` which mounts a repository
+- ``swh.loader.svn.loader.SvnLoaderFromDump`` which mounts a repository
   out of a svn dump prior to ingest it.
 
 - ``swh.loader.svn.loader.SvnLoaderFromRemoteDump`` which mounts a repository
-  with svnrdump prior to ingest its content.
+  out of a svn dump obtained with svnrdump prior to ingest its content.
 
 - ``swh.loader.svn.directory.SvnExportLoader`` which ingests an svn tree at a
   specific revision.

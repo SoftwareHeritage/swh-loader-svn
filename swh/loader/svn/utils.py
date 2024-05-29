@@ -157,45 +157,6 @@ def init_svn_repo_from_dump(
                 logger.warn("Failure to remove the dump %s: %s", dump_path, e)
 
 
-def init_svn_repo_from_archive_dump(
-    archive_path: str,
-    prefix: Optional[str] = None,
-    suffix: Optional[str] = None,
-    root_dir: str = "/tmp",
-    cleanup_dump: bool = True,
-) -> Tuple[str, str]:
-    """Given a path to an archive containing an svn dump, initializes an svn repository
-    with the content of the uncompressed dump.
-
-    Args:
-        archive_path: The archive svn dump path
-        prefix: optional prefix file name for the working directory
-        suffix: optional suffix file name for the working directory
-        root_dir: the root directory where the working directory is created
-        gzip: Boolean to determine whether we treat the dump as compressed or not.
-        cleanup_dump: Whether we want this function call to clean up the dump at the end
-            of the repository initialization.
-    Raises:
-        ValueError in case of failure to run the command to uncompress
-        and load the dump.
-
-    Returns:
-        A tuple:
-        - temporary folder: containing the mounted repository
-        - repo_path: path to the mounted repository inside the
-            temporary folder
-
-    """
-    return init_svn_repo_from_dump(
-        archive_path,
-        prefix=prefix,
-        suffix=suffix,
-        root_dir=root_dir,
-        gzip=True,
-        cleanup_dump=cleanup_dump,
-    )
-
-
 def svn_urljoin(base_url: str, *args) -> str:
     """Join a base URL and a list of paths in a SVN way.
 

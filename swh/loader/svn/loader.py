@@ -41,12 +41,7 @@ from swh.storage.interface import StorageInterface
 
 from . import converters
 from .exception import SvnLoaderHistoryAltered, SvnLoaderUneventful
-from .utils import (
-    OutputStream,
-    init_svn_repo_from_archive_dump,
-    init_svn_repo_from_dump,
-    svn_urljoin,
-)
+from .utils import OutputStream, init_svn_repo_from_dump, svn_urljoin
 
 DEFAULT_BRANCH = b"HEAD"
 TEMPORARY_DIR_PREFIX_PATTERN = "swh.loader.svn."
@@ -135,7 +130,7 @@ class SvnLoader(BaseLoader):
         atexit.register(kill_child_processes)
 
     def svn_repo(
-        self, remote_url: str, origin_url: str, temp_dir: str
+        self, remote_url: str, origin_url: Optional[str], temp_dir: str
     ) -> Optional[SvnRepo]:
         parsed_remote_url = urlparse(remote_url)
         if (
@@ -668,17 +663,17 @@ Local repository not cleaned up for investigation: %s""",
         )
 
 
-class SvnLoaderFromDumpArchive(SvnLoader):
-    """Uncompress an archive containing an svn dump, mount the svn dump as a local svn
-    repository and load that repository.
-
+class SvnLoaderFromDump(SvnLoader):
+    """Mount a (possibly gzip compressed) svn dump as a local svn repository
+    and load that repository.
     """
 
     def __init__(
         self,
         storage: StorageInterface,
         url: str,
-        archive_path: str,
+        dump_path: str,
+        gzip_dump: bool = True,
         origin_url: Optional[str] = None,
         incremental: bool = False,
         visit_date: Optional[datetime] = None,
@@ -698,17 +693,20 @@ class SvnLoaderFromDumpArchive(SvnLoader):
             check_revision=check_revision,
             **kwargs,
         )
-        self.archive_path = archive_path
+        self.dump_path = dump_path
+        self.gzip_dump = gzip_dump
         self.temp_dir = None
         self.repo_path = None
 
     def prepare(self):
-        self.log.info("Archive to mount and load %s", self.archive_path)
-        self.temp_dir, self.repo_path = init_svn_repo_from_archive_dump(
-            self.archive_path,
+        self.log.info("Archive to mount and load %s", self.dump_path)
+        self.temp_dir, self.repo_path = init_svn_repo_from_dump(
+            self.dump_path,
             prefix=TEMPORARY_DIR_PREFIX_PATTERN,
             suffix="-%s" % os.getpid(),
             root_dir=self.temp_directory,
+            cleanup_dump=False,
+            gzip=self.gzip_dump,
         )
         self.svn_url = f"file://{self.repo_path}"
         super().prepare()
@@ -723,6 +721,21 @@ class SvnLoaderFromDumpArchive(SvnLoader):
                 os.path.basename(self.repo_path),
             )
             shutil.rmtree(self.temp_dir)
+
+    def svn_repo(
+        self, remote_url: str, origin_url: Optional[str], temp_dir: str
+    ) -> Optional[SvnRepo]:
+        return super().svn_repo(
+            remote_url,
+            # consider remote origin URL as dead when using SvnLoaderFromDump
+            # to avoid slow connection timeouts with retries in SvnRepo constructor
+            (
+                origin_url
+                if origin_url and not origin_url.startswith(("http", "svn"))
+                else None
+            ),
+            temp_dir,
+        )
 
 
 class SvnLoaderFromRemoteDump(SvnLoader):

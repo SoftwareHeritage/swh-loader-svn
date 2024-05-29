@@ -29,6 +29,7 @@ testing = {file = ["requirements.txt", "requirements-swh.txt", "requirements-tes
 "loader.svn" = "swh.loader.svn:register"
 "loader.svn-export" = "swh.loader.svn:register_export"
 "loader.svn-no-dump" = "swh.loader.svn:register_no_dump"
+"loader.svn-from-dump" = "swh.loader.svn:register_from_dump"
 
 [project.urls]
 "Homepage" = "https://gitlab.softwareheritage.org/swh/devel/swh-loader-svn"

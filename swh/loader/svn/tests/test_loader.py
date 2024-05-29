@@ -16,7 +16,7 @@ from subvertpy import SubversionException
 
 from swh.loader.svn.loader import (
     SvnLoader,
-    SvnLoaderFromDumpArchive,
+    SvnLoaderFromDump,
     SvnLoaderFromRemoteDump,
 )
 from swh.loader.svn.svn_repo import SvnRepo
@@ -963,10 +963,10 @@ def test_loader_svn_loader_from_dump_archive(swh_storage, datadir, tmp_path):
         subprocess.run(["gzip", dump_filename], cwd=tmp_path)
 
         # load svn repo from that compressed dump file
-        loader = SvnLoaderFromDumpArchive(
+        loader = SvnLoaderFromDump(
             swh_storage,
             url=repo_url,
-            archive_path=os.path.join(tmp_path, f"{dump_filename}.gz"),
+            dump_path=os.path.join(tmp_path, f"{dump_filename}.gz"),
             temp_directory=tmp_path,
         )
 
@@ -1860,7 +1860,7 @@ def _dump_project(tmp_path, origin_url):
     dump_path = f"{tmp_path}/repo.dump"
     with open(dump_path, "wb") as dump_file:
         subprocess.run(svnrdump_cmd, stdout=dump_file)
-    subprocess.run(["gzip", dump_path])
+    subprocess.run(["gzip", "-f", dump_path])
     return dump_path + ".gz"
 
 
@@ -1918,7 +1918,7 @@ def test_loader_svn_add_property_on_directory_link(
 
 
 @pytest.mark.parametrize(
-    "svn_loader_cls", [SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump]
+    "svn_loader_cls", [SvnLoader, SvnLoaderFromDump, SvnLoaderFromRemoteDump]
 )
 def test_loader_with_subprojects(
     swh_storage, repo_url, tmp_path, svn_loader_cls, mocker
@@ -1976,8 +1976,8 @@ def test_loader_with_subprojects(
             "check_revision": 1,
         }
 
-        if svn_loader_cls == SvnLoaderFromDumpArchive:
-            loader_params["archive_path"] = _dump_project(tmp_path, origin_url)
+        if svn_loader_cls == SvnLoaderFromDump:
+            loader_params["dump_path"] = _dump_project(tmp_path, origin_url)
 
         loader = svn_loader_cls(**loader_params)
 
@@ -2002,8 +2002,8 @@ def test_loader_with_subprojects(
         if svn_loader_cls == SvnLoaderFromRemoteDump:
             dump_revisions.assert_called_once_with(repo_url, i, -1)
 
-        if svn_loader_cls == SvnLoaderFromDumpArchive:
-            loader_params["archive_path"] = _dump_project(tmp_path, origin_url)
+        if svn_loader_cls == SvnLoaderFromDump:
+            loader_params["dump_path"] = _dump_project(tmp_path, origin_url)
 
         loader = svn_loader_cls(**loader_params)
 
@@ -2025,7 +2025,7 @@ def test_loader_with_subprojects(
 
 
 @pytest.mark.parametrize(
-    "svn_loader_cls", [SvnLoader, SvnLoaderFromDumpArchive, SvnLoaderFromRemoteDump]
+    "svn_loader_cls", [SvnLoader, SvnLoaderFromDump, SvnLoaderFromRemoteDump]
 )
 def test_loader_subproject_root_dir_removal(
     swh_storage, repo_url, tmp_path, svn_loader_cls
@@ -2074,8 +2074,8 @@ def test_loader_subproject_root_dir_removal(
         "check_revision": 1,
     }
 
-    if svn_loader_cls == SvnLoaderFromDumpArchive:
-        loader_params["archive_path"] = _dump_project(tmp_path, origin_url)
+    if svn_loader_cls == SvnLoaderFromDump:
+        loader_params["dump_path"] = _dump_project(tmp_path, origin_url)
 
     loader = svn_loader_cls(**loader_params)
 
@@ -2088,8 +2088,8 @@ def test_loader_subproject_root_dir_removal(
     )
     check_snapshot(loader.snapshot, loader.storage)
 
-    if svn_loader_cls == SvnLoaderFromDumpArchive:
-        loader_params["archive_path"] = _dump_project(tmp_path, origin_url)
+    if svn_loader_cls == SvnLoaderFromDump:
+        loader_params["dump_path"] = _dump_project(tmp_path, origin_url)
 
     loader = svn_loader_cls(**loader_params)
 

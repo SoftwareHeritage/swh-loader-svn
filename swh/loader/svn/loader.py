@@ -174,7 +174,9 @@ Local repository not cleaned up for investigation: %s""",
 
         """
         storage = self.storage
-        latest_snapshot = snapshot_get_latest(storage, origin_url)
+        latest_snapshot = snapshot_get_latest(
+            storage, origin_url, visit_type=self.visit_type
+        )
         if not latest_snapshot:
             return None
         branches = latest_snapshot.branches

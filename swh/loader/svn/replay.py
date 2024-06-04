@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2023  The Software Heritage developers
+# Copyright (C) 2016-2024  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -195,6 +195,8 @@ class DirEditor:
 
         """
         if path in self.directory:
+            if self.editor.debug:
+                logger.debug("Removing path %s", path)
             entry_removed = self.directory[path]
             del self.directory[path]
             self.dir_states.pop(path, None)
@@ -388,8 +390,7 @@ class DirEditor:
                 externals = self.dir_states[self.path].externals
                 for path in externals.keys():
                     self.remove_external_path(os.fsencode(path))
-
-                self.dir_states[self.path].externals = {}
+                self.dir_states.pop(self.path)
 
     def delete_entry(self, path: str, revision: int) -> None:
         """Remove a path."""

@@ -1,4 +1,4 @@
-# Copyright (C) 2022-2023  The Software Heritage developers
+# Copyright (C) 2022-2024  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -2571,6 +2571,97 @@ def test_loader_svn_externals_replace(
         repo_url,
         temp_directory=tmp_path,
         check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+
+
+def test_loader_ensure_dir_state_cleanup_after_external_removal(
+    svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
+):
+    add_commit(
+        external_repo_url,
+        "Create some directories and files in an external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/hello/hello-world",
+                properties={"svn:executable": "*"},
+                data=b"#!/bin/bash\necho Hello World !",
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="code/foo/foo.sh",
+                properties={"svn:executable": "*"},
+                data=b"#!/bin/bash\necho foo",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Set trunk/code external targeting code directory in external repository",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(external_repo_url, 'code')} code\n"
+                    )
+                },
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        (
+            "Unset external on trunk and set trunk/code/hello external "
+            "targeting code/hello directory in external repository"
+        ),
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={"svn:externals": None},
+            ),
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/code/",
+                properties={
+                    "svn:externals": (
+                        f"{svn_urljoin(external_repo_url, 'code/hello')} hello\n"
+                    )
+                },
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Unset external on trunk/code",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/code/",
+                properties={"svn:externals": None},
+            ),
+        ],
+    )
+
+    loader = svn_loader_cls(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
+        debug=True,
     )
     assert loader.load() == {"status": "eventful"}
     assert_last_visit_matches(

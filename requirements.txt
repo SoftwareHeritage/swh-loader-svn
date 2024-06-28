@@ -4,5 +4,5 @@
 click
 iso8601
 subvertpy >= 0.9.4
-tenacity >= 6.2
+tenacity >= 8.4.2
 typing-extensions

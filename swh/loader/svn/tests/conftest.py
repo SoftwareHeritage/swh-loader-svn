@@ -13,7 +13,6 @@ import uuid
 import pytest
 
 from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
-from swh.loader.svn.svn_repo import SvnRepo
 from swh.scheduler.model import Lister
 
 from .utils import create_repo
@@ -64,13 +63,8 @@ def repo_url(tmpdir_factory):
 
 
 @pytest.fixture(autouse=True)
-def svn_retry_sleep_mocker(mocker):
-    mocker.patch.object(SvnRepo.export.retry, "sleep")
-    mocker.patch.object(SvnRepo.checkout.retry, "sleep")
-    mocker.patch.object(SvnRepo.propget.retry, "sleep")
-    mocker.patch.object(SvnRepo.remote_access.retry, "sleep")
-    mocker.patch.object(SvnRepo.info.retry, "sleep")
-    mocker.patch.object(SvnRepo.commit_info.retry, "sleep")
+def mock_sleep(mocker):
+    return mocker.patch("time.sleep")
 
 
 def find_free_port():

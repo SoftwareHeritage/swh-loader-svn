@@ -67,6 +67,7 @@ class SvnLoader(BaseLoader):
         temp_directory: str = "/tmp",
         debug: bool = False,
         check_revision: int = 0,
+        check_revision_from: int = 0,
         **kwargs: Any,
     ):
         """Load a svn repository (either remote or local).
@@ -98,6 +99,7 @@ class SvnLoader(BaseLoader):
         self.skip_post_load = False
         # Revision check is configurable
         self.check_revision = check_revision
+        self.check_revision_from = check_revision_from
         # internal state used to store swh objects
         self._contents: List[Content] = []
         self._skipped_contents: List[SkippedContent] = []
@@ -428,7 +430,7 @@ Local repository not cleaned up for investigation: %s""",
 
             if (
                 self.check_revision
-                and self.check_revision != 0
+                and rev >= self.check_revision_from
                 and count % self.check_revision == 0
             ):
                 self._check_revision_divergence(rev, dir_id, root_directory)

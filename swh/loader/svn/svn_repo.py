@@ -10,6 +10,7 @@ commit.
 """
 
 import bisect
+from contextlib import contextmanager
 from datetime import datetime
 import logging
 import os
@@ -38,6 +39,21 @@ from .utils import is_recursive_external, parse_external_definition, quote_svn_u
 DEFAULT_AUTHOR_MESSAGE = b""
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def ssh_askpass_anonymous():
+    """Context manager to prevent blocking subversion checkout/export operation
+    due to password prompt triggered by an external definition whose target URL
+    starts with 'svn+ssh://<user>@'. The requested password is automatically set
+    to 'anonymous' in that case."""
+    with tempfile.NamedTemporaryFile(mode="w", delete=False) as askpass_script:
+        askpass_script.write("#!/bin/sh\necho anonymous")
+        askpass_script.flush()
+        os.chmod(askpass_script.name, 0o700)
+        os.environ["SSH_ASKPASS_REQUIRE"] = "force"
+        os.environ["SSH_ASKPASS"] = askpass_script.name
+        yield askpass_script
 
 
 class SvnRepo:
@@ -312,16 +328,17 @@ class SvnRepo:
             f"@{peg_rev}" if peg_rev else "",
             to,
         )
-        return self.client.export(
-            quote_svn_url(url),
-            to=to,
-            rev=rev,
-            peg_rev=peg_rev,
-            recurse=recurse,
-            ignore_externals=ignore_externals,
-            overwrite=overwrite,
-            ignore_keywords=ignore_keywords,
-        )
+        with ssh_askpass_anonymous():
+            return self.client.export(
+                quote_svn_url(url),
+                to=to,
+                rev=rev,
+                peg_rev=peg_rev,
+                recurse=recurse,
+                ignore_externals=ignore_externals,
+                overwrite=overwrite,
+                ignore_keywords=ignore_keywords,
+            )
 
     @svn_retry()
     def checkout(
@@ -361,15 +378,16 @@ class SvnRepo:
             f"@{peg_rev}" if peg_rev else "",
             path,
         )
-        return self.client.checkout(
-            quote_svn_url(url),
-            path=path,
-            rev=rev,
-            peg_rev=peg_rev,
-            recurse=recurse,
-            ignore_externals=ignore_externals,
-            allow_unver_obstructions=allow_unver_obstructions,
-        )
+        with ssh_askpass_anonymous():
+            return self.client.checkout(
+                quote_svn_url(url),
+                path=path,
+                rev=rev,
+                peg_rev=peg_rev,
+                recurse=recurse,
+                ignore_externals=ignore_externals,
+                allow_unver_obstructions=allow_unver_obstructions,
+            )
 
     @svn_retry()
     def propget(

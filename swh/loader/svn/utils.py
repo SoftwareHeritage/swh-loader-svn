@@ -387,8 +387,9 @@ def is_recursive_external(
     external_url = urlunparse(
         parsed_external_url._replace(scheme=parsed_origin_url.scheme)
     )
-    return svn_urljoin(origin_url, quote(dir_path), quote(external_path)).startswith(
-        external_url
+    url = svn_urljoin(origin_url, quote(dir_path), quote(external_path))
+    return url.rstrip("/") != external_url.rstrip("/") and url.startswith(
+        external_url.rstrip("/") + "/"
     )
 
 

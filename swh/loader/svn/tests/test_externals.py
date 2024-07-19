@@ -1163,6 +1163,50 @@ def test_loader_with_recursive_external(
     assert not loader.svnrepo.has_recursive_externals
 
 
+def test_loader_with_not_recursive_external(
+    svn_loader_cls, swh_storage, repo_url, tmp_path
+):
+    add_commit(
+        repo_url,
+        "Add trunk/src dir and a file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/src/bar.sh",
+                data=b"#!/bin/bash\necho bar",
+            )
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Set externals src on trunk/ dir targeting same directory",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={"svn:externals": (f"{repo_url}/trunk/src src")},
+            ),
+        ],
+    )
+
+    loader = svn_loader_cls(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+    )
+    check_snapshot(loader.snapshot, loader.storage)
+    assert not loader.svnrepo.has_recursive_externals
+
+
 def test_loader_externals_with_same_target(
     svn_loader_cls, swh_storage, repo_url, external_repo_url, tmp_path
 ):

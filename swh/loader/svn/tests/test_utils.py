@@ -444,12 +444,12 @@ parse_external_test_params = [
     ),
     # subversion >= 1.6
     (
-        'http://svn.thirdparty.com/repos/My%20Project "My Project"',
+        'http://example.com/svn/repos/My%20Project "My Project"',
         "trunk/externals",
         "http://svn.example.org/repos/test",
         (
             "My Project",
-            "http://svn.thirdparty.com/repos/My Project",
+            "http://example.com/svn/repos/My Project",
             None,
             None,
             False,
@@ -457,12 +457,12 @@ parse_external_test_params = [
         ),
     ),
     (
-        "http://svn.thirdparty.com/repos/My%20Project 'My Project'",
+        "http://example.com/svn/repos/My%20Project 'My Project'",
         "trunk/externals",
         "http://svn.example.org/repos/test",
         (
             "My Project",
-            "http://svn.thirdparty.com/repos/My Project",
+            "http://example.com/svn/repos/My Project",
             None,
             None,
             False,
@@ -470,12 +470,12 @@ parse_external_test_params = [
         ),
     ),
     (
-        'http://svn.thirdparty.com/repos/My%20%20%20Project "My   Project"',
+        'http://example.com/svn/repos/My%20%20%20Project "My   Project"',
         "trunk/externals",
         "http://svn.example.org/repos/test",
         (
             "My   Project",
-            "http://svn.thirdparty.com/repos/My   Project",
+            "http://example.com/svn/repos/My   Project",
             None,
             None,
             False,
@@ -483,12 +483,12 @@ parse_external_test_params = [
         ),
     ),
     (
-        'http://svn.thirdparty.com/repos/%22Quotes%20Too%22 \\"Quotes\\ Too\\"',
+        'http://example.com/svn/repos/%22Quotes%20Too%22 \\"Quotes\\ Too\\"',
         "trunk/externals",
         "http://svn.example.org/repos/test",
         (
             '"Quotes Too"',
-            'http://svn.thirdparty.com/repos/"Quotes Too"',
+            'http://example.com/svn/repos/"Quotes Too"',
             None,
             None,
             False,
@@ -496,12 +496,12 @@ parse_external_test_params = [
         ),
     ),
     (
-        'http://svn.thirdparty.com/repos/%22Quotes%20%20%20Too%22 \\"Quotes\\ \\ \\ Too\\"',  # noqa
+        'http://example.com/svn/repos/%22Quotes%20%20%20Too%22 \\"Quotes\\ \\ \\ Too\\"',  # noqa
         "trunk/externals",
         "http://svn.example.org/repos/test",
         (
             '"Quotes   Too"',
-            'http://svn.thirdparty.com/repos/"Quotes   Too"',
+            'http://example.com/svn/repos/"Quotes   Too"',
             None,
             None,
             False,
@@ -510,12 +510,12 @@ parse_external_test_params = [
     ),
     # edge cases
     (
-        '-r1 http://svn.thirdparty.com/repos/test "trunk/PluginFramework"',
+        '-r1 http://example.com/svn/repos/test "trunk/PluginFramework"',
         "trunk/externals",
         "http://svn.example.org/repos/test",
         (
             "trunk/PluginFramework",
-            "http://svn.thirdparty.com/repos/test",
+            "http://example.com/svn/repos/test",
             1,
             None,
             False,
@@ -523,12 +523,12 @@ parse_external_test_params = [
         ),
     ),
     (
-        "external -r 9 http://svn.thirdparty.com/repos/test",
+        "external -r 9 http://example.com/svn/repos/test",
         "tags",
         "http://svn.example.org/repos/test",
         (
             "external",
-            "http://svn.thirdparty.com/repos/test",
+            "http://example.com/svn/repos/test",
             9,
             None,
             False,
@@ -536,12 +536,12 @@ parse_external_test_params = [
         ),
     ),
     (
-        "./external http://svn.thirdparty.com/repos/test",
+        "./external http://example.com/svn/repos/test",
         "tags",
         "http://svn.example.org/repos/test",
         (
             "external",
-            "http://svn.thirdparty.com/repos/test",
+            "http://example.com/svn/repos/test",
             None,
             None,
             False,
@@ -549,12 +549,12 @@ parse_external_test_params = [
         ),
     ),
     (
-        ".external http://svn.thirdparty.com/repos/test",
+        ".external http://example.com/svn/repos/test",
         "tags",
         "http://svn.example.org/repos/test",
         (
             ".external",
-            "http://svn.thirdparty.com/repos/test",
+            "http://example.com/svn/repos/test",
             None,
             None,
             False,
@@ -562,12 +562,12 @@ parse_external_test_params = [
         ),
     ),
     (
-        "external/ http://svn.thirdparty.com/repos/test",
+        "external/ http://example.com/svn/repos/test",
         "tags",
         "http://svn.example.org/repos/test",
         (
             "external",
-            "http://svn.thirdparty.com/repos/test",
+            "http://example.com/svn/repos/test",
             None,
             None,
             False,
@@ -575,12 +575,12 @@ parse_external_test_params = [
         ),
     ),
     (
-        "external ttp://svn.thirdparty.com/repos/test",
+        "external ttp://example.com/svn/repos/test",
         "tags",
         "http://svn.example.org/repos/test",
         (
             "external",
-            "ttp://svn.thirdparty.com/repos/test",
+            "ttp://example.com/svn/repos/test",
             None,
             None,
             False,
@@ -588,12 +588,12 @@ parse_external_test_params = [
         ),
     ),
     (
-        "external http//svn.thirdparty.com/repos/test",
+        "external http//example.com/svn/repos/test",
         "tags",
         "http://svn.example.org/repos/test",
         (
             "external",
-            "http//svn.thirdparty.com/repos/test",
+            "http//example.com/svn/repos/test",
             None,
             None,
             False,
@@ -601,12 +601,12 @@ parse_external_test_params = [
         ),
     ),
     (
-        "C:\\code\\repo\\external http://svn.thirdparty.com/repos/test",
+        "C:\\code\\repo\\external http://example.com/svn/repos/test",
         "tags",
         "http://svn.example.org/repos/test",
         (
             "C:coderepoexternal",
-            "http://svn.thirdparty.com/repos/test",
+            "http://example.com/svn/repos/test",
             None,
             None,
             False,
@@ -614,12 +614,12 @@ parse_external_test_params = [
         ),
     ),
     (
-        "C:\\\\code\\\\repo\\\\external http://svn.thirdparty.com/repos/test",
+        "C:\\\\code\\\\repo\\\\external http://example.com/svn/repos/test",
         "tags",
         "http://svn.example.org/repos/test",
         (
             "C:\\code\\repo\\external",
-            "http://svn.thirdparty.com/repos/test",
+            "http://example.com/svn/repos/test",
             None,
             None,
             False,

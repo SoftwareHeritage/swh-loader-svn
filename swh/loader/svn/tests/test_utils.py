@@ -127,9 +127,10 @@ def test_init_svn_repo_from_truncated_dump(datadir, tmp_path):
         run(svnrdump_cmd, stdout=dump)
 
     # create a truncated dump file that will generate a "svnadmin load" error
-    with open(dump_path, "rb") as dump, open(
-        truncated_dump_path, "wb"
-    ) as truncated_dump:
+    with (
+        open(dump_path, "rb") as dump,
+        open(truncated_dump_path, "wb") as truncated_dump,
+    ):
         dump_lines = dump.readlines()
         assert len(dump_lines) > 150
         truncated_dump_content = b"".join(dump_lines[:150])

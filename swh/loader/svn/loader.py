@@ -362,9 +362,10 @@ Local repository not cleaned up for investigation: %s""",
                                     ignore_keywords=True,
                                     overwrite=True,
                                 )
-                                with open(export_path, "rb") as exported_file, open(
-                                    dir[path].data["path"], "rb"
-                                ) as checkout_file:
+                                with (
+                                    open(export_path, "rb") as exported_file,
+                                    open(dir[path].data["path"], "rb") as checkout_file,
+                                ):
                                     diff_lines = difflib.diff_bytes(
                                         difflib.unified_diff,
                                         exported_file.read().split(b"\n"),

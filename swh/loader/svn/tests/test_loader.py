@@ -112,7 +112,7 @@ def test_loader_svn_failures(svn_loader_cls, swh_storage, tmp_path, exception, m
     existing_repo_url = "existing-repo-url"
     loader = svn_loader_cls(swh_storage, existing_repo_url, temp_directory=tmp_path)
 
-    assert loader.load() == {"status": "failed"}
+    assert loader.load()["status"] == "failed"
 
     assert_last_visit_matches(
         swh_storage,
@@ -1320,7 +1320,7 @@ def test_loader_first_revision_is_not_number_one(
     loader = svn_loader_cls(swh_storage, repo_url, temp_directory=tmp_path)
 
     # post loading will detect an issue and make a partial visit with a snapshot
-    assert loader.load() == {"status": "failed"}
+    assert loader.load()["status"] == "failed"
 
     assert_last_visit_matches(
         loader.storage,
@@ -1439,7 +1439,7 @@ def test_loader_last_revision_divergence(
 
     loader = SvnLoaderRevisionDivergence(swh_storage, repo_url, temp_directory=tmp_path)
 
-    assert loader.load() == {"status": "failed"}
+    assert loader.load()["status"] == "failed"
 
     assert_last_visit_matches(
         loader.storage,

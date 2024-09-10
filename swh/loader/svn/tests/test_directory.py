@@ -207,7 +207,7 @@ def test_loader_svn_directory_hash_mismatch(swh_storage, datadir, tmp_path):
     actual_result = loader.load()
 
     # Ingestion fails because the checks failed
-    assert actual_result == {"status": "failed"}
+    assert actual_result["status"] == "failed"
     assert get_stats(swh_storage) == {
         "content": 0,
         "directory": 0,

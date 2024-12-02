@@ -47,7 +47,7 @@ def ssh_askpass_anonymous():
     due to password prompt triggered by an external definition whose target URL
     starts with 'svn+ssh://<user>@'. The requested password is automatically set
     to 'anonymous' in that case."""
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as askpass_script:
+    with tempfile.NamedTemporaryFile(mode="w") as askpass_script:
         askpass_script.write("#!/bin/sh\necho anonymous")
         askpass_script.flush()
         os.chmod(askpass_script.name, 0o700)

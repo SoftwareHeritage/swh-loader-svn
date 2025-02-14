@@ -1,3 +1,4 @@
+celery-types
 pytest >= 8.1
 pytest-mock
 pytest-postgresql

@@ -3,9 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-"""Remote Access client to svn server.
-
-"""
+"""Remote Access client to svn server."""
 
 from __future__ import annotations
 

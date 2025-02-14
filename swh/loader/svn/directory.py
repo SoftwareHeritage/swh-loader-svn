@@ -3,9 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-"""Loader in charge of injecting tree at a specific revision.
-
-"""
+"""Loader in charge of injecting tree at a specific revision."""
 
 from datetime import datetime
 import os

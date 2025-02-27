@@ -24,6 +24,9 @@ from subvertpy.ra import (
     Auth,
     RemoteAccess,
     get_simple_prompt_provider,
+    get_ssl_client_cert_file_provider,
+    get_ssl_client_cert_pw_file_provider,
+    get_ssl_server_trust_file_provider,
     get_username_provider,
 )
 
@@ -120,6 +123,12 @@ class SvnRepo:
                     remote_url = self.origin_url
 
         self.remote_url = remote_url.rstrip("/")
+
+        auth_providers += [
+            get_ssl_client_cert_file_provider(),
+            get_ssl_client_cert_pw_file_provider(),
+            get_ssl_server_trust_file_provider(),
+        ]
 
         self.auth = Auth(auth_providers)
         # one client for update operation

@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2023  The Software Heritage developers
+# Copyright (C) 2016-2025  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -414,14 +414,18 @@ def get_head_revision_at_date(svn_url: str, date: datetime) -> int:
     """
     from swh.loader.svn.svn_repo import get_svn_repo
 
-    return get_svn_repo(svn_url).get_head_revision_at_date(date)
+    repo = get_svn_repo(svn_url)
+    assert repo is not None
+    return repo.get_head_revision_at_date(date)
 
 
 @lru_cache()
 def _get_repo_root_url(svn_url: str) -> str:
     from swh.loader.svn.svn_repo import get_svn_repo
 
-    return get_svn_repo(svn_url).repos_root_url
+    repo = get_svn_repo(svn_url)
+    assert repo is not None
+    return repo.repos_root_url
 
 
 def get_repo_root_url(svn_url):

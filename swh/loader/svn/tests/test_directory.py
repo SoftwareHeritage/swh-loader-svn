@@ -1,9 +1,10 @@
-# Copyright (C) 2023-2024  The Software Heritage developers
+# Copyright (C) 2023-2025  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -21,10 +22,11 @@ from swh.loader.tests import (
 def compute_nar_hash_for_rev(repo_url: str, rev: int, hash_name: str = "sha256") -> str:
     """Compute the Nar hashes of the svn tree at the revision 'rev'."""
     svn_repo = get_svn_repo(repo_url)
+    assert svn_repo is not None
     _, export_dir = svn_repo.export_temporary(rev)
 
     nar = Nar(hash_names=[hash_name])
-    nar.serialize(export_dir.decode())
+    nar.serialize(Path(export_dir.decode()))
     return nar.hexdigest()[hash_name]
 
 

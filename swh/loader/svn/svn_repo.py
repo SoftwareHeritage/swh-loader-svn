@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2024  The Software Heritage developers
+# Copyright (C) 2015-2025  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -669,7 +669,7 @@ class SvnRepo:
         )
 
 
-def get_svn_repo(*args, **kwargs):
+def get_svn_repo(*args, **kwargs) -> Optional[SvnRepo]:
     """Instantiate an SvnRepo class and trap SubversionException if any raises.
     In case of connection error to the repository, its read access using anonymous
     credentials is also attempted.
@@ -710,3 +710,4 @@ def get_svn_repo(*args, **kwargs):
                 continue
             else:
                 raise
+    return None

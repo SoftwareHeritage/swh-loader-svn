@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2023  The Software Heritage developers
+# Copyright (C) 2015-2025  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -16,11 +16,14 @@ import shutil
 from subprocess import PIPE, Popen
 import tempfile
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
+from urllib.parse import urlparse, urlunparse
+
+from subvertpy import SubversionException
 
 from swh.loader.core.loader import BaseLoader
 from swh.loader.core.utils import clean_dangling_folders
 from swh.loader.exception import NotFound
-from swh.loader.svn.svn_repo import get_svn_repo
+from swh.loader.svn.svn_repo import SvnRepo, get_svn_repo
 from swh.model import from_disk, hashutil
 from swh.model.model import (
     Content,
@@ -116,6 +119,41 @@ class SvnLoader(BaseLoader):
         # state from previous visit
         self.latest_snapshot = None
         self.latest_revision: Optional[Revision] = None
+
+    def svn_repo(
+        self, remote_url: str, origin_url: str, temp_dir: str
+    ) -> Optional[SvnRepo]:
+        parsed_remote_url = urlparse(remote_url)
+        if parsed_remote_url.scheme.startswith("http"):
+            # if remote svn URL has http(s) scheme, we want to check if the
+            # communication with the repository can be done with the svn protocol
+            # as it is much faster
+            svn_urls = [
+                urlunparse(parsed_remote_url._replace(scheme="svn")),
+                remote_url,
+            ]
+        else:
+            svn_urls = [remote_url]
+
+        last_exc: Optional[Exception] = None
+        svnrepo = None
+        for svn_url in svn_urls:
+            try:
+                svnrepo = get_svn_repo(
+                    svn_url,
+                    origin_url,
+                    temp_dir,
+                    self.max_content_size,
+                    debug=self.debug,
+                )
+                break
+            except (NotFound, SubversionException) as exc:
+                # Keep trying until the last URL in the list
+                last_exc = exc
+        else:
+            if last_exc:
+                raise last_exc
+        return svnrepo
 
     def pre_cleanup(self):
         """Cleanup potential dangling files from prior runs (e.g. OOM killed
@@ -459,12 +497,10 @@ Local repository not cleaned up for investigation: %s""",
 
         local_dirname = self._create_tmp_dir(self.temp_directory)
 
-        self.svnrepo = get_svn_repo(
+        self.svnrepo = self.svn_repo(
             self.svn_url,
             self.origin.url,
             local_dirname,
-            self.max_content_size,
-            debug=self.debug,
         )
 
         try:
@@ -834,13 +870,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         # subversion origin and get the number of the last one
         last_loaded_svn_rev = self.get_last_loaded_svn_rev(self.origin.url)
 
-        self.svnrepo = get_svn_repo(
-            self.origin.url,
-            self.origin.url,
-            self.temp_dir,
-            self.max_content_size,
-            debug=self.debug,
-        )
+        self.svnrepo = self.svn_repo(self.origin.url, self.origin.url, self.temp_dir)
 
         # Ensure to use remote URL retrieved by SvnRepo as origin URL might redirect
         # and svnrdump does not handle URL redirection

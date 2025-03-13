@@ -759,7 +759,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         return svn_revision
 
     def dump_svn_revisions(
-        self, svn_url: str, last_loaded_svn_rev: int = -1
+        self, svn_url: str, max_rev: int = -1, last_loaded_svn_rev: int = -1
     ) -> Tuple[str, int]:
         """Generate a compressed subversion dump file using the svnrdump tool and gzip.
         If the svnrdump command failed somehow, the produced dump file is analyzed to
@@ -782,6 +782,8 @@ class SvnLoaderFromRemoteDump(SvnLoader):
                 "--password",
                 self.svnrepo.password,
             ]
+        if max_rev > 0:
+            svnrdump_cmd.append(f"-r0:{max_rev}")
 
         # Launch the svnrdump command while capturing stderr as
         # successfully dumped revision numbers are printed to it
@@ -876,6 +878,26 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         # and svnrdump does not handle URL redirection
         self.svn_url = self.svnrepo.remote_url
 
+        max_rev = -1
+        if self.svnrepo.root_directory:
+            # When loading a sub-path of a repository from a dump file it has been
+            # observed it is less error-prone to dump the whole repository as some
+            # partial dumps fail to be loaded by svnadmin or svnrdump can end up
+            # with error
+            try:
+                self.svnrepo.info(self.svnrepo.repos_root_url)
+            except SubversionException:
+                # Repository root URL cannot be accessed by a svn client, try to
+                # load from a partial dump then
+                pass
+            else:
+                # A dump file for the whole repository can be produced, in that case
+                # we stop to dump revisions once the last one modifying the repository
+                # sub-path was dumped (revisions not modifying sub-path are then filtered
+                # out during the loading process).
+                max_rev = self.svnrepo.info(self.svn_url).last_changed_revision
+                self.svn_url = self.svnrepo.repos_root_url
+
         # Then for stale repository, check if the last loaded revision in the archive
         # is different from the last revision on the remote subversion server.
         # Skip the dump of all revisions and the loading process if they are identical
@@ -895,7 +917,9 @@ class SvnLoaderFromRemoteDump(SvnLoader):
 
         # Then try to generate a dump file containing relevant svn revisions
         # to load, an exception will be thrown if something wrong happened
-        dump_path, max_rev = self.dump_svn_revisions(self.svn_url, last_loaded_svn_rev)
+        dump_path, max_rev = self.dump_svn_revisions(
+            self.svn_url, max_rev, last_loaded_svn_rev
+        )
 
         # Finally, mount the dump and load the repository
         self.log.debug('Mounting dump file with "svnadmin load".')

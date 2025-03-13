@@ -2000,7 +2000,7 @@ def test_loader_with_subprojects(
         assert len(root_dir) == 1 and root_dir[0]["type"] == "file"
 
         if svn_loader_cls == SvnLoaderFromRemoteDump:
-            dump_revisions.assert_called_once_with(origin_url.rstrip("/"), -1)
+            dump_revisions.assert_called_once_with(repo_url, i, -1)
 
         if svn_loader_cls == SvnLoaderFromDumpArchive:
             loader_params["archive_path"] = _dump_project(tmp_path, origin_url)

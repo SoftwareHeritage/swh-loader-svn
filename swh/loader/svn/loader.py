@@ -7,12 +7,14 @@
 swh-storage.
 
 """
+import atexit
 from datetime import datetime
 import difflib
 import os
 import pty
 import re
 import shutil
+import signal
 from subprocess import PIPE, Popen
 import tempfile
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
@@ -119,6 +121,18 @@ class SvnLoader(BaseLoader):
         # state from previous visit
         self.latest_snapshot = None
         self.latest_revision: Optional[Revision] = None
+
+        def kill_child_processes():
+            try:
+                os.killpg(os.getpid(), signal.SIGTERM)
+            except SystemExit:
+                # ignore SystemExit raised by swh.core.cli.clean_exit_on_signal
+                # when loader is executed through swh CLI
+                pass
+
+        # ensure to terminate svn* child processes that might have been
+        # spawned by the loader if its process gets killed
+        atexit.register(kill_child_processes)
 
     def svn_repo(
         self, remote_url: str, origin_url: str, temp_dir: str

@@ -208,8 +208,11 @@ class SvnRepo:
         message = revprops.get(properties.PROP_REVISION_LOG, DEFAULT_AUTHOR_MESSAGE)
 
         has_changes = changed_paths is not None and any(
-            changed_path.startswith(self.root_directory)
-            for changed_path in changed_paths.keys()
+            (
+                changed_path.startswith(self.root_directory)
+                or (copyfrom_rev != -1 and self.root_directory.startswith(changed_path))
+            )
+            for changed_path, (_, _, copyfrom_rev, _) in changed_paths.items()
         )
 
         return {
@@ -225,6 +228,9 @@ class SvnRepo:
         self,
         revision_start: int,
         revision_end: int,
+        paths: Optional[List[str]] = None,
+        limit: int = 0,
+        discover_changed_paths: bool = True,
     ) -> Iterator[Dict]:
         """Stream svn logs between revision_start and revision_end.
 
@@ -247,10 +253,11 @@ class SvnRepo:
 
         """
         for log_entry in self.remote_access().iter_log(
-            paths=None,
+            paths=paths,
             start=revision_start,
             end=revision_end,
-            discover_changed_paths=True,
+            discover_changed_paths=discover_changed_paths,
+            limit=limit,
         ):
             yield self._revision_data(log_entry)
 

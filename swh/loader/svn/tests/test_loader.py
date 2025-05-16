@@ -2554,3 +2554,39 @@ def test_loader_svnrepo_propget_on_url(svn_loader_cls, swh_storage, repo_url, tm
     }
 
     assert loader.svnrepo.propget("svn:eol-style", baz_file_url, peg_rev=1, rev=1) == {}
+
+
+def test_loader_subpath_from_copy(swh_storage, repo_url, tmp_path, svn_loader_cls):
+    add_commit(
+        repo_url,
+        "Create trunk/data/foo file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/foo",
+                data=b"foo",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Copy trunk/ folder from revision 1",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="tags/v1/",
+                copyfrom_path=repo_url + "/trunk/",
+                copyfrom_rev=1,
+            ),
+        ],
+    )
+
+    loader = svn_loader_cls(
+        swh_storage,
+        repo_url + "/tags/v1/data",
+        temp_directory=tmp_path,
+        debug=True,
+        check_revision=1,
+    )
+    assert loader.load() == {"status": "eventful"}

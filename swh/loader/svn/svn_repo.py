@@ -151,6 +151,7 @@ class SvnRepo:
             svnrepo=self,
             temp_dir=local_dirname,
             debug=debug,
+            max_content_size=max_content_length,
         )
         self.max_content_length = max_content_length
         self.has_relative_externals = False

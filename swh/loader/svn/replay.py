@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2024  The Software Heritage developers
+# Copyright (C) 2016-2025  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -80,6 +80,7 @@ class FileEditor:
         "state",
         "svnrepo",
         "editor",
+        "max_content_size",
     ]
 
     def __init__(
@@ -88,12 +89,14 @@ class FileEditor:
         rootpath: bytes,
         path: bytes,
         svnrepo: SvnRepo,
+        max_content_size: Optional[int],
     ):
         self.directory = directory
         self.path = path
         self.fullpath = os.path.join(rootpath, path)
         self.svnrepo = svnrepo
         self.editor: Editor = svnrepo.swhreplay.editor
+        self.max_content_size = max_content_size
 
     def change_prop(self, key: str, value: str) -> None:
         if self.editor.debug:
@@ -128,7 +131,9 @@ class FileEditor:
             )
 
         # And now compute file's checksums
-        self.directory[self.path] = from_disk.Content.from_file(path=self.fullpath)
+        self.directory[self.path] = from_disk.Content.from_file(
+            path=self.fullpath, max_content_length=self.max_content_size
+        )
 
 
 @dataclass
@@ -158,6 +163,7 @@ class DirEditor:
         "svnrepo",
         "editor",
         "externals",
+        "max_content_size",
     ]
 
     def __init__(
@@ -167,6 +173,7 @@ class DirEditor:
         path: bytes,
         dir_states: Dict[bytes, DirState],
         svnrepo: SvnRepo,
+        max_content_size: Optional[int],
     ):
         self.directory = directory
         self.rootpath = rootpath
@@ -179,6 +186,7 @@ class DirEditor:
         self.svnrepo = svnrepo
         self.editor = svnrepo.swhreplay.editor
         self.externals: Dict[str, List[ExternalDefinition]] = {}
+        self.max_content_size = max_content_size
 
     def remove_child(self, path: bytes) -> None:
         """Remove a path from the current objects.
@@ -214,6 +222,7 @@ class DirEditor:
             path=os.fsencode(path),
             dir_states=self.dir_states,
             svnrepo=self.svnrepo,
+            max_content_size=self.max_content_size,
         )
 
     def add_directory(
@@ -246,7 +255,9 @@ class DirEditor:
                 overwrite=True,
                 ignore_externals=True,
             )
-            self.directory[path_bytes] = from_disk.Directory.from_disk(path=fullpath)
+            self.directory[path_bytes] = from_disk.Directory.from_disk(
+                path=fullpath, max_content_length=self.max_content_size
+            )
 
             # get externals for the copied paths possibly set in copyfrom_rev
             externals = self.svnrepo.propget(
@@ -271,6 +282,7 @@ class DirEditor:
                         path,
                         self.dir_states,
                         svnrepo=self.svnrepo,
+                        max_content_size=self.max_content_size,
                     )
                     dir_editor.change_prop(
                         properties.PROP_EXTERNALS,
@@ -296,6 +308,7 @@ class DirEditor:
             path_bytes,
             self.dir_states,
             svnrepo=self.svnrepo,
+            max_content_size=self.max_content_size,
         )
 
     def open_file(self, path: str, *args) -> FileEditor:
@@ -310,6 +323,7 @@ class DirEditor:
             rootpath=self.rootpath,
             path=path_bytes,
             svnrepo=self.svnrepo,
+            max_content_size=self.max_content_size,
         )
 
     def add_file(
@@ -339,13 +353,16 @@ class DirEditor:
                 ignore_keywords=True,
                 overwrite=True,
             )
-            self.directory[path_bytes] = from_disk.Content.from_file(path=fullpath)
+            self.directory[path_bytes] = from_disk.Content.from_file(
+                path=fullpath, max_content_length=self.max_content_size
+            )
 
         return FileEditor(
             self.directory,
             self.rootpath,
             path_bytes,
             svnrepo=self.svnrepo,
+            max_content_size=self.max_content_size,
         )
 
     def change_prop(self, key: str, value: str) -> None:
@@ -623,7 +640,7 @@ class DirEditor:
                     os.remove(fullpath)
                 shutil.copy(os.fsdecode(temp_path), os.fsdecode(fullpath))
                 self.directory[dest_fullpath] = from_disk.Content.from_file(
-                    path=fullpath
+                    path=fullpath, max_content_length=self.max_content_size
                 )
             else:
                 self.add_directory(os.fsdecode(dest_fullpath))
@@ -636,7 +653,7 @@ class DirEditor:
                 )
 
                 self.directory[dest_fullpath] = from_disk.Directory.from_disk(
-                    path=fullpath
+                    path=fullpath, max_content_length=self.max_content_size
                 )
 
             # ensure to not count same external paths multiple times
@@ -736,9 +753,13 @@ class DirEditor:
                 remove_dest_path=False,
             )
             if os.path.isfile(dest_path) or os.path.islink(dest_path):
-                self.directory[fullpath] = from_disk.Content.from_file(path=dest_path)
+                self.directory[fullpath] = from_disk.Content.from_file(
+                    path=dest_path, max_content_length=self.max_content_size
+                )
             else:
-                self.directory[fullpath] = from_disk.Directory.from_disk(path=dest_path)
+                self.directory[fullpath] = from_disk.Directory.from_disk(
+                    path=dest_path, max_content_length=self.max_content_size
+                )
         except SubversionException:
             pass
 
@@ -758,6 +779,7 @@ class Editor:
         directory: from_disk.Directory,
         svnrepo: SvnRepo,
         temp_dir: str,
+        max_content_size: Optional[int],
         debug: bool = False,
     ):
         self.rootpath = rootpath
@@ -771,6 +793,7 @@ class Editor:
         self.svnrepo = svnrepo
         self.revnum = -1
         self.debug = debug
+        self.max_content_size = max_content_size
 
     def set_target_revision(self, revnum) -> None:
         self.revnum = revnum
@@ -788,6 +811,7 @@ class Editor:
             path=b"",
             dir_states=self.dir_states,
             svnrepo=self.svnrepo,
+            max_content_size=self.max_content_size,
         )
 
 
@@ -802,6 +826,7 @@ class Replay:
         temp_dir: str,
         directory: Optional[from_disk.Directory] = None,
         debug: bool = False,
+        max_content_size: Optional[int] = None,
     ):
         self.conn = conn
         self.rootpath = rootpath
@@ -814,6 +839,7 @@ class Replay:
             svnrepo=svnrepo,
             temp_dir=temp_dir,
             debug=debug,
+            max_content_size=max_content_size,
         )
 
     def replay(self, rev: int, low_water_mark: int) -> from_disk.Directory:

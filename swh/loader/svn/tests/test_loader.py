@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2024  The Software Heritage developers
+# Copyright (C) 2016-2025  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -2480,7 +2480,7 @@ def test_loader_check_tree_divergence(
     shutil.rmtree(os.path.join(export_path, "trunk/data/baz/"))
 
     # create directory model from the modified export
-    export_dir = Directory.from_disk(path=export_path.encode())
+    export_dir = Directory.from_disk(path=export_path.encode(), max_content_length=None)
 
     # ensure debug logs
     caplog.set_level(logging.DEBUG)
@@ -2590,3 +2590,38 @@ def test_loader_subpath_from_copy(swh_storage, repo_url, tmp_path, svn_loader_cl
         check_revision=1,
     )
     assert loader.load() == {"status": "eventful"}
+
+
+def test_loader_svn_max_content_size(svn_loader_cls, swh_storage, datadir, tmp_path):
+    """Ensure all contents are skipped for loading when setting max_content_size
+    to one byte."""
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = prepare_repository_from_archive(archive_path, archive_name, tmp_path)
+
+    loader = svn_loader_cls(
+        swh_storage, repo_url, temp_directory=tmp_path, max_content_size=1
+    )
+
+    assert loader.load() == {"status": "eventful"}
+
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="full",
+        type="svn",
+        snapshot=GOURMET_SNAPSHOT.id,
+    )
+
+    stats = get_stats(loader.storage)
+
+    assert stats == {
+        "content": 0,
+        "directory": 17,
+        "origin": 1,
+        "origin_visit": 1,
+        "release": 0,
+        "revision": 6,
+        "skipped_content": 19,
+        "snapshot": 1,
+    }

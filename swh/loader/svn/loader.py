@@ -210,7 +210,9 @@ Local repository not cleaned up for investigation: %s""",
         """
         assert self.svnrepo is not None
         local_dirname, local_url = self.svnrepo.export_temporary(revision)
-        root_dir = from_disk.Directory.from_disk(path=local_url)
+        root_dir = from_disk.Directory.from_disk(
+            path=local_url, max_content_length=self.max_content_size
+        )
         self.svnrepo.clean_fs(local_dirname)
         return root_dir
 

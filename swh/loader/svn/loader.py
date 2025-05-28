@@ -139,7 +139,7 @@ class SvnLoader(BaseLoader):
     ) -> Optional[SvnRepo]:
         parsed_remote_url = urlparse(remote_url)
         if (
-            parsed_remote_url.path == "svn.code.sf.net"
+            parsed_remote_url.netloc == "svn.code.sf.net"
             and parsed_remote_url.scheme.startswith("http")
         ):
             # if remote svn URL hosted on sourceforge has http(s) scheme, we want

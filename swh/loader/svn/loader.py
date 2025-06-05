@@ -125,7 +125,7 @@ class SvnLoader(BaseLoader):
         def kill_child_processes():
             try:
                 os.killpg(os.getpid(), signal.SIGTERM)
-            except SystemExit:
+            except (SystemExit, ProcessLookupError):
                 # ignore SystemExit raised by swh.core.cli.clean_exit_on_signal
                 # when loader is executed through swh CLI
                 pass

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from swh.loader.core.nar import Nar
+from swh.core.nar import Nar
 from swh.loader.svn.directory import SvnExportLoader
 from swh.loader.svn.svn_repo import get_svn_repo
 from swh.loader.tests import (

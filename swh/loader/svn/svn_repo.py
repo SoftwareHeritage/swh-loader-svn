@@ -686,7 +686,7 @@ def get_svn_repo(*args, **kwargs) -> Optional[SvnRepo]:
         NotFound: if the repository is not found
         SubversionException: if any other kind of subversion problems arise
     """
-    credentials = [(None, None), ("anonymous", ""), ("anonymous", "anonymous")]
+    credentials = [(None, None), ("anonymous", "anonymous"), ("anonymous", "")]
     for i, (username, password) in enumerate(credentials):
         try:
             if username is not None:
@@ -700,19 +700,25 @@ def get_svn_repo(*args, **kwargs) -> Optional[SvnRepo]:
                 kwargs["password"] = password
             return SvnRepo(*args, **kwargs)
         except SubversionException as e:
-            connection_error_message = "Unable to connect to a repository at URL"
+            connection_error_messages = [
+                "Unable to connect to a repository at URL",
+                "No provider registered for",
+            ]
             error_msgs = [
                 "Unknown URL type",
                 "is not a working copy",
             ]
             # no more credentials to test, raise NotFound
             if i == len(credentials) - 1:
-                error_msgs.append(connection_error_message)
+                raise NotFound(e)
             for msg in error_msgs:
                 if msg in e.args[0]:
                     raise NotFound(e)
 
-            if connection_error_message in e.args[0]:
+            if any(
+                connection_error_message in e.args[0]
+                for connection_error_message in connection_error_messages
+            ):
                 # still some credentials to test, continue attempting to connect
                 # to the repository
                 continue

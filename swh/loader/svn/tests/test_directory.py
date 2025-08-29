@@ -21,7 +21,7 @@ from swh.loader.tests import (
 
 def compute_nar_hash_for_rev(repo_url: str, rev: int, hash_name: str = "sha256") -> str:
     """Compute the Nar hashes of the svn tree at the revision 'rev'."""
-    svn_repo = get_svn_repo(repo_url)
+    svn_repo = get_svn_repo(repo_url, revision=rev)
     assert svn_repo is not None
     _, export_dir = svn_repo.export_temporary(rev)
 
@@ -255,3 +255,29 @@ def test_loader_svn_directory_not_found(swh_storage, datadir, tmp_path):
         "skipped_content": 0,
         "snapshot": 0,
     }
+
+
+def test_loader_svn_directory_path_not_in_head_revision(swh_storage, datadir, tmp_path):
+    """Check a directory path present in specific revision but not present in HEAD revision
+    can be exported."""
+    archive_name = "pkg-gourmet-add-remove-dir"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    repo_url = (
+        prepare_repository_from_archive(archive_path, "pkg-gourmet", tmp_path=tmp_path)
+        # path deleted in HEAD (revision 7)
+        + "/gourmet/trunk/debian"
+    )
+    svn_revision = 6
+    checksums = {"sha256": compute_nar_hash_for_rev(repo_url, svn_revision)}
+
+    loader = SvnExportLoader(
+        swh_storage,
+        repo_url,
+        ref=svn_revision,
+        checksum_layout="nar",
+        checksums=checksums,
+    )
+
+    actual_result = loader.load()
+
+    assert actual_result == {"status": "eventful"}

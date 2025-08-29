@@ -49,7 +49,7 @@ class SvnExportLoader(BaseDirectoryLoader):
         svn_url: Optional[str] = None,
         **kwargs,
     ):
-        self.svn_revision = kwargs.pop("ref")
+        self.svn_revision = int(kwargs.pop("ref"))
         self.svn_paths = svn_paths
         super().__init__(*args, **kwargs)
         self.svn_url = svn_url
@@ -58,7 +58,7 @@ class SvnExportLoader(BaseDirectoryLoader):
         self.svnrepo: Optional[SvnRepo] = None
 
     def prepare(self) -> None:
-        self.svnrepo = get_svn_repo(self.svn_url)
+        self.svnrepo = get_svn_repo(self.svn_url, revision=self.svn_revision)
         super().prepare()
 
     def cleanup(self) -> None:

@@ -78,6 +78,7 @@ class SvnRepo:
         debug: bool = False,
         username: str = "",
         password: str = "",
+        revision: Optional[int] = None,
     ):
         if origin_url is None:
             origin_url = remote_url
@@ -136,7 +137,9 @@ class SvnRepo:
 
         if not self.remote_url.startswith("file://"):
             # use redirection URL if any for remote operations
-            self.remote_url = self.info(self.remote_url).url
+            self.remote_url = self.info(
+                self.remote_url, revision=revision, peg_revision=revision
+            ).url
 
         self.remote_access_url = self.remote_url
 
@@ -160,7 +163,9 @@ class SvnRepo:
 
         # compute root directory path from the origin URL, required to
         # properly load the sub-tree of a repository mounted from a dump file
-        repos_root_url = self.info(self.origin_url).repos_root_url
+        repos_root_url = self.info(
+            self.origin_url, revision=revision, peg_revision=revision
+        ).repos_root_url
         origin_url_parsed = urlparse(self.origin_url)
         repos_root_url_parsed = urlparse(repos_root_url)
         if origin_url_parsed.scheme != repos_root_url_parsed.scheme:
@@ -170,7 +175,9 @@ class SvnRepo:
             )
         self.root_directory = self.origin_url.rstrip("/").replace(repos_root_url, "", 1)
         # get root repository URL from the remote URL
-        self.repos_root_url = self.info(self.remote_url).repos_root_url
+        self.repos_root_url = self.info(
+            self.remote_url, revision=revision, peg_revision=revision
+        ).repos_root_url
 
     def __del__(self):
         # ensure temporary directory is removed when created by constructor
@@ -527,6 +534,7 @@ class SvnRepo:
                 url,
                 to=local_url,
                 rev=revision,
+                peg_rev=revision,
                 ignore_keywords=True,
                 ignore_externals=self.has_recursive_externals,
             )

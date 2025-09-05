@@ -345,8 +345,8 @@ def is_recursive_external(
     assert external_url
     parsed_origin_url = urlparse(origin_url)
     parsed_external_url = urlparse(external_url)
-    external_url = urlunparse(
-        parsed_external_url._replace(scheme=parsed_origin_url.scheme)
+    external_url = quote_svn_url(
+        urlunparse(parsed_external_url._replace(scheme=parsed_origin_url.scheme))
     )
     url = svn_urljoin(origin_url, quote(dir_path), quote(external_path))
     return url.rstrip("/") != external_url.rstrip("/") and url.startswith(

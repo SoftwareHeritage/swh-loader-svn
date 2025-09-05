@@ -760,3 +760,26 @@ def test_get_head_revision_at_date(repo_url):
     utils.get_head_revision_at_date(
         repo_url, SECOND_COMMIT_DATE + (THIRD_COMMIT_DATE - SECOND_COMMIT_DATE) / 2
     ) == 2
+
+
+@pytest.mark.parametrize(
+    "origin_url,dir_path,external_path,external_url",
+    [
+        (
+            "https://svn.code.sf.net/p/aiadsocialnet/svn",
+            "trunk aiadsocialnet-svn/Viewer",
+            "trunk_aiadsocialnet-svn",
+            "https://svn.code.sf.net/p/aiadsocialnet/svn/trunk aiadsocialnet-svn",
+        ),
+        (
+            "https://svn.code.sf.net/p/aiadsocialnet/svn",
+            "aiadsocialnet-svn/Viewer",
+            "aiadsocialnet-svn",
+            "https://svn.code.sf.net/p/aiadsocialnet/svn/aiadsocialnet-svn",
+        ),
+    ],
+)
+def test_is_recursive_external(origin_url, dir_path, external_path, external_url):
+    assert utils.is_recursive_external(
+        origin_url, dir_path, external_path, external_url
+    )

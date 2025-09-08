@@ -206,6 +206,9 @@ Local repository not cleaned up for investigation: %s""",
         """
         assert self.svnrepo is not None
         local_dirname, local_url = self.svnrepo.export_temporary(revision)
+        # remove paths from corrupted externals to avoid directory hashes mismatch
+        for path in self.svnrepo.swhreplay.editor.corrupted_externals:
+            shutil.rmtree(os.path.join(local_url, path), ignore_errors=True)
         root_dir = from_disk.Directory.from_disk(
             path=local_url, max_content_length=self.max_content_size
         )

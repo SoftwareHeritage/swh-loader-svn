@@ -1,15 +1,20 @@
-# Copyright (C) 2022-2024  The Software Heritage developers
+# Copyright (C) 2022-2025  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
 from datetime import datetime, timedelta, timezone
+import os
 
 import pytest
 
 from swh.loader.svn.loader import SvnLoader, SvnLoaderFromRemoteDump
 from swh.loader.svn.utils import ExternalDefinition, svn_urljoin
-from swh.loader.tests import assert_last_visit_matches, check_snapshot
+from swh.loader.tests import (
+    assert_last_visit_matches,
+    check_snapshot,
+    prepare_repository_from_archive,
+)
 
 from .utils import CommitChange, CommitChangeType, add_commit, create_repo
 
@@ -2715,3 +2720,47 @@ def test_loader_ensure_dir_state_cleanup_after_external_removal(
         type="svn",
     )
     check_snapshot(loader.snapshot, loader.storage)
+
+
+@pytest.mark.parametrize("byte_idx_to_change", [1000, 2000, 3000])
+def test_loader_corrupted_external(
+    svn_loader_cls, swh_storage, repo_url, tmp_path, datadir, byte_idx_to_change
+):
+    archive_name = "pkg-gourmet"
+    archive_path = os.path.join(datadir, f"{archive_name}.tgz")
+    external_repo_url = prepare_repository_from_archive(
+        archive_path, archive_name, tmp_path
+    )
+    external_repo_path = external_repo_url.replace("file://", "")
+
+    # corrupt repository by changing a byte in file storing revision 5
+    # in svn database
+    rev_data_path = os.path.join(external_repo_path, "db/revs/0/5")
+    os.chmod(rev_data_path, 0o666)
+    with open(rev_data_path, "rb") as rev_data_file:
+        rev_data = bytearray(rev_data_file.read())
+    rev_data[byte_idx_to_change] = 0
+    with open(rev_data_path, "wb") as rev_data_file:
+        rev_data_file.write(bytes(rev_data))
+
+    add_commit(
+        repo_url,
+        "Add corrupted external in trunk",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/",
+                properties={"svn:externals": (f"{external_repo_url} gourmet\n")},
+            ),
+        ],
+    )
+
+    loader = svn_loader_cls(
+        swh_storage,
+        repo_url,
+        temp_directory=tmp_path,
+        check_revision=1,
+        debug=True,
+    )
+
+    assert loader.load() == {"status": "eventful"}

@@ -567,12 +567,7 @@ class DirEditor:
                 )
                 temp_path = os.path.join(temp_dir, dest_path)
                 os.makedirs(b"/".join(temp_path.split(b"/")[:-1]), exist_ok=True)
-                if (
-                    external.url,
-                    external.revision,
-                    external.peg_revision,
-                    external.legacy_format,
-                ) not in self.editor.dead_externals:
+                if external not in self.editor.dead_externals:
                     url = external.url.rstrip("/")
                     origin_url = self.svnrepo.origin_url.rstrip("/")
                     if (
@@ -594,17 +589,15 @@ class DirEditor:
                     )
                     self.editor.externals_cache[external] = temp_path
 
-            except SubversionException as se:
-                # external no longer available (404)
-                logger.debug(se)
-                self.editor.dead_externals.add(
-                    (
-                        external.url,
-                        external.revision,
-                        external.peg_revision,
-                        external.legacy_format,
-                    )
-                )
+            except (OSError, SubversionException) as exc:
+                logger.debug(exc)
+                if os.path.exists(temp_path):
+                    # external is corrupted and could not be fully exported
+                    self.editor.corrupted_externals[dest_fullpath] = external
+                    shutil.rmtree(temp_path)
+                else:
+                    # external no longer available (404)
+                    self.editor.dead_externals.add(external)
 
         else:
             temp_path = self.editor.externals_cache[external]
@@ -787,7 +780,8 @@ class Editor:
         self.dir_states: Dict[bytes, DirState] = defaultdict(DirState)
         self.external_paths: Set[bytes] = set()
         self.valid_externals: Dict[bytes, Tuple[str, bool]] = {}
-        self.dead_externals: Set[Tuple[str, Optional[int], Optional[int], bool]] = set()
+        self.dead_externals: Set[ExternalDefinition] = set()
+        self.corrupted_externals: Dict[bytes, ExternalDefinition] = {}
         self.externals_cache_dir = tempfile.mkdtemp(dir=temp_dir)
         self.externals_cache: Dict[ExternalDefinition, bytes] = {}
         self.svnrepo = svnrepo

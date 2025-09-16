@@ -110,7 +110,7 @@ class SvnExportLoader(BaseDirectoryLoader):
                 ),
                 branch_name: SnapshotBranch(
                     target_type=SnapshotTargetType.DIRECTORY,
-                    target=self.directory.hash,
+                    target=self.directory.id,
                 ),
             }
         )

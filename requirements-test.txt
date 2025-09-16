@@ -4,5 +4,5 @@ pytest-mock
 pytest-postgresql
 requests_mock
 swh.core[http] >= 4.5.0
-swh.loader.core[testing] >= 5.18.1
+swh.loader.core[testing] >= 5.24.0
 types-python-dateutil

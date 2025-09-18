@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from swh.core.nar import Nar
+from swh.core.nar import Nar, NarHashAlgo
 from swh.loader.svn.directory import SvnExportLoader
 from swh.loader.svn.svn_repo import get_svn_repo
 from swh.loader.tests import (
@@ -19,7 +19,9 @@ from swh.loader.tests import (
 )
 
 
-def compute_nar_hash_for_rev(repo_url: str, rev: int, hash_name: str = "sha256") -> str:
+def compute_nar_hash_for_rev(
+    repo_url: str, rev: int, hash_name: NarHashAlgo = "sha256"
+) -> str:
     """Compute the Nar hashes of the svn tree at the revision 'rev'."""
     svn_repo = get_svn_repo(repo_url, revision=rev)
     assert svn_repo is not None

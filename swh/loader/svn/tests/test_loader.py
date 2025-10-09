@@ -2021,7 +2021,7 @@ def test_loader_with_subprojects(
         assert len(root_dir) == 1 and root_dir[0]["type"] == "file"
 
         if svn_loader_cls == SvnLoaderFromRemoteDump:
-            dump_revisions.assert_called_once_with(repo_url, i, -1)
+            dump_revisions.assert_called_once_with(repo_url, 3, -1)
 
         if svn_loader_cls == SvnLoaderFromDump:
             loader_params["dump_path"] = _dump_project(tmp_path, origin_url)
@@ -2160,7 +2160,12 @@ def test_loader_svn_from_remote_dump_url_redirect(swh_storage, tmp_path, mocker)
     # mock remote subversion operations
     from swh.loader.svn.svn_repo import client
 
-    mocker.patch("swh.loader.svn.svn_repo.RemoteAccess")
+    svn_ra_mock = mocker.MagicMock()
+    svn_ra_mock.get_repos_root.return_value = repo_redirect_url
+    svn_ra_mock.get_latest_revnum.return_value = 0
+
+    mocker.patch("swh.loader.svn.svn_repo.RemoteAccess").return_value = svn_ra_mock
+
     init_svn_repo_from_dump = mocker.patch(
         "swh.loader.svn.loader.init_svn_repo_from_dump"
     )
@@ -2644,5 +2649,55 @@ def test_loader_svn_max_content_size(svn_loader_cls, swh_storage, datadir, tmp_p
         "release": 0,
         "revision": 6,
         "skipped_content": 19,
+        "snapshot": 1,
+    }
+
+
+def test_loader_svn_path_not_in_head(svn_loader_cls, swh_storage, repo_url, tmp_path):
+    """Loading a path in a subversion repository no longer available in HEAD revision
+    should work."""
+
+    add_commit(
+        repo_url,
+        "Create trunk/data/foo file",
+        [
+            CommitChange(
+                change_type=CommitChangeType.AddOrUpdate,
+                path="trunk/data/foo",
+                data=b"foo\n",
+            ),
+        ],
+    )
+
+    add_commit(
+        repo_url,
+        "Delete trunk/data directory",
+        [
+            CommitChange(
+                change_type=CommitChangeType.Delete,
+                path="trunk/data/",
+            ),
+        ],
+    )
+
+    loader = svn_loader_cls(
+        swh_storage,
+        repo_url + "/trunk/data",
+        temp_directory=tmp_path,
+        check_revision=1,
+    )
+
+    assert loader.load() == {"status": "eventful"}
+
+    stats = get_stats(loader.storage)
+
+    assert stats == {
+        "content": 1,
+        "directory": 3,
+        "origin": 1,
+        "origin_visit": 1,
+        "release": 0,
+        "revision": 1,
+        "skipped_content": 0,
         "snapshot": 1,
     }

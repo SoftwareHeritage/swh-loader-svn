@@ -941,25 +941,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
                 # we stop to dump revisions once the last one modifying the repository
                 # sub-path was dumped (revisions not modifying sub-path are then filtered
                 # out during the loading process).
-
-                path = self.svnrepo.remote_url.replace(
-                    self.svnrepo.repos_root_url + "/", ""
-                )
-                svn_repo = self.svn_repo(
-                    self.svnrepo.repos_root_url,
-                    self.svnrepo.repos_root_url,
-                    self.temp_dir,
-                )
-                path_last_log = list(
-                    svn_repo.logs(
-                        svn_repo.head_revision(),
-                        0,
-                        paths=[path],
-                        discover_changed_paths=False,
-                        limit=1,
-                    )
-                )
-                max_rev = path_last_log[0]["rev"]
+                max_rev = self.svnrepo.head_revision()
                 self.svn_url = self.svnrepo.repos_root_url
 
         # Then for stale repository, check if the last loaded revision in the archive

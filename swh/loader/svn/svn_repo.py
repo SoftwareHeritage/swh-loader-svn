@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from datetime import datetime
 import logging
 import os
+import re
 import shutil
 import tempfile
 from typing import Dict, Iterator, List, Optional, Tuple
@@ -137,9 +138,16 @@ class SvnRepo:
 
         if not self.remote_url.startswith("file://"):
             # use redirection URL if any for remote operations
-            self.remote_url = self.info(
-                self.remote_url, revision=revision, peg_revision=revision
-            ).url
+            try:
+                self.remote_url = self.info(
+                    self.remote_url, revision=revision, peg_revision=revision
+                ).url
+            except SubversionException as se:
+                match = re.match(r"^URL '(.+)' non-existent in revision.*$", se.args[0])
+                if match:
+                    self.remote_url = match.group(1)
+                else:
+                    raise
 
         self.remote_access_url = self.remote_url
 
@@ -163,9 +171,19 @@ class SvnRepo:
 
         # compute root directory path from the origin URL, required to
         # properly load the sub-tree of a repository mounted from a dump file
-        repos_root_url = self.info(
-            self.origin_url, revision=revision, peg_revision=revision
-        ).repos_root_url
+        if self.origin_url != self.remote_url:
+            try:
+                repos_root_url = self.info(
+                    self.origin_url, revision=revision, peg_revision=revision
+                ).repos_root_url
+            except SubversionException as se:
+                match = re.match(r"^URL '(.+)' non-existent in revision.*$", se.args[0])
+                if match:
+                    repos_root_url = self.remote_access(match.group(1)).get_repos_root()
+                else:
+                    raise
+        else:
+            repos_root_url = conn.get_repos_root()
         origin_url_parsed = urlparse(self.origin_url)
         repos_root_url_parsed = urlparse(repos_root_url)
         if origin_url_parsed.scheme != repos_root_url_parsed.scheme:
@@ -175,9 +193,23 @@ class SvnRepo:
             )
         self.root_directory = self.origin_url.rstrip("/").replace(repos_root_url, "", 1)
         # get root repository URL from the remote URL
-        self.repos_root_url = self.info(
-            self.remote_url, revision=revision, peg_revision=revision
-        ).repos_root_url
+        self.repos_root_url = conn.get_repos_root()
+
+        path = self.remote_url.replace(self.repos_root_url + "/", "")
+        if self.repos_root_url == self.remote_url:
+            path = ""
+
+        conn = self.remote_access(self.repos_root_url)
+        self.head_revision_num = conn.get_latest_revnum()
+        while (
+            conn.check_path(path, self.head_revision_num) == 0
+            and self.head_revision_num >= 0
+        ):
+            self.head_revision_num -= 1
+        if self.head_revision_num < 0:
+            raise ValueError(
+                f"Path {path} never existed in root repository {self.repos_root_url}"
+            )
 
     def __del__(self):
         # ensure temporary directory is removed when created by constructor
@@ -196,7 +228,7 @@ class SvnRepo:
 
     def head_revision(self) -> int:
         """Retrieve current head revision."""
-        return self.remote_access().get_latest_revnum()
+        return self.head_revision_num
 
     def initial_revision(self) -> int:
         """Retrieve the initial revision from which the remote url appeared."""
@@ -283,10 +315,10 @@ class SvnRepo:
         return next(self.logs(revision, revision), None)
 
     @svn_retry()
-    def remote_access(self) -> RemoteAccess:
+    def remote_access(self, remote_access_url: Optional[str] = None) -> RemoteAccess:
         """Simple wrapper around subvertpy.ra.RemoteAccess creation
         enabling to retry the operation if a network error occurs."""
-        return RemoteAccess(self.remote_access_url, auth=self.auth)
+        return RemoteAccess(remote_access_url or self.remote_access_url, auth=self.auth)
 
     @svn_retry()
     def info(

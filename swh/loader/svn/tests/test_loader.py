@@ -154,7 +154,7 @@ def test_loader_svnrdump_no_such_revision(swh_storage, tmp_path, datadir):
     os.mkdir(loading_path)
 
     # Prepare the dump as a local svn repository for test purposes
-    temp_dir, repo_path = init_svn_repo_from_dump(
+    temp_dir, repo_path, _ = init_svn_repo_from_dump(
         archive_dump, root_dir=tmp_path, gzip=True
     )
     repo_url = f"file://{repo_path}"
@@ -722,7 +722,7 @@ def test_loader_svn_cleanup_loader_from_dump_archive(swh_storage, datadir, tmp_p
     os.mkdir(loading_path)
 
     # Prepare the dump as a local svn repository for test purposes
-    temp_dir, repo_path = init_svn_repo_from_dump(
+    temp_dir, repo_path, _ = init_svn_repo_from_dump(
         archive_dump, root_dir=tmp_path, gzip=True
     )
     repo_url = f"file://{repo_path}"
@@ -1013,6 +1013,41 @@ def test_loader_svn_loader_from_dump(
             "skipped_content": 0,
             "snapshot": 1,
         }
+
+
+def test_loader_svn_loader_from_dump_checksum_mismatch(swh_storage, datadir, tmp_path):
+    """Check repository where dump cannot be fully imported can still be partially loaded."""
+    repo_url = "https://svn.example.org/project"
+    dump_path = os.path.join(datadir, "pkg-gourmet-checksum-mismatch.dump.gz")
+
+    loader = SvnLoaderFromDump(
+        swh_storage,
+        url=repo_url,
+        dump_path=dump_path,
+        temp_directory=tmp_path,
+        gzip_dump=True,
+    )
+
+    assert loader.load() == {"status": "eventful"}
+
+    assert_last_visit_matches(
+        loader.storage,
+        repo_url,
+        status="partial",
+        type="svn",
+        snapshot=hash_to_bytes("a2ab99fe3e5f1bbb0c73c7a7e1487b47eb5934e6"),
+    )
+
+    assert get_stats(loader.storage) == {
+        "content": 18,
+        "directory": 13,
+        "origin": 1,
+        "origin_visit": 1,
+        "release": 0,
+        "revision": 5,
+        "skipped_content": 0,
+        "snapshot": 1,
+    }
 
 
 def test_loader_eol_style_file_property_handling_edge_case(
@@ -2169,7 +2204,7 @@ def test_loader_svn_from_remote_dump_url_redirect(swh_storage, tmp_path, mocker)
     init_svn_repo_from_dump = mocker.patch(
         "swh.loader.svn.loader.init_svn_repo_from_dump"
     )
-    init_svn_repo_from_dump.return_value = ("", "")
+    init_svn_repo_from_dump.return_value = ("", "", False)
     mock_client = mocker.MagicMock()
     mocker.patch.object(client, "Client", mock_client)
 

@@ -117,6 +117,7 @@ class SvnLoader(BaseLoader):
         # state from previous visit
         self.latest_snapshot = None
         self.latest_revision: Optional[Revision] = None
+        self.partial_load = False
 
         def kill_child_processes():
             try:
@@ -701,6 +702,7 @@ class SvnLoaderFromDump(SvnLoader):
         self.gzip_dump = gzip_dump
         self.temp_dir = None
         self.repo_path = None
+        self.partial_load = False
 
     def prepare(self):
         cleanup_dump = False
@@ -714,7 +716,7 @@ class SvnLoaderFromDump(SvnLoader):
             self.dump_path = dump_path
             cleanup_dump = True
         self.log.info("Archive to mount and load %s", self.dump_path)
-        self.temp_dir, self.repo_path = init_svn_repo_from_dump(
+        self.temp_dir, self.repo_path, self.partial_load = init_svn_repo_from_dump(
             self.dump_path,
             prefix=TEMPORARY_DIR_PREFIX_PATTERN,
             suffix="-%s" % os.getpid(),
@@ -751,6 +753,12 @@ class SvnLoaderFromDump(SvnLoader):
             temp_dir,
         )
 
+    def visit_status(self):
+        if self.partial_load:
+            return "partial"
+        else:
+            return super().visit_status()
+
 
 class SvnLoaderFromRemoteDump(SvnLoader):
     """Create a subversion repository dump out of a remote svn repository (using the
@@ -783,7 +791,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
         )
         self.temp_dir = self._create_tmp_dir(self.temp_directory)
         self.repo_path = None
-        self.truncated_dump = False
+        self.partial_load = False
 
     def get_last_loaded_svn_rev(self, svn_url: str) -> int:
         """Check if the svn repository has already been visited and return the last
@@ -891,7 +899,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
                     last_loaded_svn_rev + 1,
                     last_dumped_rev,
                 )
-                self.truncated_dump = True
+                self.partial_load = True
                 return dump_path, last_dumped_rev
             elif last_dumped_rev != -1 and last_dumped_rev < last_loaded_svn_rev:
                 raise Exception(
@@ -969,7 +977,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
 
         # Finally, mount the dump and load the repository
         self.log.debug('Mounting dump file with "svnadmin load".')
-        _, self.repo_path = init_svn_repo_from_dump(
+        _, self.repo_path, self.partial_load = init_svn_repo_from_dump(
             dump_path,
             prefix=TEMPORARY_DIR_PREFIX_PATTERN,
             suffix="-%s" % os.getpid(),
@@ -986,7 +994,7 @@ class SvnLoaderFromRemoteDump(SvnLoader):
             shutil.rmtree(self.temp_dir)
 
     def visit_status(self):
-        if self.truncated_dump:
+        if self.partial_load:
             return "partial"
         else:
             return super().visit_status()

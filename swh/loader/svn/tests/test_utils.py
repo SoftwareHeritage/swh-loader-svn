@@ -41,12 +41,13 @@ def test_init_svn_repo_from_dump(datadir, tmp_path):
     dump_name = "penguinsdbtools2018.dump.gz"
     dump_path = os.path.join(datadir, dump_name)
 
-    tmp_repo, repo_path = utils.init_svn_repo_from_dump(
+    tmp_repo, repo_path, partial_load = utils.init_svn_repo_from_dump(
         dump_path, gzip=True, cleanup_dump=False, root_dir=tmp_path
     )
 
     assert os.path.exists(dump_path), "Dump path should still exists"
     assert os.path.exists(repo_path), "Repository should exists"
+    assert partial_load is False
 
 
 def test_init_svn_repo_from_dump_svnadmin_error(tmp_path):
@@ -72,7 +73,7 @@ def test_init_svn_repo_from_dump_and_cleanup(datadir, tmp_path):
     assert os.path.exists(dump_path)
     assert os.path.exists(dump_ori_path)
 
-    tmp_repo, repo_path = utils.init_svn_repo_from_dump(
+    tmp_repo, repo_path, _ = utils.init_svn_repo_from_dump(
         dump_path, gzip=True, root_dir=tmp_path
     )
 
@@ -99,7 +100,7 @@ def test_init_svn_repo_from_dump_and_cleanup_already_done(
     assert os.path.exists(dump_path)
     assert os.path.exists(dump_ori_path)
 
-    tmp_repo, repo_path = utils.init_svn_repo_from_dump(
+    tmp_repo, repo_path, _ = utils.init_svn_repo_from_dump(
         dump_path, gzip=True, root_dir=tmp_path
     )
 
@@ -141,13 +142,14 @@ def test_init_svn_repo_from_truncated_dump(datadir, tmp_path):
         max_rev = int(revs[-1]) - 1
 
     # prepare repository from truncated dump
-    _, repo_path = utils.init_svn_repo_from_dump(
+    _, repo_path, partial_load = utils.init_svn_repo_from_dump(
         truncated_dump_path, gzip=False, root_dir=tmp_path, max_rev=max_rev
     )
 
     # check expected number of revisions have been loaded
     svnadmin_info = run(["svnadmin", "info", repo_path], capture_output=True, text=True)
     assert f"Revisions: {max_rev}\n" in svnadmin_info.stdout
+    assert partial_load is True
 
 
 def test_init_svn_repo_from_gzip_dump(datadir, tmp_path):
@@ -155,7 +157,7 @@ def test_init_svn_repo_from_gzip_dump(datadir, tmp_path):
     dump_name = "penguinsdbtools2018.dump.gz"
     dump_path = os.path.join(datadir, dump_name)
 
-    tmp_repo, repo_path = utils.init_svn_repo_from_dump(
+    tmp_repo, repo_path, _ = utils.init_svn_repo_from_dump(
         dump_path,
         cleanup_dump=False,
         root_dir=tmp_path,
@@ -177,7 +179,7 @@ def test_init_svn_repo_from_gzip_dump_and_cleanup(datadir, tmp_path):
     assert os.path.exists(dump_path)
     assert os.path.exists(dump_ori_path)
 
-    tmp_repo, repo_path = utils.init_svn_repo_from_dump(
+    tmp_repo, repo_path, _ = utils.init_svn_repo_from_dump(
         dump_path,
         root_dir=tmp_path,
         gzip=True,

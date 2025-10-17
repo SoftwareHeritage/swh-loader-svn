@@ -72,7 +72,7 @@ def init_svn_repo_from_dump(
     gzip: bool = False,
     cleanup_dump: bool = True,
     max_rev: int = -1,
-) -> Tuple[str, str]:
+) -> Tuple[str, str, bool]:
     """Given a path to a svn dump, initialize an svn repository with the content of said
     dump.
 
@@ -93,6 +93,8 @@ def init_svn_repo_from_dump(
         A tuple:
         - temporary folder: containing the mounted repository
         - repo_path: path to the mounted repository inside the temporary folder
+        - partial_load: if :const:`True`, an error occurred when loading the dump
+            and only a subset of revisions is available in the repository
 
     """
     project_name = os.path.basename(os.path.dirname(dump_path))
@@ -137,13 +139,22 @@ def init_svn_repo_from_dump(
                         ["svnadmin", "info", repo_path], capture_output=True, text=True
                     )
                     if f"Revisions: {max_rev}\n" in svnadmin_info.stdout:
-                        return temp_dir, repo_path
+                        return temp_dir, repo_path, True
                 raise ValueError(
                     f"Failed to mount the svn dump for project {project_name}\n"
                     + svnadmin_load.stderr
                 )
-            return temp_dir, repo_path
+            return temp_dir, repo_path, False
     except Exception as e:
+        for svn_error in (
+            "E000002",  # Can't open file
+            "E160013",  # File not found
+            "E200014",  # Checksum mismatch
+        ):
+            # an error occurred when loading repository from dump file but a partial
+            # loading is still possible
+            if svn_error in str(e):
+                return temp_dir, repo_path, True
         shutil.rmtree(temp_dir)
         raise e
     finally:

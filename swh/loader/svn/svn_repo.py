@@ -144,8 +144,13 @@ class SvnRepo:
                 ).url
             except SubversionException as se:
                 match = re.match(r"^URL '(.+)' non-existent in revision.*$", se.args[0])
+                match2 = re.match(
+                    r"^Repository moved temporarily to '(.+)'.*$", se.args[0]
+                )
                 if match:
                     self.remote_url = match.group(1)
+                elif match2:
+                    self.remote_url = match2.group(1)
                 else:
                     raise
 
@@ -178,8 +183,15 @@ class SvnRepo:
                 ).repos_root_url
             except SubversionException as se:
                 match = re.match(r"^URL '(.+)' non-existent in revision.*$", se.args[0])
+                match2 = re.match(
+                    r"^Repository moved temporarily to '(.+)'.*$", se.args[0]
+                )
                 if match:
                     repos_root_url = self.remote_access(match.group(1)).get_repos_root()
+                elif match2:
+                    repos_root_url = self.remote_access(
+                        match2.group(1)
+                    ).get_repos_root()
                 else:
                     raise
         else:

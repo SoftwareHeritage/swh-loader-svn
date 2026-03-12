@@ -4,6 +4,6 @@
 click
 iso8601
 requests
-subvertpy >= 0.9.4
+subvertpy >= 0.11.1
 tenacity >= 8.4.2
 typing-extensions

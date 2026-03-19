@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2025  The Software Heritage developers
+# Copyright (C) 2016-2026  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -98,7 +98,7 @@ class FileEditor:
         self.editor: Editor = svnrepo.swhreplay.editor
         self.max_content_size = max_content_size
 
-    def change_prop(self, key: str, value: str) -> None:
+    def change_prop(self, key: str, value: Optional[Union[str, bytes]]) -> None:
         if self.editor.debug:
             logger.debug(
                 "Setting property %s to value %s on path %s", key, value, self.path
@@ -110,7 +110,7 @@ class FileEditor:
         # do not apply textdelta, file will be fully exported when closing the editor
         return lambda *args: None
 
-    def close(self) -> None:
+    def close(self, text_checksum: Optional[str] = None) -> None:
         """When done with a file added or modified in the current replayed revision,
         we export it to disk and update the from_disk model.
 
@@ -286,7 +286,7 @@ class DirEditor:
                     )
                     dir_editor.change_prop(
                         properties.PROP_EXTERNALS,
-                        os.fsdecode(externals[quote_svn_url(url)]),
+                        externals[quote_svn_url(url)],
                     )
                     dir_editor.close()
 
@@ -365,13 +365,15 @@ class DirEditor:
             max_content_size=self.max_content_size,
         )
 
-    def change_prop(self, key: str, value: str) -> None:
+    def change_prop(self, key: str, value: Optional[Union[str, bytes]]) -> None:
         """Change property callback on directory."""
         if key == properties.PROP_EXTERNALS:
+            if isinstance(value, str):
+                value = value.encode()
             logger.debug(
                 "Setting '%s' property with value '%s' on path %s",
                 key,
-                value,
+                value.decode() if value else None,
                 self.path,
             )
             self.externals = defaultdict(list)
@@ -379,13 +381,15 @@ class DirEditor:
                 try:
                     # externals are set on that directory path, parse and store them
                     # for later processing in the close method
-                    for external in value.split("\n"):
-                        external = external.strip(" \t\r")
+                    for external in value.split(b"\n"):
+                        external = external.strip(b" \t\r")
                         # skip empty line or comment
-                        if not external or external.startswith("#"):
+                        if not external or external.startswith(b"#"):
                             continue
                         external_def = parse_external_definition(
-                            external, os.fsdecode(self.path), self.svnrepo.origin_url
+                            external.decode(),
+                            os.fsdecode(self.path),
+                            self.svnrepo.origin_url,
                         )
                         self.externals[external_def.path].append(external_def)
                 except ValueError:

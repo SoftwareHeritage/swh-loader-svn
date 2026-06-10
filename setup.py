@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (C) 2015-2023  The Software Heritage developers
+# Copyright (C) 2015-2026  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -77,8 +77,8 @@ def svn_build_data():
     )
 
 
-(apr_includedir, apr_link_flags) = apr_build_data()
-(svn_includedirs, svn_libdirs, svn_link_flags) = svn_build_data()
+apr_includedir, apr_link_flags = apr_build_data()
+svn_includedirs, svn_libdirs, svn_link_flags = svn_build_data()
 
 
 class SvnExtension(Extension):

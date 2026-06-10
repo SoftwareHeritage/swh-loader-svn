@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2025  The Software Heritage developers
+# Copyright (C) 2016-2026  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -2254,9 +2254,7 @@ def test_loader_basic_authentication_required(
 
     # disable anonymous access and require authentication on test repo
     with open(os.path.join(repo_path, "conf", "svnserve.conf"), "w") as svnserve_conf:
-        svnserve_conf.write(
-            textwrap.dedent(
-                """
+        svnserve_conf.write(textwrap.dedent("""
                 [general]
 
                 # Authentication realm of the repository.
@@ -2268,9 +2266,7 @@ def test_loader_basic_authentication_required(
 
                 # Grant authenticated users read and write privileges
                 auth-access = write
-                """
-            )
-        )
+                """))
 
     # add a user with read/write access on test repo
     with open(os.path.join(repo_path, "conf", "passwd"), "w") as passwd:

@@ -1,4 +1,4 @@
-# Copyright (C) 2022-2024  The Software Heritage developers
+# Copyright (C) 2022-2026  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -379,5 +379,31 @@ def test_svn_commit_info_retry_failure(
 
     with pytest.raises(type(exception_to_retry)):
         svnrepo.commit_info(sample_repo_url)
+
+    assert_sleep_calls(mock_sleep, mocker, nb_failed_calls - 1)
+
+
+@pytest.mark.parametrize("exception_to_retry", RETRYABLE_EXCEPTIONS)
+def test_svn_crawl_repository_retry_failure(
+    mocker, tmp_path, sample_repo_url, exception_to_retry, mock_sleep
+):
+    svnrepo = SvnRepo(
+        sample_repo_url, sample_repo_url, tmp_path, max_content_length=100000
+    )
+
+    nb_failed_calls = SVN_RETRY_MAX_ATTEMPTS
+
+    crawl_repository = mocker.patch(
+        "swh.loader.svn.svn_repo.fast_crawler.crawl_repository"
+    )
+    if isinstance(exception_to_retry, SubversionException):
+        exception = RuntimeError(str(exception_to_retry.args[0]))
+    else:
+        exception = exception_to_retry
+
+    crawl_repository.side_effect = [exception] * nb_failed_calls
+
+    with pytest.raises(type(exception)):
+        svnrepo.crawl_repository(sample_repo_url)
 
     assert_sleep_calls(mock_sleep, mocker, nb_failed_calls - 1)

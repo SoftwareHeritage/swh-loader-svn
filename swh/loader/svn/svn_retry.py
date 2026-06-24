@@ -1,4 +1,4 @@
-# Copyright (C) 2022  The Software Heritage developers
+# Copyright (C) 2022-2026  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -20,17 +20,24 @@ SVN_RETRY_MAX_ATTEMPTS = 3
 
 
 def is_retryable_svn_exception(exception):
-    if isinstance(exception, SubversionException):
-        return exception.args[0].startswith(
-            (
-                "Connection timed out",
-                "Unable to connect to a repository at URL",
-                "Error running context: The server unexpectedly closed the connection",
-                "ra_serf: The server sent a truncated HTTP response body",
-                "Unexpected HTTP status 504 'Gateway Time-out'",
+    if isinstance(exception, (SubversionException, RuntimeError)):
+        return any(
+            message in exception.args[0]
+            for message in (
+                (
+                    "Connection timed out",
+                    "Unable to connect to a repository at URL",
+                    "Error running context: The server unexpectedly closed the connection",
+                    "ra_serf: The server sent a truncated HTTP response body",
+                    "Unexpected HTTP status 504 'Gateway Time-out'",
+                    "Can't read from connection: Connection timed out",
+                    "Software caused connection abort",
+                )
             )
         )
-    return isinstance(exception, (ConnectionResetError, TimeoutError))
+    return isinstance(
+        exception, (ConnectionAbortedError, ConnectionResetError, TimeoutError)
+    )
 
 
 def svn_retry():

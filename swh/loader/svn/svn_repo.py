@@ -9,6 +9,8 @@ commit.
 
 """
 
+from __future__ import annotations
+
 import bisect
 from contextlib import contextmanager
 from datetime import datetime
@@ -17,7 +19,7 @@ import os
 import re
 import shutil
 import tempfile
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Iterator, List, Optional, Tuple
 from urllib.parse import urlparse, urlunparse
 
 from subvertpy import SubversionException, client, properties, wc
@@ -38,6 +40,9 @@ from swh.model.model import Content, Directory, SkippedContent
 from . import converters, fast_crawler, replay
 from .svn_retry import svn_retry
 from .utils import is_recursive_external, parse_external_definition, quote_svn_url
+
+if TYPE_CHECKING:
+    from swh.loader.svn.fast_crawler import SvnPathInfo
 
 # When log message contains empty data
 DEFAULT_AUTHOR_MESSAGE = b""
@@ -519,9 +524,9 @@ class SvnRepo:
 
             # recursive propget operation is terribly slow over the network,
             # so we use a much faster approach relying on a C++ extension module
-            paths = fast_crawler.crawl_repository(
+            paths = self.crawl_repository(
                 self.remote_url,
-                revnum=revision,
+                revision=revision,
                 username=self.username,
                 password=self.password,
             )
@@ -715,6 +720,21 @@ class SvnRepo:
             list(range(1, self.head_revision() + 1)),
             date,
             key=lambda rev_id: self.commit_info(rev_id)["author_date"].to_datetime(),
+        )
+
+    @svn_retry()
+    def crawl_repository(
+        self,
+        remote_url: str,
+        revision: int = -1,
+        username: str = "",
+        password: str = "",
+    ) -> Dict[str, SvnPathInfo]:
+        return fast_crawler.crawl_repository(
+            remote_url,
+            revnum=revision,
+            username=username,
+            password=password,
         )
 
 

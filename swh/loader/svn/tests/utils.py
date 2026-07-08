@@ -1,4 +1,4 @@
-# Copyright (C) 2022-2023  The Software Heritage developers
+# Copyright (C) 2022-2026  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -7,11 +7,10 @@ from datetime import datetime
 from enum import Enum
 from io import BytesIO
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TypedDict
 
 from subvertpy import SubversionException, delta, repos
 from subvertpy.ra import Auth, RemoteAccess, get_username_provider
-from typing_extensions import TypedDict
 
 
 class CommitChangeType(Enum):

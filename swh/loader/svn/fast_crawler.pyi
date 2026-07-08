@@ -3,9 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from typing import Dict
-
-from typing_extensions import TypedDict
+from typing import Dict, TypedDict
 
 class SvnPathInfo(TypedDict):
     type: str

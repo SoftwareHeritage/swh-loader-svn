@@ -58,7 +58,7 @@ libraries = [
         "svn_delta-1",
         "svn_ra-1",
         "svn_subr-1",
-    ], binding = "cpython" },
+    ], binding = "cpython", py_limited_api = "cp311" },
 ]
 
 [tool.black]

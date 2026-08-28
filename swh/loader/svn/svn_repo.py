@@ -34,10 +34,11 @@ from subvertpy.ra import (
 )
 
 from swh.loader.exception import NotFound
+from swh.loader.svn import fast_crawler
 from swh.model.from_disk import Directory as DirectoryFromDisk
 from swh.model.model import Content, Directory, SkippedContent
 
-from . import converters, fast_crawler, replay
+from . import converters, replay
 from .svn_retry import svn_retry
 from .utils import is_recursive_external, parse_external_definition, quote_svn_url
 

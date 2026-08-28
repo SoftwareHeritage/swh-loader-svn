@@ -61,6 +61,17 @@ libraries = [
     ], binding = "cpython", py_limited_api = "cp311" },
 ]
 
+[tool.cibuildwheel]
+# binary wheels are compiled with abi3-py311 so no need to build wheels
+# for Python > 3.11
+build = "cp311-*manylinux*"
+# use subversion 1.14 for building wheel
+# as manylinux_2_28 packages outdated subversion 1.9
+manylinux-x86_64-image = "manylinux_2_34"
+build-verbosity = 1
+before-all = "dnf -y install subversion-devel"
+
+
 [tool.black]
 target-version = ['py311', 'py312', 'py313']
 
